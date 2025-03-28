@@ -1,0 +1,37 @@
+# Entorno virtual
+venv/
+*.env
+
+# Archivos de configuración de la IDE
+.vscode/
+.idea/
+
+# Archivos de Python compilados
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Archivos de logs
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.swp
+*.bak
+
+# Dependencias de pip
+pip-wheel-metadata/
+*.egg-info/
+
+# Archivos de exportación generados
+*.pdf
+*.csv
+*.xlsx
+
+# Archivos de configuración locales
+excel_printer_config.json
+

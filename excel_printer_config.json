@@ -1,0 +1,78 @@
+{
+    "fedex": {
+        "eliminar": [
+            "errors",
+            "senderAccountNumber",
+            "poNumber",
+            "senderLine1",
+            "senderPostcode",
+            "totalShipmentWeight",
+            "weightUnits",
+            "recipientPostcode",
+            "creationDate",
+            "recipientPhoneExtension",
+            "senderContactNumber",
+            "senderCity",
+            "length",
+            "senderEmail",
+            "senderLine2",
+            "recipientState",
+            "packageWeight",
+            "returnRmaNumber",
+            "invoiceNumber",
+            "paymentType",
+            "senderContactName",
+            "recipientContactNumber",
+            "departmentNumber",
+            "senderState",
+            "status",
+            "reference",
+            "recipientTin",
+            "estimatedShippingCosts",
+            "recipientEmail",
+            "senderCompany",
+            "recipientResidential",
+            "senderPhoneExtension",
+            "senderTin",
+            "height",
+            "returnReason",
+            "width",
+            "etdEnabled",
+            "quoteId",
+            "recipientLine2",
+            "recipientCountry",
+            "senderResidential",
+            "recipientLine1",
+            "pickupId",
+            "returnTrackingId",
+            "senderLine3",
+            "shipmentType",
+            "senderCountry"
+        ],
+        "sumar": [
+            "numberOfPackages"
+        ],
+        "mantener_formato": [
+            "masterTrackingNumber"
+        ]
+    },
+    "urbano": {
+        "eliminar": [],
+        "sumar": [],
+        "mantener_formato": [],
+        "start_row": 2
+    },
+    "listados": {
+        "eliminar": [
+            "Moneda",
+            "Fecha doc.",
+            "RUT",
+            "Vendedor",
+            "Glosa",
+            "Total",
+            "Tipo cambio"
+        ],
+        "sumar": [],
+        "mantener_formato": []
+    }
+}
