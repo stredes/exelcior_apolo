@@ -3,15 +3,17 @@ from pathlib import Path
 from typing import Optional
 from tkinter import messagebox
 
+
 def validate_file(file_path: str) -> bool:
     path = Path(file_path)
     if not path.exists():
         messagebox.showerror("Error", "El archivo no existe.")
         return False
-    if path.suffix.lower() not in ('.xlsx', '.xls'):
+    if path.suffix.lower() not in ('.xlsx', '.xls', '.csv'):
         messagebox.showerror("Error", "Formato de archivo no soportado.")
         return False
     return True
+
 
 def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
     path_obj = Path(file_path).resolve()
@@ -21,6 +23,7 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
     if not path_obj.exists():
         raise FileNotFoundError(f"El archivo no existe en la ruta: {file_path_str}")
 
+    # Selección de engine según extensión
     if file_extension in [".xlsx", ".xlsm", ".xltx", ".xltm"]:
         engine = "openpyxl"
     elif file_extension == ".xls":
@@ -34,7 +37,6 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
     else:
         raise ValueError(f"Formato de archivo no soportado: {file_extension}")
 
-    # 👇 Aquí se toma correctamente el valor de start_row del config
     start_row = config_columns.get(mode, {}).get("start_row", 0)
     skiprows = list(range(start_row)) if start_row > 0 else None
 
@@ -80,6 +82,32 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str) -> p
         df_transformed = pd.concat([df_transformed, total_row], ignore_index=True)
         return df_transformed
 
-    # --- Otros modos ---
-    cols_to_drop = config_columns.get(mode, {}).get("eliminar", set())
-    return df.drop(columns=list(cols_to_drop), errors="ignore").copy()
+    # --- Genérico para urbano, listados, etc. ---
+    config = config_columns.get(mode, {})
+    cols_to_drop = config.get("eliminar", [])
+    cols_to_sum = config.get("sumar", [])
+    cols_format = config.get("mantener_formato", [])
+
+    df_transformed = df.drop(columns=list(cols_to_drop), errors="ignore").copy()
+
+    # Mantener formato de columnas
+    for col in cols_format:
+        if col in df_transformed.columns:
+            df_transformed[col] = df_transformed[col].astype(str)
+
+    # Calcular sumas
+    resumen = {}
+    for col in cols_to_sum:
+        if col in df_transformed.columns:
+            df_transformed[col] = pd.to_numeric(df_transformed[col], errors='coerce')
+            resumen[col] = df_transformed[col].sum()
+
+    # Agregar fila resumen si corresponde
+    if resumen:
+        total_row_data = {col: '' for col in df_transformed.columns}
+        for col, total in resumen.items():
+            total_row_data[col] = total
+        total_row = pd.DataFrame([total_row_data])
+        df_transformed = pd.concat([df_transformed, total_row], ignore_index=True)
+
+    return df_transformed
