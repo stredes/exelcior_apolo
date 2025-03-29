@@ -63,7 +63,6 @@ class ExcelPrinterApp(tk.Tk):
         buttons = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
             ("Carga Automática 🚀", self._threaded_auto_load),
-            ("Autocarga 🧠", self._auto_load_latest_file),  # 🧠 nuevo botón
             ("Configuración ⚙️", self._open_config_menu),
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", self.view_logs),
