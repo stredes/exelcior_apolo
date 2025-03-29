@@ -1,96 +1,176 @@
-📄 ExcelPrinter v0.3.0
-¡Bienvenido a ExcelPrinter! 🖨️✨
-Una herramienta multiplataforma poderosa para transformar, visualizar, imprimir y exportar archivos Excel personalizados para tu flujo de trabajo diario.
+""# 📊 Exelcior Apolo – Transformador Inteligente de Excel
 
-🚀 Características Principales
-Funcionalidad	Descripción
-📊 Estadísticas Dinámicas	Muestra estadísticas instantáneas del archivo Excel: filas, columnas, bultos, clientes únicos y fechas envío.
-📁 Exportación Avanzada (CSV, PDF, XLSX)	Exporta el archivo transformado en múltiples formatos de manera sencilla.
-🎨 Editor Visual de Columnas	Elimina columnas no deseadas, renombra dinámicamente y guarda configuraciones.
-🔍 Búsqueda Avanzada	Busca registros específicos dentro de la vista previa (cliente, ciudad, tracking).
-🌙 Modo Oscuro / Claro Toggle	Alterna entre modo claro y oscuro para mayor comodidad visual.
-🖨️ Compatibilidad Multiplataforma de Impresión	Imprime en Windows (Win32) y Linux/macOS (LibreOffice + lp).
-🖥️ Gestión de Modo Urbano / FedEx / Listados	Transforma y limpia automáticamente los archivos según modo seleccionado.
-💾 Historial de Archivos Procesados	Guarda un registro de los últimos archivos procesados (nombre, fecha, modo usado).
-📧 Envío Directo por Email (SMTP)	Envía el Excel o PDF directamente desde la app.
-🔐 Gestión de Usuarios (Login Previo para Herramientas Avanzadas)	Sistema de login básico para proteger configuraciones y accesos.
-⏰ Programación de Impresión Automática (Opcional)	Permite programar impresión diaria/semanal (mediante cron o tareas programadas).
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/github/license/stredes/exelcior_apolo)](LICENSE)
+[![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow.svg)]()
+[![Repo](https://img.shields.io/badge/github-exelcior--apolo-000?logo=github)](https://github.com/stredes/exelcior_apolo)
 
-📥 Instalación
+Transformador de archivos Excel para operaciones logísticas, generación de reportes, filtrado automatizado y emisión directa en PDF o impresión. Optimizado para flujos de trabajo con FedEx, Urbano y Listados comerciales.
 
-1. Clonar el proyecto:
+> Aplicación de escritorio multiplataforma con GUI desarrollada en Python, usando Tkinter y funciones avanzadas de análisis de datos con pandas.
+
+---
+
+## 🚀 Características
+
+- 🔍 **Autodetección automática de archivos Excel** desde la carpeta `Descargas/` por tipo de operación
+- 📤 **Exportación instantánea a PDF** o impresión directa
+- 📁 **Historial persistente** de archivos procesados en base SQLite
+- ⚙️ **Configuración personalizada** de columnas a eliminar, sumar o mantener
+- 📄 **Vista previa interactiva** y validación de datos
+- 🧠 **Modos de operación inteligentes**: `FedEx`, `Urbano`, `Listados`
+- 🌗 Interfaz clara, ligera y moderna, con tema oscuro
+- 💻 Compatible con Linux y Windows
+
+---
+
+## 🛠️ Tecnologías
+
+- Python 3.12
+- Tkinter (GUI)
+- pandas / openpyxl
+- SQLite3
+- ReportLab y LibreOffice (para impresión PDF)
+- Git / GitHub
+
+---
+
+## 📦 Instalación
+
+### Clona el proyecto
+
+```bash
+git clone https://github.com/stredes/exelcior_apolo.git
+cd exelcior_apolo
+Activa entorno virtual
 bash
-Copiar código
-git clone https://github.com/stredes/conversorv.0.3.0.git
-cd conversorv.0.3.0
+Mostrar siempre los detalles
 
-2. Crear entorno virtual:
+Copiar
+python3 -m venv .venv
+source .venv/bin/activate   # En Windows: .venv\\Scripts\\activate
+Instala dependencias
 bash
-Copiar código
-python3 -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate     # Windows
+Mostrar siempre los detalles
 
-3. Instalar dependencias:
-bash
-Copiar código
+Copiar
 pip install -r requirements.txt
-
-
-⚙️ Uso Básico
+Ejecuta la app
 bash
-Copiar código
+Mostrar siempre los detalles
+
+Copiar
 python main_app.py
+📂 Modos y estructura esperada
+FedEx
+Archivos tipo Shipment_Report_YYYY-MM-DD.xlsx
 
-🏷️ Modos Disponibles
-Flag UI (checkbox)	Modo	Descripción
-🟢 Urbano	Urbano	Lee archivos desde fila 3. Ideal para listados urbanos.
-🟣 FedEx	FedEx	Limpia columnas, agrupa bultos, renombra y suma total de bultos al final según plantilla.
-🔵 Listados	Listados	Limpieza general para listados personalizados.
+Aplica reglas de eliminación y suma por numberOfPackages
 
-🔥 Comandos y Funcionalidades Clave:
-Comando / Botón en GUI	Descripción
-Seleccionar Excel 📂	Carga archivo Excel desde tu sistema.
-Configuración ⚙️	Permite seleccionar/eliminar columnas según modo actual.
-Exportar PDF 📄, Exportar CSV, Exportar XLSX	Exporta el archivo transformado en el formato elegido.
-Ver Logs 📋	Visualiza el historial y registros detallados de uso.
-Herramientas Avanzadas 🔥	Acceso a estadísticas, editor, búsqueda, envío email, configuraciones (requiere login previo).
-Imprimir	Envía el documento transformado directamente a la impresora configurada.
-Modo Oscuro / Claro 🌙	Alterna entre temas visuales para la GUI.
-Salir ❌	Cierra la aplicación.
+Urbano
+Archivos con exactamente 9 dígitos numéricos en su nombre (211823030.xlsx)
 
+Usa start_row: 2 y suma la columna PIEZAS
 
-✉️ Configuración SMTP para Envío de Emails
-Modifica tu archivo herramientas.py:
+Listados
+Archivos lista_doc_venta_YYYYMMDD_HHMMSS.xlsx
 
-python
-Copiar código
-msg['From'] = 'tuemail@dominio.com'
-with smtplib.SMTP('smtp.dominio.com', 587) as server:
-    server.login('tuemail@dominio.com', 'tupassword')
+Elimina campos contables como Glosa, Vendedor, RUT, etc.
 
+🧠 Uso de la App
+🖱️ Selecciona un modo (urbano, fedex, listados)
 
+📂 Carga manualmente un Excel o usa el botón Carga Automática 🚀
 
-📜 Requisitos
-Python 3.8+
-tkinter, pandas, openpyxl, reportlab, smtplib
-(Linux) LibreOffice + CUPS configurado
-(Windows) Win32com instalado
+👁️ Visualiza la transformación
 
-🌎 Multiplataforma
-✔️ Windows
-✔️ Linux
-✔️ macOS
+📄 Exporta o 🖨️ Imprime directamente
 
-📦 Empaquetado (Opcional)
-Para distribuir como ejecutable:
+🔧 Configuración por modo
+Editable desde GUI (⚙️ Configuración):
+
+json
+Mostrar siempre los detalles
+
+Copiar
+"fedex": {
+  "eliminar": ["senderEmail", "senderCity", "..."],
+  "sumar": ["numberOfPackages"],
+  "mantener_formato": ["masterTrackingNumber"]
+},
+"urbano": {
+  "eliminar": ["SERVICIO", "AGENCIA", "..."],
+  "sumar": ["PIEZAS"],
+  "start_row": 2
+}
+📁 Estructura del Proyecto
+bash
+Mostrar siempre los detalles
+
+Copiar
+app_excel/
+│
+├── printer/                 # Exportación e impresión
+├── db/                      # Base de datos y modelos
+├── utils/                   # Carga, logs y herramientas
+├── data/                    # BD local
+├── autoloader.py            # Autocarga de archivos recientes
+├── excel_processor.py       # Transformaciones de datos
+├── main_app.py              # App principal con GUI
+├── config_dialog.py         # Configurador visual de columnas
+├── requirements.txt
+└── README.md
+🧪 Debug y Logs
+Los errores y operaciones se registran en logs/logs_app.log
+
+Accesibles desde GUI (📋 Ver Logs)
+
+🤝 Contribuciones
+¿Quieres colaborar? ¡Sigue estos pasos!
 
 bash
-Copiar código
-pyinstaller --onefile --noconsole main_app.py
-🛡️ Licencia
-MIT License
+Mostrar siempre los detalles
+
+Copiar
+# Crea una rama nueva
+git checkout -b feature/nueva-funcionalidad
+
+# Haz tus cambios
+git add .
+git commit -m "feat: nueva funcionalidad"
+git push origin feature/nueva-funcionalidad
+Y abre un Pull Request desde GitHub.
 
 👤 Autor
-Desarrollado por Stredes 🚀
+Gian Lucas
+Técnico de laboratorio clínico – Desarrollador Python
+GitHub: @stredes
 
+📄 Licencia
+Distribuido bajo la licencia Apache 2.0.
+Consulta el archivo LICENSE para más detalles.
+
+📬 Contacto
+¿Tienes preguntas o sugerencias?
+Abre un Issue """
+
+Guardar en README.md
+readme_path = Path("README.md") readme_path.write_text(readme_content, encoding="utf-8")
+
+readme_path.absolute()
+
+Mostrar siempre los detalles
+
+Copiar
+Resultado
+PosixPath('/home/sandbox/README.md')
+✅ El README.md fue generado exitosamente y guardado en el proyecto.
+
+Ahora puedes hacer:
+
+bash
+Copiar
+Editar
+git add README.md
+git commit -m "docs: actualizar README con autoloader, estructura y badges"
+git push origin main
