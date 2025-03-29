@@ -14,6 +14,7 @@ from printer.exporter import export_to_pdf
 from herramientas import abrir_herramientas
 from utils import load_config, LOG_FILE
 from db import init_db, save_file_history
+from autoloader import find_latest_file_by_mode  # Importación autoloader
 
 # Detectar sistema operativo
 def _get_print_function():
@@ -21,14 +22,13 @@ def _get_print_function():
         from printer import print_document
     else:
         from printer.printer_linux import print_document_linux as print_document
-
     return print_document
 
 class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("600x500")
+        self.geometry("700x500")
         self.configure(bg="#F9FAFB")
 
         init_db()
@@ -62,6 +62,8 @@ class ExcelPrinterApp(tk.Tk):
 
         buttons = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
+            ("Carga Automática 🚀", self._threaded_auto_load),
+            ("Autocarga 🧠", self._auto_load_latest_file),  # 🧠 nuevo botón
             ("Configuración ⚙️", self._open_config_menu),
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", self.view_logs),
@@ -110,6 +112,36 @@ class ExcelPrinterApp(tk.Tk):
         if file_path and validate_file(file_path):
             self.processing = True
             threading.Thread(target=self._process_file, args=(file_path,), daemon=True).start()
+
+    def _threaded_auto_load(self):
+        if self.processing:
+            return
+        threading.Thread(target=self._auto_load_latest_file, daemon=True).start()
+
+    def _auto_load_latest_file(self):
+        self._update_status("Buscando archivo más reciente...")
+        try:
+            archivo, estado = find_latest_file_by_mode(self.mode)
+
+            if estado == "ok" and archivo and validate_file(str(archivo)):
+                self._update_status(f"✅ Cargado: {archivo.name}")
+                self._process_file(str(archivo))
+            elif estado == "no_match":
+                self._update_status("⚠️ No se encontraron archivos compatibles.")
+                messagebox.showwarning("Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'.")
+            elif estado == "empty_folder":
+                self._update_status("📂 Carpeta vacía o inexistente.")
+                messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
+            else:
+                self._update_status("❌ Error en la autocarga.")
+                messagebox.showerror("Error", "Ocurrió un error inesperado.")
+        except Exception as e:
+            self._update_status("❌ Fallo crítico")
+            logging.error(f"Error en carga automática: {e}")
+            messagebox.showerror("Error", f"No se pudo cargar automáticamente:\n{e}")
+        finally:
+            self.processing = False
+
 
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
@@ -172,23 +204,17 @@ class ExcelPrinterApp(tk.Tk):
                 messagebox.showerror("Error", "No hay datos para imprimir.")
                 return
 
-            # Crear carpeta de exportación
             output_dir = Path("exportados/excel")
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Nombre del archivo con timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
 
-            # Añadir fila con pie de página (fecha/hora)
             footer_text = f"Generado el {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             footer_df = pd.DataFrame({self.transformed_df.columns[0]: [footer_text]})
             df_con_footer = pd.concat([self.transformed_df, footer_df], ignore_index=True)
 
-            # Guardar archivo con pie de página
             df_con_footer.to_excel(output_file, index=False)
-
-            # Enviar a imprimir
             self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
 
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
@@ -203,7 +229,6 @@ class ExcelPrinterApp(tk.Tk):
             return
         self.open_config_dialog(self.mode)
         print("CONFIGURACIÓN CARGADA:", self.config_columns)
-
 
     def open_config_dialog(self, mode: str):
         dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
