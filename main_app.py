@@ -12,9 +12,12 @@ from config_dialog import ConfigDialog
 from excel_processor import validate_file, load_excel, apply_transformation
 from printer.exporter import export_to_pdf
 from herramientas import abrir_herramientas
-from utils import load_config, LOG_FILE
 from db import init_db, save_file_history
 from autoloader import find_latest_file_by_mode  # Importación autoloader
+from logger_bod1 import capturar_log_bod1
+from utils import load_config
+
+
 
 # Detectar sistema operativo
 def _get_print_function():
@@ -144,18 +147,22 @@ class ExcelPrinterApp(tk.Tk):
 
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
+        capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
             save_file_history(file_path, self.mode)
+            capturar_log_bod1(f"Archivo procesado correctamente: {file_path}", "info")
             self.after(0, self._show_preview)
         except Exception as exc:
+            capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
             messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
             logging.error(f"Error: {exc}")
         finally:
             self.processing = False
             self._update_status("Listo")
+
 
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
@@ -214,13 +221,19 @@ class ExcelPrinterApp(tk.Tk):
             df_con_footer = pd.concat([self.transformed_df, footer_df], ignore_index=True)
 
             df_con_footer.to_excel(output_file, index=False)
+
+            capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
+
             self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
 
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
+            capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
 
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
+            capturar_log_bod1(f"Error durante impresión: {e}", "error")
+
 
     def _open_config_menu(self):
         if self.df is None:
@@ -235,16 +248,25 @@ class ExcelPrinterApp(tk.Tk):
         self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
 
     def view_logs(self):
-        if not LOG_FILE.exists():
+        log_dir = Path("logs")
+        if not log_dir.exists():
             messagebox.showinfo("Logs", "No hay logs para mostrar.")
             return
+
+        log_files = sorted(log_dir.glob("bod1_log_*.log"), reverse=True)
+        if not log_files:
+            messagebox.showinfo("Logs", "No hay logs para mostrar.")
+            return
+
+        latest_log = log_files[0]
         log_win = tk.Toplevel(self)
-        log_win.title("Logs de la Aplicación")
+        log_win.title(f"Logs: {latest_log.name}")
         log_win.geometry("600x400")
         txt = tk.Text(log_win)
         txt.pack(fill=tk.BOTH, expand=True)
-        with LOG_FILE.open("r", encoding="utf-8", errors="replace") as f:
+        with latest_log.open("r", encoding="utf-8", errors="replace") as f:
             txt.insert(tk.END, f.read())
+
 
 if __name__ == "__main__":
     app = ExcelPrinterApp()
