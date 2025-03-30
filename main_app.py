@@ -28,7 +28,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("700x600")
+        self.geometry("700x555")    
         self.configure(bg="#F9FAFB")
 
         init_db()

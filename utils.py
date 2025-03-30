@@ -21,9 +21,19 @@ def load_config():
 
 # ---------- Guardar Configuración ----------
 def save_config(config_data):
+    def convert_sets(obj):
+        if isinstance(obj, set):
+            return list(obj)
+        elif isinstance(obj, dict):
+            return {k: convert_sets(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_sets(i) for i in obj]
+        return obj
+
     try:
+        serializable_data = convert_sets(config_data)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=4)
+            json.dump(serializable_data, f, indent=4)
         logging.info("Configuración guardada correctamente.")
     except Exception as e:
         logging.error(f"Error al guardar configuración: {e}")
