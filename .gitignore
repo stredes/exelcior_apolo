@@ -32,6 +32,8 @@ pip-wheel-metadata/
 *.csv
 *.xlsx
 
+portable
+
 # Archivos de configuración locales
 excel_printer_config.json
 
