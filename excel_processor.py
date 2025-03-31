@@ -2,6 +2,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 from tkinter import messagebox
+from logger_bod1 import capturar_log_bod1
+
 
 
 def validate_file(file_path: str) -> bool:
