@@ -42,7 +42,7 @@ Transformador de archivos Excel para operaciones logísticas, generación de rep
 git clone https://github.com/stredes/exelcior_apolo.git
 cd exelcior_apolo
 --- 
-2. Crear entorno virtual
+### 2. Crear entorno virtual
 bash
 Copiar
 Editar
@@ -50,51 +50,51 @@ python3 -m venv .venv
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
 ---
 ---
-3. Instalar dependencias
+### 3. Instalar dependencias
 bash
 Copiar
 Editar
 pip install -r requirements.txt
 ---
 ---
-4. Ejecutar la aplicación
+### 4. Ejecutar la aplicación
 bash
 Copiar
 Editar
 python main_app.py
 ---
-📂 Modos de operación y estructura de archivos esperada
-🟣 FedEx
+### 📂 Modos de operación y estructura de archivos esperada
+### 🟣 FedEx
 Archivos: Shipment_Report_YYYY-MM-DD.xlsx
 
 Suma: numberOfPackages
 
 Elimina columnas irrelevantes (por configuración)
 
-🔵 Urbano
+### 🔵 Urbano
 Archivos: 9 dígitos exactos, e.g. 211823030.xlsx
 
 Suma: PIEZAS
 
 Empieza a leer desde la fila 3 (start_row: 2)
 
-🟢 Listados
+### 🟢 Listados
 Archivos: lista_doc_venta_YYYYMMDD_HHMMSS.xlsx
 
 Elimina columnas contables como Glosa, Vendedor, RUT, etc.
 ---
 ---
-🧠 Uso de la App
+### 🧠 Uso de la App
 🖱️ Selecciona un modo (Urbano, FedEx, Listados)
 
-📂 Carga un Excel manualmente o usa Carga Automática
+### 📂 Carga un Excel manualmente o usa Carga Automática
 
 👁️ Visualiza la transformación previa
 
-📄 Exporta o 🖨️ Imprime directamente
+### 📄 Exporta o 🖨️ Imprime directamente
 ---
 ---
-⚙️ Configuración por modo
+### ⚙️ Configuración por modo
 Editable desde la interfaz de configuración (⚙️). También puedes modificar manualmente el archivo excel_printer_config.json.
 
 json
@@ -114,7 +114,7 @@ Editar
 }
 ---
 ---
-🧱 Estructura del Proyecto
+### 🧱 Estructura del Proyecto
 bash
 Copiar
 Editar
@@ -131,12 +131,12 @@ exelcior_apolo/
 └── README.md
 ---
 ---
-🧪 Debug y Logs
+### 🧪 Debug y Logs
 Los errores y operaciones se registran automáticamente en logs/logs_app.log.
 Puedes acceder a ellos desde la GUI (📋 Ver Logs).
 ---
 ---
-🤝 Contribuciones
+### 🤝 Contribuciones
 ¿Quieres colaborar? ¡Sigue estos pasos!
 ---
 ---
@@ -154,13 +154,13 @@ git push origin feature/nueva-funcionalidad
 Luego abre un Pull Request desde GitHub.
 ---
 ---
-👤 Autor
+### 👤 Autor
 Gian Lucas
 Técnico de laboratorio clínico – Desarrollador Python
 GitHub: @stredes
 ---
 ---
-📄 Licencia
+### 📄 Licencia
 Distribuido bajo la licencia Apache 2.0.
 Consulta el archivo LICENSE para más detalles.
 ---
