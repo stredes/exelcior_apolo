@@ -123,40 +123,6 @@ Editar
 
 
 
-
-
-
-
-
-
-
-
-### 🧱 Estructura del Proyecto
-bash
-Copiar
-Editar
-exelcior_apolo/
-├── main_app.py               # App principal con GUI
-├── autoloader.py             # Detección automática de archivos
-├── config_dialog.py          # Configurador visual de columnas
-├── excel_processor.py        # Transformaciones y limpieza de datos
-├── printer/                  # Exportación e impresión por sistema
-├── db/                       # Base de datos local
-├── utils/                    # Utilidades generales
-├── data/                     # Archivos de datos
-├── requirements.txt
-└── README.md
-
-
-
-
-
-
-
-
-
-
-
 ---
 
 ### 🧪 Debug y Logs
