@@ -15,16 +15,17 @@ from herramientas import abrir_herramientas
 from db import init_db, save_file_history
 from autoloader import find_latest_file_by_mode  # Importación autoloader
 from logger_bod1 import capturar_log_bod1
-from utils import load_config
+from utils.utils import load_config
 
 
 
-# Detectar sistema operativo
 def _get_print_function():
     if platform.system() == "Windows":
-        from printer import print_document
+        from printer.printer import print_document
+    elif platform.system() == "Linux":
+        from printer.printer_linux import print_document
     else:
-        from printer.printer_linux import print_document_linux as print_document
+        raise OSError("Sistema operativo no soportado")
     return print_document
 
 class ExcelPrinterApp(tk.Tk):
@@ -216,14 +217,12 @@ class ExcelPrinterApp(tk.Tk):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
 
-            footer_text = f"Generado el {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            footer_df = pd.DataFrame({self.transformed_df.columns[0]: [footer_text]})
-            df_con_footer = pd.concat([self.transformed_df, footer_df], ignore_index=True)
-
-            df_con_footer.to_excel(output_file, index=False)
+            # Guardar solamente los datos procesados
+            self.transformed_df.to_excel(output_file, index=False)
 
             capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
 
+            # Enviar a impresión
             self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
 
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
@@ -233,6 +232,7 @@ class ExcelPrinterApp(tk.Tk):
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
+
 
 
     def _open_config_menu(self):
