@@ -1,0 +1,32 @@
+# Contenido de un LICENSE Apache 2.0 personalizado para Gian Lucas San Martín y GCNJ
+license_apache = """\
+Apache License
+Version 2.0, January 2004
+http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+Copyright 2025 Gian Lucas San Martín – GCNJ
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.
+
+Attribution:
+
+This software, Exelcior Apolo, was developed by Gian Lucas San Martín – Analista Programador y Técnico de Laboratorio Clínico – junto con sus socios en GCNJ.
+
+Este sistema fue creado con fines técnicos, clínicos y logísticos.
+Todos los derechos reservados en la jurisdicción de Chile y protegidos bajo tratados internacionales de propiedad intelectual.
+"""
+
+# Guardar el archivo LICENSE.txt
+license_path = Path("/mnt/data/LICENSE.txt")
+license_path.write_text(license_apache, encoding="utf-8")
+license_path
