@@ -17,6 +17,7 @@ from autoloader import find_latest_file_by_mode  # Importación autoloader
 from logger_bod1 import capturar_log_bod1
 from utils.utils import load_config
 from utils.platform_utils import is_windows, is_linux
+from autoloader import set_carpeta_descarga_personalizada  
 
 
 
@@ -120,10 +121,12 @@ class ExcelPrinterApp(tk.Tk):
         self.mode = selected_mode
 
     def _threaded_select_file(self):
-        if self.processing:
-            return
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+
         if file_path and validate_file(file_path):
+            # Calibrar la carpeta automáticamente
+            set_carpeta_descarga_personalizada(Path(file_path).parent, self.mode)
+
             self.processing = True
             threading.Thread(target=self._process_file, args=(file_path,), daemon=True).start()
 
@@ -210,7 +213,7 @@ class ExcelPrinterApp(tk.Tk):
         ttk.Button(preview_win, text="Imprimir", command=self._threaded_print).pack(pady=5)
         ttk.Button(preview_win, text="Cerrar", command=preview_win.destroy).pack(pady=5)
 
-        
+
         def eliminar_filas_seleccionadas():
             seleccion = tree.selection()
             if not seleccion:

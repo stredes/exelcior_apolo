@@ -33,7 +33,7 @@ pip-wheel-metadata/
 *.xlsx
 
 portable
-
+user_config.json
 # Archivos de configuración locales
 
 
