@@ -16,6 +16,17 @@ from db import init_db, save_file_history
 from autoloader import find_latest_file_by_mode  # Importación autoloader
 from logger_bod1 import capturar_log_bod1
 from utils.utils import load_config
+from utils.platform_utils import is_windows, is_linux
+
+
+
+if is_windows():
+    from printer.printer import print_document
+elif is_linux():
+    from printer.printer_linux import print_document
+else:
+    raise OSError("Sistema no compatible")
+
 
 
 
@@ -198,6 +209,26 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(preview_win, text="Imprimir", command=self._threaded_print).pack(pady=5)
         ttk.Button(preview_win, text="Cerrar", command=preview_win.destroy).pack(pady=5)
+
+        
+        def eliminar_filas_seleccionadas():
+            seleccion = tree.selection()
+            if not seleccion:
+                messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila para eliminar.")
+                return
+
+            filas_indices = [tree.index(i) for i in seleccion]
+            for item in seleccion:
+                tree.delete(item)
+
+            # Eliminar del DataFrame original
+            self.transformed_df.drop(index=self.transformed_df.index[filas_indices], inplace=True)
+            self.transformed_df.reset_index(drop=True, inplace=True)
+            capturar_log_bod1(f"Filas eliminadas en vista previa: {filas_indices}", "info")
+
+        ttk.Button(preview_win, text="Eliminar filas seleccionadas", command=eliminar_filas_seleccionadas).pack(pady=5)
+
+        
 
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
