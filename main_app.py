@@ -44,7 +44,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("700x555")    
+        self.geometry("750x600")    
         self.configure(bg="#F9FAFB")
 
         init_db()
@@ -74,7 +74,7 @@ class ExcelPrinterApp(tk.Tk):
         sidebar.pack(side="left", fill="y")
 
         tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
-                 font=("Segoe UI", 14, "bold")).pack(pady=20)
+                font=("Segoe UI", 14, "bold")).pack(pady=20)
 
         buttons = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
@@ -89,6 +89,10 @@ class ExcelPrinterApp(tk.Tk):
         for text, command in buttons[:-1]:
             ttk.Button(sidebar, text=text, command=command).pack(pady=10, fill="x", padx=10)
 
+        # Botón "Acerca de"
+        ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
+
+        # Botón salir al final
         ttk.Button(sidebar, text=buttons[-1][0], command=buttons[-1][1]).pack(side="bottom", pady=20, fill="x", padx=10)
 
     def _setup_main_area(self):
@@ -110,6 +114,40 @@ class ExcelPrinterApp(tk.Tk):
         self.status_var = tk.StringVar()
         ttk.Label(self, textvariable=self.status_var,
                   relief=tk.SUNKEN, anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
+        
+
+    def _mostrar_acerca_de(self):
+            acerca_win = tk.Toplevel(self)
+            acerca_win.title("Acerca de Exelcior Apolo")
+            acerca_win.geometry("600x600")
+            acerca_win.configure(bg="#F9FAFB")  
+
+            contenido = (
+                "🧬 Sistema Exelcior Apolo\n\n"
+                "📄 Descripción:\n"
+                "Aplicación para facilitar la gestión, edición e impresión de archivos Excel\n"
+                "clínicos y logísticos, con herramientas pensadas para el trabajo real en terreno.\n\n"
+                "👤 Desarrollador principal:\n"
+                "Gian Lucas San Martín\n"
+                "• Analista Programador\n"
+                "• Técnico de Laboratorio Clínico\n"
+                "• Socio fundador de GCNJ\n\n"
+                "🤝 Colaboradores:\n"
+                "• Mis socios de GCNJ, siempre presentes en el desarrollo de este proyecto\n\n"
+                "🔖 Versión: 1.0.0\n"
+                "📅 Última actualización: 2025-03-31\n\n"
+                "💼 Propiedad:\n"
+                "Este software fue creado con fines prácticos y profesionales por el equipo de GCNJ.\n"
+                "El código y el diseño pertenecen a sus autores.\n\n"
+                "© 2025 Gian Lucas San Martín – GCNJ. Todos los derechos reservados."
+            )
+
+            label = tk.Label(acerca_win, text=contenido, justify=tk.LEFT, bg="#F9FAFB", font=("Segoe UI", 10))
+            label.pack(padx=20, pady=20)
+            
+
+            ttk.Button(acerca_win, text="Cerrar", command=acerca_win.destroy).pack(pady=10)
+
 
     def _update_status(self, message):
         self.status_var.set(message)
