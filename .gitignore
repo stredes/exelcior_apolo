@@ -34,6 +34,9 @@ pip-wheel-metadata/
 
 portable
 user_config.json
+dist
+build
+
 # Archivos de configuración locales
 
 
