@@ -6,14 +6,13 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        ('data/*', 'data'),
-        ('db/*', 'db'),
-        ('printer/*', 'printer'),
-        ('logs/*', 'logs'),
-        ('exportados/*', 'exportados'),
+        ('data', 'data'),
+        ('db', 'db'),
+        ('printer', 'printer'),
+        ('logs', 'logs'),
+        ('exportados', 'exportados'),
         ('excel_printer.db', '.'),
         ('excel_printer_config.json', '.'),
-        # icon eliminado para evitar error
     ],
     hiddenimports=[
         'tkinter',
@@ -23,14 +22,6 @@ a = Analysis(
         'fpdf',
         'yaml',
         'PIL',
-        'utils',
-        'config_dialog',
-        'excel_processor',
-        'printer',
-        'herramientas',
-        'db',
-        'autoloader',
-        'logger_bod1',
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -52,8 +43,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # True si quieres consola visible para debug
-    # icon eliminado
+    console=False,
 )
 
 coll = COLLECT(

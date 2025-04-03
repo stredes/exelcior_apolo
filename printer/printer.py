@@ -3,21 +3,24 @@ from datetime import datetime
 from tkinter import messagebox
 import pandas as pd
 import logging
-import time
 
 try:
+    import pythoncom
     from win32com.client import Dispatch
 except ImportError:
     Dispatch = None
+    pythoncom = None
 
 
 def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataFrame):
     try:
+        if Dispatch is None or pythoncom is None:
+            raise EnvironmentError("win32com.client o pythoncom no disponible. Instala pywin32.")
+
+        pythoncom.CoInitialize()
+
         if not filepath.exists():
             raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
-
-        if Dispatch is None:
-            raise EnvironmentError("win32com.client no disponible. Instala pywin32.")
 
         excel = Dispatch("Excel.Application")
         excel.Visible = False
@@ -33,9 +36,24 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
         sheet.PageSetup.FitToPagesWide = 1
         sheet.PageSetup.FitToPagesTall = False
 
-        # Pie de página
+        # Fecha y hora actual
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
-        sheet.PageSetup.CenterFooter = f"&\"Arial,Bold\"&8 Impreso el: {now}"
+
+        # --- Contador dinámico según el modo ---
+        if mode == "fedex":
+            bultos_col = next((col for col in df.columns if col.strip().lower() == "bultos"), None)
+            total = df[bultos_col].sum() if bultos_col else len(df)
+            label = "Piezas"
+        elif mode == "urbano":
+            piezas_col = next((col for col in df.columns if col.strip().lower() == "piezas"), None)
+            total = df[piezas_col].sum() if piezas_col else 0
+            label = "Bultos"
+        else:
+            total = len(df)
+            label = "Items"
+
+        # Establecer pie de página
+        sheet.PageSetup.CenterFooter = f"&\"Arial,Bold\"&8 Impreso el: {now}  |  Total {label}: {total}"
 
         # Formato especial para FedEx si corresponde
         if (
@@ -49,23 +67,22 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
 
             for row in range(2, used_rows + 1):
                 cell = sheet.Cells(row, col_idx)
-                if cell.Value is not None:
+                val = cell.Value
+                if val is not None:
                     try:
-                        val = cell.Value
-                        if isinstance(val, float) and val.is_integer():
-                            cell.Value = str(int(val))
-                        else:
-                            cell.Value = str(val)
+                        cell.Value = str(int(val)) if isinstance(val, float) and val.is_integer() else str(val)
                     except Exception:
                         cell.Value = str(cell.Value)
 
-        # Imprimir
+        # Enviar a imprimir
         sheet.PrintOut()
         wb.Close(SaveChanges=False)
         excel.Quit()
 
         logging.info(f"Impresión completada: {filepath}")
         messagebox.showinfo("Impresión exitosa", f"Archivo enviado a imprimir:\n{filepath}")
+
+        pythoncom.CoUninitialize()
 
     except Exception as e:
         logging.error(f"Error al imprimir {filepath}: {e}")
