@@ -18,6 +18,8 @@ from logger_bod1 import capturar_log_bod1
 from utils.utils import load_config
 from utils.platform_utils import is_windows, is_linux
 from autoloader import set_carpeta_descarga_personalizada  
+from gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
+
 
 
 
@@ -83,17 +85,17 @@ class ExcelPrinterApp(tk.Tk):
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", self.view_logs),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
-            ("Salir ❌", self.quit)
+            ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
         ]
 
-        for text, command in buttons[:-1]:
+        for text, command in buttons:
             ttk.Button(sidebar, text=text, command=command).pack(pady=10, fill="x", padx=10)
 
         # Botón "Acerca de"
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
 
         # Botón salir al final
-        ttk.Button(sidebar, text=buttons[-1][0], command=buttons[-1][1]).pack(side="bottom", pady=20, fill="x", padx=10)
+        ttk.Button(sidebar, text="Salir ❌", command=self.quit).pack(side="bottom", pady=20, fill="x", padx=10)
 
     def _setup_main_area(self):
         self.main_frame = tk.Frame(self, bg="#F9FAFB")
@@ -313,6 +315,20 @@ class ExcelPrinterApp(tk.Tk):
             return
         self.open_config_dialog(self.mode)
         print("CONFIGURACIÓN CARGADA:", self.config_columns)
+
+    def _abrir_editor_etiquetas(self):
+        try:
+            path = filedialog.askopenfilename(
+                title="Selecciona el archivo de etiquetas",
+                filetypes=[("Excel Files", "*.xlsx")]
+            )
+            if not path:
+                return
+            df_clientes = cargar_clientes(path)
+            crear_editor_etiqueta(df_clientes)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
+
 
     def open_config_dialog(self, mode: str):
         dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
