@@ -88,19 +88,14 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-<<<<<<< HEAD
-    name='ExelciorApolo',
-=======
+
     name='ExelciorApolo',  # Nombre del ejecutable
 >>>>>>> 05350b4 (ejecutable con modificacion v1.2.0 + reaadme + license)
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-<<<<<<< HEAD
-    console=False,  # True si quieres consola visible para debug
-    # icon eliminado
-=======
+
     console=False,  # Usa True si quieres que se vea la consola
     icon='assets/icono.ico',  # Asigna el ícono si tienes uno
 >>>>>>> 05350b4 (ejecutable con modificacion v1.2.0 + reaadme + license)

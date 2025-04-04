@@ -2,21 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ===============================
-<<<<<<< HEAD
-echo  🚀 Build automático Exelcior
-echo ===============================
 
-REM Verificar carpetas requeridas
-set DIRS=data db printer logs exportados assets
-
-echo ▶ Verificando carpetas necesarias...
-for %%D in (%DIRS%) do (
-    if not exist "%%D" (
-        echo ❌ Carpeta "%%D" no existe. Creándola...
-        mkdir %%D
-    )
-    if not exist "%%D\\.keep" (
-=======
 echo  🔧 Build automático Exelcior
 echo ===============================
 
@@ -38,10 +24,7 @@ for %%D in (%DIRS%) do (
     )
 )
 
-<<<<<<< HEAD
-REM Ejecutar PyInstaller
-echo ▶ Compilando con PyInstaller...
-=======
+
 REM Limpiar build anterior (opcional)
 echo.
 echo ♻️  Limpiando builds previos...
@@ -56,12 +39,7 @@ pyinstaller main_app.spec > build.log 2>&1
 
 REM Verificar resultado
 if exist dist\ExelciorApolo\ExelciorApolo.exe (
-<<<<<<< HEAD
-    echo ✅ Compilación exitosa:
-    echo    dist\ExelciorApolo\ExelciorApolo.exe
-) else (
-    echo ❌ Fallo en la compilación. Revisa build.log
-=======
+
     echo.
     echo ✅ Build exitoso. Ejecutable generado:
     echo    dist\ExelciorApolo\ExelciorApolo.exe
