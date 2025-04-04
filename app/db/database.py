@@ -1,10 +1,9 @@
-# db/database.py
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from .models import Base, User, Configuracion, HistorialArchivo, RegistroImpresion
 from pathlib import Path
+from datetime import datetime
 import logging
 
 DATABASE_URL = "sqlite:///excel_printer.db"
@@ -39,3 +38,20 @@ def init_db():
                 logging.info("Nueva base de datos creada exitosamente.")
             except Exception as err:
                 logging.error(f"Error creando nueva base de datos: {err}")
+
+def save_file_history(filepath, modo):
+    session = SessionLocal()
+    try:
+        nuevo_registro = HistorialArchivo(
+            nombre_archivo=Path(filepath).name,
+            modo=modo,
+            fecha=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        session.add(nuevo_registro)
+        session.commit()
+        logging.info(f"Historial registrado: {filepath}")
+    except Exception as e:
+        logging.error(f"Error al guardar historial: {e}")
+        session.rollback()
+    finally:
+        session.close()

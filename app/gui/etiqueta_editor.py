@@ -25,12 +25,12 @@ def buscar_cliente_por_rut(df_clientes, rut):
         }
     return None
 
-# Generar etiqueta PDF con tamaño configurable
-def generar_etiqueta_pdf(data, output_path, width_cm=10, height_cm=10):
-    c = canvas.Canvas(str(output_path), pagesize=(width_cm*cm, height_cm*cm))
+# Generar etiqueta PDF 10x10 cm
+def generar_etiqueta_pdf(data, output_path):
+    c = canvas.Canvas(str(output_path), pagesize=(10*cm, 10*cm))
     c.setFont("Helvetica", 10)
 
-    y = (height_cm - 0.5) * cm
+    y = 9.5 * cm
     row_height = 1.3 * cm
 
     for key, label in [
@@ -44,7 +44,7 @@ def generar_etiqueta_pdf(data, output_path, width_cm=10, height_cm=10):
         ("transporte", "Transporte")
     ]:
         valor = data.get(key, "")
-        c.rect(0.5*cm, y - row_height + 0.3*cm, (width_cm - 1)*cm, row_height, stroke=1, fill=0)
+        c.rect(0.5*cm, y - row_height + 0.3*cm, 9*cm, row_height, stroke=1, fill=0)
         c.drawString(0.7*cm, y, f"{label}: {valor}")
         y -= row_height
 
@@ -53,7 +53,7 @@ def generar_etiqueta_pdf(data, output_path, width_cm=10, height_cm=10):
 # Interfaz Tkinter
 def crear_editor_etiqueta(df_clientes):
     root = tk.Tk()
-    root.title("Editor de Etiquetas")
+    root.title("Editor de Etiquetas 10x10cm")
 
     frame = ttk.Frame(root, padding=20)
     frame.grid(row=0, column=0)
@@ -77,17 +77,6 @@ def crear_editor_etiqueta(df_clientes):
         entry.grid(row=idx, column=1, pady=5)
         entradas[key] = entry
 
-    # Tamaño de etiqueta
-    ttk.Label(frame, text="Ancho (cm):").grid(row=len(campos), column=0, sticky="e", pady=5)
-    ancho_entry = ttk.Entry(frame, width=10)
-    ancho_entry.insert(0, "10")
-    ancho_entry.grid(row=len(campos), column=1, sticky="w", pady=5)
-
-    ttk.Label(frame, text="Alto (cm):").grid(row=len(campos)+1, column=0, sticky="e", pady=5)
-    alto_entry = ttk.Entry(frame, width=10)
-    alto_entry.insert(0, "10")
-    alto_entry.grid(row=len(campos)+1, column=1, sticky="w", pady=5)
-
     def cargar_datos_cliente(event=None):
         rut = entradas["rut"].get()
         cliente = buscar_cliente_por_rut(df_clientes, rut)
@@ -107,24 +96,17 @@ def crear_editor_etiqueta(df_clientes):
 
     def generar_pdf():
         data = {k: v.get() for k, v in entradas.items()}
-        try:
-            width_cm = float(ancho_entry.get())
-            height_cm = float(alto_entry.get())
-        except ValueError:
-            messagebox.showerror("Error", "Tamaño de etiqueta inválido.")
-            return
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = Path.cwd() / f"etiqueta_{data['rut']}_{timestamp}.pdf"
-        generar_etiqueta_pdf(data, output_path, width_cm, height_cm)
+        generar_etiqueta_pdf(data, output_path)
         messagebox.showinfo("Etiqueta generada", f"Etiqueta guardada en:\n{output_path}")
 
-    ttk.Button(frame, text="Generar Etiqueta PDF", command=generar_pdf).grid(row=len(campos)+2, column=0, columnspan=2, pady=15)
+    ttk.Button(frame, text="Generar Etiqueta PDF", command=generar_pdf).grid(row=len(campos), column=0, columnspan=2, pady=15)
 
     root.mainloop()
 
 # --- Carga inicial ---
 if __name__ == "__main__":
-    excel_path = "etiqueta pedido.xlsx"  # Debe estar en el mismo directorio
+    excel_path = "etiqueta pedido.xlsx"  # Asegúrate de que esté en el mismo directorio
     df_clientes = cargar_clientes(excel_path)
     crear_editor_etiqueta(df_clientes)

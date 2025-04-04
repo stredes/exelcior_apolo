@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from logger_bod1 import capturar_log_bod1
+from app.core.logger_bod1 import capturar_log_bod1
 
 # Ruta del archivo de configuración
 CONFIG_FILE = Path("excel_printer_config.json")

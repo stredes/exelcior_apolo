@@ -8,45 +8,41 @@ from datetime import datetime
 import tempfile
 import platform
 
-from config_dialog import ConfigDialog
-from excel_processor import validate_file, load_excel, apply_transformation
-from printer.exporter import export_to_pdf
-from herramientas import abrir_herramientas
-from db import init_db, save_file_history
-from autoloader import find_latest_file_by_mode  # Importación autoloader
-from logger_bod1 import capturar_log_bod1
-from utils.utils import load_config
-from utils.platform_utils import is_windows, is_linux
-from autoloader import set_carpeta_descarga_personalizada  
-from gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
-
-
-
-
-if is_windows():
-    from printer.printer import print_document
-elif is_linux():
-    from printer.printer_linux import print_document
-else:
-    raise OSError("Sistema no compatible")
-
+# ✅ IMPORTS AJUSTADOS A LA NUEVA ESTRUCTURA
+from app.config.config_dialog import ConfigDialog
+from app.core.excel_processor import validate_file, load_excel, apply_transformation
+from app.printer.exporter import export_to_pdf
+from app.core.herramientas import abrir_herramientas
+from app.db.database import init_db
+from app.db.database import save_file_history
+from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
+from app.core.logger_bod1 import capturar_log_bod1
+from app.utils.utils import load_config
+from app.utils.platform_utils import is_windows, is_linux
+from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
+from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 
 
 
 def _get_print_function():
     if platform.system() == "Windows":
-        from printer.printer import print_document
+        from app.printer.printer import print_document
     elif platform.system() == "Linux":
-        from printer.printer_linux import print_document
+        from app.printer.printer_linux import print_document
     else:
         raise OSError("Sistema operativo no soportado")
     return print_document
+
 
 class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("750x600")    
+        self.geometry("750x700") 
+
+
+     
+
         self.configure(bg="#F9FAFB")
 
         init_db()
