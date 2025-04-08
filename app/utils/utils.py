@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from app.core.logger_bod1 import capturar_log_bod1
+import pandas as pd
 
 # Ruta del archivo de configuración
 CONFIG_FILE = Path("excel_printer_config.json")
@@ -53,3 +54,14 @@ def setup_logging():
         format="%(asctime)s - %(levelname)s - %(message)s",
         encoding="utf-8"
     )
+
+def drop_duplicates_reference_master(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Elimina duplicados de 'Reference' solo si el 'masterTrackingNumber' también se repite.
+    """
+    if "Reference" in df.columns and "masterTrackingNumber" in df.columns:
+        # Aseguramos tipos string por seguridad
+        df["Reference"] = df["Reference"].astype(str)
+        df["masterTrackingNumber"] = df["masterTrackingNumber"].astype(str)
+        return df.drop_duplicates(subset=["Reference", "masterTrackingNumber"])
+    return df

@@ -21,6 +21,8 @@ from app.utils.utils import load_config
 from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
+from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
+
 
 
 
@@ -234,17 +236,29 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self.processing = False
 
-
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
-            self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+
+            # ✅ Capturar correctamente la tupla
+            self.transformed_df, self.total_bultos = apply_transformation(df, self.config_columns, self.mode)
+
+            if self.mode == "fedex":
+                self.transformed_df = drop_duplicates_reference_master(self.transformed_df)
+
+            if "Reference" not in self.transformed_df.columns:
+                for col in self.transformed_df.columns:
+                    if col.strip().lower() == "reference":
+                        self.transformed_df.rename(columns={col: "Reference"}, inplace=True)
+                        break
+
             save_file_history(file_path, self.mode)
             capturar_log_bod1(f"Archivo procesado correctamente: {file_path}", "info")
             self.after(0, self._show_preview)
+
         except Exception as exc:
             capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
             messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
@@ -253,11 +267,26 @@ class ExcelPrinterApp(tk.Tk):
             self.processing = False
             self._update_status("Listo")
 
-
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
             messagebox.showerror("Error", "No hay datos para mostrar.")
             return
+
+        df_vista = self.transformed_df.copy()
+
+        # 🔍 Eliminar columnas no deseadas por modo
+        columnas_ocultas = []
+        if self.mode == "fedex":
+            columnas_ocultas = ["recipientCompany"]
+        elif self.mode == "urbano":
+            columnas_ocultas = ["OtraColumnaNoDeseada"]
+
+        for col in columnas_ocultas:
+            if col in df_vista.columns:
+                df_vista.drop(columns=[col], inplace=True)
+
+        if self.mode != "fedex" and "Reference" in df_vista.columns:
+            df_vista.drop(columns=["Reference"], inplace=True)
 
         preview_win = tk.Toplevel(self)
         preview_win.title("Vista Previa")
@@ -267,7 +296,7 @@ class ExcelPrinterApp(tk.Tk):
         tree_frame = ttk.Frame(preview_win, padding=10)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        columns = list(self.transformed_df.columns)
+        columns = list(df_vista.columns)
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
@@ -282,31 +311,36 @@ class ExcelPrinterApp(tk.Tk):
             tree.heading(col, text=col)
             tree.column(col, width=120, minwidth=80, anchor=tk.CENTER)
 
-        for row in self.transformed_df.itertuples(index=False):
+        for row in df_vista.itertuples(index=False):
             tree.insert("", "end", values=row)
 
-        ttk.Button(preview_win, text="Imprimir", command=self._threaded_print).pack(pady=5)
-        ttk.Button(preview_win, text="Cerrar", command=preview_win.destroy).pack(pady=5)
+        barra_botones = ttk.Frame(preview_win)
+        barra_botones.pack(pady=5)
 
+        ttk.Button(barra_botones, text="Imprimir", command=self._threaded_print).pack(side=tk.LEFT, padx=5)
+        ttk.Button(barra_botones, text="Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=5)
 
         def eliminar_filas_seleccionadas():
             seleccion = tree.selection()
             if not seleccion:
-                messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila para eliminar.")
+                messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila.")
                 return
-
             filas_indices = [tree.index(i) for i in seleccion]
             for item in seleccion:
                 tree.delete(item)
-
-            # Eliminar del DataFrame original
             self.transformed_df.drop(index=self.transformed_df.index[filas_indices], inplace=True)
             self.transformed_df.reset_index(drop=True, inplace=True)
             capturar_log_bod1(f"Filas eliminadas en vista previa: {filas_indices}", "info")
 
-        ttk.Button(preview_win, text="Eliminar filas seleccionadas", command=eliminar_filas_seleccionadas).pack(pady=5)
+        ttk.Button(barra_botones, text="Eliminar filas seleccionadas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=5)
 
-        
+        if self.mode == "fedex" and hasattr(self, 'total_bultos'):
+            ttk.Label(barra_botones, text=f"Total PIEZAS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+
+        elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
+            ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+
+
 
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
@@ -368,7 +402,20 @@ class ExcelPrinterApp(tk.Tk):
     def open_config_dialog(self, mode: str):
         dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
         self.wait_window(dialog)
-        self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+
+        # ✅ Ajuste al nuevo retorno de apply_transformation
+        self.transformed_df, self.total_bultos = apply_transformation(self.df, self.config_columns, self.mode)
+
+        # 🧼 Aplicar limpieza solo si corresponde
+        if self.mode == "fedex":
+            self.transformed_df = drop_duplicates_reference_master(self.transformed_df)
+
+        if "Reference" not in self.transformed_df.columns:
+            for col in self.transformed_df.columns:
+                if col.strip().lower() == "reference":
+                    self.transformed_df.rename(columns={col: "Reference"}, inplace=True)
+                    break
+
 
     def view_logs(self):
         log_dir = Path("logs")
