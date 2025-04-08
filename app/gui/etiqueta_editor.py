@@ -1,18 +1,63 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
-from reportlab.lib.units import cm
-from reportlab.pdfgen import canvas
+from tkinter import ttk, messagebox, filedialog
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+import json
+import shutil
 
-# Cargar datos de clientes desde Excel
+try:
+    import win32com.client
+    import win32print
+except ImportError:
+    win32com = None
+    win32print = None
+
+from openpyxl import load_workbook
+
+CONFIG_PATH = Path("config.json")
+
+def cargar_configuracion():
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def guardar_configuracion(config):
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
+
+def obtener_ruta_excel():
+    config = cargar_configuracion()
+    ruta = config.get("ruta_excel", "")
+    if ruta and Path(ruta).exists():
+        return ruta
+    nueva_ruta = filedialog.askopenfilename(
+        title="Selecciona el archivo 'etiqueta pedido.xlsx'",
+        filetypes=[("Archivos Excel", "*.xlsx")]
+    )
+    if nueva_ruta:
+        config["ruta_excel"] = nueva_ruta
+        guardar_configuracion(config)
+        return nueva_ruta
+    else:
+        messagebox.showerror("Archivo no seleccionado", "No se seleccionó ningún archivo de etiquetas.")
+        exit()
+
+def guardar_impresora_en_config(impresora_nombre):
+    config = cargar_configuracion()
+    config["impresora_por_defecto"] = impresora_nombre
+    guardar_configuracion(config)
+
+def obtener_impresora_guardada():
+    config = cargar_configuracion()
+    return config.get("impresora_por_defecto", "")
+
 def cargar_clientes(path_excel):
     xls = pd.ExcelFile(path_excel)
     df_clientes = xls.parse("Clientes")
     return df_clientes
 
-# Buscar cliente por RUT
 def buscar_cliente_por_rut(df_clientes, rut):
     fila = df_clientes[df_clientes['rut'] == rut.strip()]
     if not fila.empty:
@@ -25,35 +70,59 @@ def buscar_cliente_por_rut(df_clientes, rut):
         }
     return None
 
-# Generar etiqueta PDF 10x10 cm
-def generar_etiqueta_pdf(data, output_path):
-    c = canvas.Canvas(str(output_path), pagesize=(10*cm, 10*cm))
-    c.setFont("Helvetica", 10)
+def imprimir_etiqueta_excel(data, impresora):
+    plantilla = Path("plantilla_etiqueta.xlsx")
+    if not plantilla.exists():
+        messagebox.showerror("Error", "No se encuentra el archivo plantilla_etiqueta.xlsx")
+        return
 
-    y = 9.5 * cm
-    row_height = 1.3 * cm
+    output_dir = Path("output/etiquetas_excel")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    salida = output_dir / f"etiqueta_{data['rut']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-    for key, label in [
-        ("guia", "Guía"),
-        ("rut", "RUT"),
-        ("razsoc", "Cliente"),
-        ("dir", "Dirección"),
-        ("comuna", "Comuna"),
-        ("ciudad", "Ciudad"),
-        ("bultos", "Bultos"),
-        ("transporte", "Transporte")
-    ]:
-        valor = data.get(key, "")
-        c.rect(0.5*cm, y - row_height + 0.3*cm, 9*cm, row_height, stroke=1, fill=0)
-        c.drawString(0.7*cm, y, f"{label}: {valor}")
-        y -= row_height
+    shutil.copy(plantilla, salida)
 
-    c.save()
+    wb = load_workbook(salida)
+    ws = wb.active
 
-# Interfaz Tkinter
+    reemplazos = {
+        "{{guia}}": data.get("guia", ""),
+        "{{rut}}": data.get("rut", ""),
+        "{{razsoc}}": data.get("razsoc", ""),
+        "{{dir}}": data.get("dir", ""),
+        "{{comuna}}": data.get("comuna", ""),
+        "{{ciudad}}": data.get("ciudad", ""),
+        "{{bultos}}": data.get("bultos", ""),
+        "{{transporte}}": data.get("transporte", "")
+    }
+
+    for row in ws.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str):
+                for key, val in reemplazos.items():
+                    if key in cell.value:
+                        cell.value = cell.value.replace(key, val)
+
+    wb.save(salida)
+
+    excel = win32com.client.Dispatch("Excel.Application")
+    excel.Visible = False
+
+    ruta_completa = str(salida.resolve())
+
+    try:
+        wb_com = excel.Workbooks.Open(ruta_completa)
+        wb_com.PrintOut()
+        wb_com.Close(SaveChanges=False)
+        excel.Quit()
+        messagebox.showinfo("Impresión enviada", f"Etiqueta enviada a: {impresora}")
+    except Exception as e:
+        excel.Quit()
+        messagebox.showerror("Error en impresión", str(e))
+
 def crear_editor_etiqueta(df_clientes):
     root = tk.Tk()
-    root.title("Editor de Etiquetas 10x10cm")
+    root.title("Impresión de Etiquetas Zebra (Excel)")
 
     frame = ttk.Frame(root, padding=20)
     frame.grid(row=0, column=0)
@@ -77,6 +146,22 @@ def crear_editor_etiqueta(df_clientes):
         entry.grid(row=idx, column=1, pady=5)
         entradas[key] = entry
 
+    ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=5)
+    impresoras = [printer['pPrinterName'] for printer in win32print.EnumPrinters(
+        win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS, None, 5
+    )] if win32print else []
+
+    impresora_var = tk.StringVar()
+    impresora_combo = ttk.Combobox(frame, textvariable=impresora_var, values=impresoras, width=38)
+    impresora_combo.grid(row=len(campos), column=1, pady=5)
+
+    impresora_guardada = obtener_impresora_guardada()
+    if impresora_guardada in impresoras:
+        impresora_var.set(impresora_guardada)
+        impresora_combo.current(impresoras.index(impresora_guardada))
+    elif impresoras:
+        impresora_var.set(impresoras[0])
+
     def cargar_datos_cliente(event=None):
         rut = entradas["rut"].get()
         cliente = buscar_cliente_por_rut(df_clientes, rut)
@@ -94,19 +179,20 @@ def crear_editor_etiqueta(df_clientes):
 
     entradas["rut"].bind("<Return>", cargar_datos_cliente)
 
-    def generar_pdf():
+    def imprimir():
         data = {k: v.get() for k, v in entradas.items()}
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = Path.cwd() / f"etiqueta_{data['rut']}_{timestamp}.pdf"
-        generar_etiqueta_pdf(data, output_path)
-        messagebox.showinfo("Etiqueta generada", f"Etiqueta guardada en:\n{output_path}")
+        impresora = impresora_var.get().strip()
+        if not impresora:
+            messagebox.showwarning("Selecciona una impresora", "Debes seleccionar una impresora.")
+            return
+        guardar_impresora_en_config(impresora)
+        imprimir_etiqueta_excel(data, impresora)
 
-    ttk.Button(frame, text="Generar Etiqueta PDF", command=generar_pdf).grid(row=len(campos), column=0, columnspan=2, pady=15)
-
+    ttk.Button(frame, text="Imprimir Etiqueta", command=imprimir).grid(row=len(campos)+1, column=0, columnspan=2, pady=15)
     root.mainloop()
 
-# --- Carga inicial ---
+# --- Inicio ---
 if __name__ == "__main__":
-    excel_path = "etiqueta pedido.xlsx"  # Asegúrate de que esté en el mismo directorio
+    excel_path = obtener_ruta_excel()
     df_clientes = cargar_clientes(excel_path)
     crear_editor_etiqueta(df_clientes)

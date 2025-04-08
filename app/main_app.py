@@ -22,6 +22,10 @@ from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 
 
 
