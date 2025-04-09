@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 from typing import Optional, List, Tuple
 
+from app.utils.utils import load_config
+from app.core.logger_bod1 import capturar_log_bod1
+
 CONFIG_PATH = Path("config/user_config.json")
 
 
@@ -38,8 +41,9 @@ def get_carpeta_descarga_personalizada(modo: str) -> Path:
 
 # --- Detección por patrón de nombre de archivo ---
 
-def is_urbano_pattern(filename: str) -> bool:
-    return re.fullmatch(r"\d{9}", Path(filename).stem) is not None
+def is_urbano_pattern(filename: str, digit_lengths: List[int]) -> bool:
+    stem = Path(filename).stem
+    return stem.isdigit() and len(stem) in digit_lengths
 
 def is_listado_pattern(filename: str) -> bool:
     return re.match(r"^lista_doc_venta_\d{8}_\d{6}$", Path(filename).stem) is not None
@@ -47,14 +51,18 @@ def is_listado_pattern(filename: str) -> bool:
 def is_fedex_pattern(filename: str) -> bool:
     return re.match(r"^shipment_report_\d{4}-\d{2}-\d{2}$", Path(filename).stem.lower()) is not None
 
-def matches_mode(filename: str, mode: str) -> bool:
+
+def matches_mode(filename: str, mode: str, config: dict) -> bool:
     name = filename.lower()
+
     if mode == "fedex":
         return "fedex" in name or is_fedex_pattern(filename)
     elif mode == "listados":
         return is_listado_pattern(filename) or "listado" in name or "venta" in name
     elif mode == "urbano":
-        return is_urbano_pattern(filename)
+        digit_lengths = config.get(mode, {}).get("nombre_archivo_digitos", [9, 10])
+        return is_urbano_pattern(filename, digit_lengths)
+
     return False
 
 
@@ -68,12 +76,15 @@ def find_latest_file_by_mode(
     """
     Devuelve (archivo, estado): estado puede ser 'ok', 'empty_folder', 'no_match'
     """
+    config = load_config()
+
     if download_folder is None:
         download_folder = get_carpeta_descarga_personalizada(mode)
     if allowed_extensions is None:
         allowed_extensions = ['.xlsx', '.xls', '.csv']
 
     if not download_folder.exists():
+        capturar_log_bod1(f"📂 Carpeta de descargas no encontrada: {download_folder}", "warning")
         return None, "empty_folder"
 
     archivos = list(download_folder.glob("*"))
@@ -82,11 +93,13 @@ def find_latest_file_by_mode(
 
     archivos_filtrados = [
         f for f in archivos
-        if f.suffix.lower() in allowed_extensions and matches_mode(f.name, mode)
+        if f.suffix.lower() in allowed_extensions and matches_mode(f.name, mode, config)
     ]
 
     if not archivos_filtrados:
+        capturar_log_bod1(f"❌ No hay archivos válidos para el modo '{mode}' en {download_folder}", "warning")
         return None, "no_match"
 
     archivos_ordenados = sorted(archivos_filtrados, key=lambda f: f.stat().st_mtime, reverse=True)
+    capturar_log_bod1(f"✅ Archivo encontrado: {archivos_ordenados[0].name}", "info")
     return archivos_ordenados[0], "ok"

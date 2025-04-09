@@ -1,24 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
-import sys
-from pathlib import Path
-
 block_cipher = None
 
-project_root = Path(__file__).resolve().parent
-app_dir = project_root / "exelcior_apolo-main" / "app"
-
 a = Analysis(
-    [str(app_dir / "main_app.py")],
-    pathex=[str(app_dir)],
+    ['app/main_app.py'],
+    pathex=['.'],
     binaries=[],
     datas=[
-        (str(app_dir / 'data'), 'data'),
-        (str(app_dir / 'db'), 'db'),
-        (str(app_dir / 'printer'), 'printer'),
-        (str(app_dir / 'logs'), 'logs'),
-        (str(app_dir / 'exportados'), 'exportados'),
-        (str(app_dir / 'excel_printer.db'), '.'),
-        (str(app_dir / 'excel_printer_config.json'), '.'),
+        # Carpetas funcionales y archivos de configuración
+        ('app/db', 'app/db'),
+        ('app/data', 'app/data'),
+        ('app/printer', 'app/printer'),
+        ('app/logs', 'app/logs'),
+        ('app/exportados', 'app/exportados'),
+
+        # Archivos individuales importantes
+        ('app/db/.keep', 'app/db'),
+        ('app/logs/.keep', 'app/logs'),
+        ('app/exportados/.keep', 'app/exportados'),
+
+        ('app/excel_printer.db', 'app'),
+        ('app/excel_printer_config.json', 'app'),
     ],
     hiddenimports=[
         'tkinter',

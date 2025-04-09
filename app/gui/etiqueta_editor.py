@@ -5,15 +5,24 @@ from pathlib import Path
 from datetime import datetime
 import json
 import shutil
-
-try:
-    import win32com.client
-    import win32print
-except ImportError:
-    win32com = None
-    win32print = None
-
+import platform
 from openpyxl import load_workbook
+
+# Detecta sistema operativo y aplica método de impresión correcto
+def imprimir_etiqueta_plataforma(path_etiqueta: Path, impresora: str):
+    if platform.system() == "Windows":
+        import win32com.client
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.Visible = False
+        libro = excel.Workbooks.Open(str(path_etiqueta.resolve()))
+        libro.PrintOut()
+        libro.Close(False)
+        excel.Quit()
+    elif platform.system() == "Linux":
+        import subprocess
+        subprocess.run(["libreoffice", "--headless", "--pt", impresora, str(path_etiqueta.resolve())], check=True)
+    else:
+        raise NotImplementedError("Sistema operativo no soportado para impresión.")
 
 CONFIG_PATH = Path("config.json")
 
@@ -70,7 +79,7 @@ def buscar_cliente_por_rut(df_clientes, rut):
         }
     return None
 
-def imprimir_etiqueta_excel(data, impresora):
+def imprimir_etiqueta_excel(data: dict, impresora: str):
     plantilla = Path("plantilla_etiqueta.xlsx")
     if not plantilla.exists():
         messagebox.showerror("Error", "No se encuentra el archivo plantilla_etiqueta.xlsx")
@@ -104,23 +113,13 @@ def imprimir_etiqueta_excel(data, impresora):
                         cell.value = cell.value.replace(key, val)
 
     wb.save(salida)
-
-    excel = win32com.client.Dispatch("Excel.Application")
-    excel.Visible = False
-
-    ruta_completa = str(salida.resolve())
-
     try:
-        wb_com = excel.Workbooks.Open(ruta_completa)
-        wb_com.PrintOut()
-        wb_com.Close(SaveChanges=False)
-        excel.Quit()
+        imprimir_etiqueta_plataforma(salida, impresora)
         messagebox.showinfo("Impresión enviada", f"Etiqueta enviada a: {impresora}")
     except Exception as e:
-        excel.Quit()
         messagebox.showerror("Error en impresión", str(e))
 
-def crear_editor_etiqueta(df_clientes):
+def crear_editor_etiqueta(df_clientes: pd.DataFrame):
     root = tk.Tk()
     root.title("Impresión de Etiquetas Zebra (Excel)")
 
@@ -147,9 +146,22 @@ def crear_editor_etiqueta(df_clientes):
         entradas[key] = entry
 
     ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=5)
-    impresoras = [printer['pPrinterName'] for printer in win32print.EnumPrinters(
-        win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS, None, 5
-    )] if win32print else []
+
+    try:
+        if platform.system() == "Windows":
+            import win32print
+            impresoras = [printer['pPrinterName'] for printer in win32print.EnumPrinters(
+                win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS, None, 5
+            )]
+        elif platform.system() == "Linux":
+            import subprocess
+            salida = subprocess.check_output(["lpstat", "-a"]).decode()
+            impresoras = [line.split()[0] for line in salida.strip().splitlines()]
+        else:
+            impresoras = []
+    except Exception as e:
+        impresoras = []
+        messagebox.showwarning("Impresoras no detectadas", str(e))
 
     impresora_var = tk.StringVar()
     impresora_combo = ttk.Combobox(frame, textvariable=impresora_var, values=impresoras, width=38)
@@ -158,7 +170,6 @@ def crear_editor_etiqueta(df_clientes):
     impresora_guardada = obtener_impresora_guardada()
     if impresora_guardada in impresoras:
         impresora_var.set(impresora_guardada)
-        impresora_combo.current(impresoras.index(impresora_guardada))
     elif impresoras:
         impresora_var.set(impresoras[0])
 
@@ -191,7 +202,6 @@ def crear_editor_etiqueta(df_clientes):
     ttk.Button(frame, text="Imprimir Etiqueta", command=imprimir).grid(row=len(campos)+1, column=0, columnspan=2, pady=15)
     root.mainloop()
 
-# --- Inicio ---
 if __name__ == "__main__":
     excel_path = obtener_ruta_excel()
     df_clientes = cargar_clientes(excel_path)

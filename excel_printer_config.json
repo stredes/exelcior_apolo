@@ -1,82 +1,94 @@
 {
     "fedex": {
-      "eliminar": [
-        "errors",
-        "senderAccountNumber",
-        "poNumber",
-        "senderLine1",
-        "senderPostcode",
-        "totalShipmentWeight",
-        "weightUnits",
-        "recipientPostcode",
-        "creationDate",
-        "recipientPhoneExtension",
-        "senderContactNumber",
-        "senderCity",
-        "length",
-        "senderEmail",
-        "senderLine2",
-        "recipientState",
-        "packageWeight",
-        "returnRmaNumber",
-        "invoiceNumber",
-        "paymentType",
-        "senderContactName",
-        "recipientContactNumber",
-        "departmentNumber",
-        "senderState",  
-        "status",
-        "recipientTin",
-        "estimatedShippingCosts",
-        "recipientEmail",
-        "senderCompany",
-        "recipientResidential",
-        "senderPhoneExtension",
-        "senderTin",
-        "height",
-        "returnReason",
-        "width",
-        "etdEnabled",
-        "quoteId",
-        "recipientLine2",
-        "recipientCountry",
-        "senderResidential",
-        "recipientLine1",
-        "pickupId",
-        "returnTrackingId",
-        "senderLine3",
-        "shipmentType",
-        "senderCountry"
-      ],
-      "sumar": ["numberOfPackages"],
-      "mantener_formato": ["masterTrackingNumber"]
+        "eliminar": [
+            "width",
+            "status",
+            "recipientContactNumber",
+            "creationDate",
+            "recipientResidential",
+            "poNumber",
+            "quoteId",
+            "height",
+            "invoiceNumber",
+            "senderTin",
+            "senderEmail",
+            "senderCity",
+            "senderResidential",
+            "totalShipmentWeight",
+            "errors",
+            "senderLine2",
+            "returnRmaNumber",
+            "departmentNumber",
+            "estimatedShippingCosts",
+            "weightUnits",
+            "recipientLine1",
+            "senderPostcode",
+            "recipientTin",
+            "recipientPhoneExtension",
+            "senderPhoneExtension",
+            "recipientLine2",
+            "paymentType",
+            "pickupId",
+            "senderCountry",
+            "returnTrackingId",
+            "shipmentType",
+            "packageWeight",
+            "recipientCountry",
+            "recipientState",
+            "etdEnabled",
+            "length",
+            "senderContactNumber",
+            "senderCompany",
+            "senderLine3",
+            "recipientEmail",
+            "senderLine1",
+            "recipientPostcode",
+            "senderState",
+            "senderAccountNumber",
+            "senderContactName",
+            "returnReason"
+        ],
+        "sumar": [
+            "numberOfPackages"
+        ],
+        "mantener_formato": [
+            "masterTrackingNumber"
+        ],
+        "start_row": 0,
+        "nombre_archivo_digitos": [],
+        "vista_previa_fuente": 10
     },
     "urbano": {
-      "eliminar": [
-        "AGENCIA",
-        "SHIPPER",
-        "FECHA CHK",
-        "DIAS",
-        "ESTADO",
-        "SERVICIO",
-        "PESO"
-      ],
-      "sumar": ["PIEZAS"],
-      "mantener_formato": [],
-      "start_row": 2
+        "eliminar": [
+            "SERVICIO",
+            "DIAS",
+            "PESO",
+            "AGENCIA",
+            "ESTADO",
+            "SHIPPER",
+            "FECHA CHK"
+        ],
+        "sumar": [
+            "PIEZAS"
+        ],
+        "mantener_formato": [],
+        "start_row": 2,
+        "nombre_archivo_digitos": [
+            10
+        ],
+        "vista_previa_fuente": 10
     },
     "listados": {
-      "eliminar": [
-        "Moneda",
-        "Fecha doc.",
-        "RUT",
-        "Vendedor",
-        "Glosa",
-        "Total",
-        "Tipo cambio"
-      ],
-      "sumar": [],
-      "mantener_formato": []
+        "eliminar": [
+            "Moneda",
+            "Fecha doc.",
+            "RUT",
+            "Vendedor",
+            "Glosa",
+            "Total",
+            "Tipo cambio"
+        ],
+        "sumar": [],
+        "mantener_formato": []
     }
-  }
-  
+}
