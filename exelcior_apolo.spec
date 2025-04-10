@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys  # 👈 NECESARIO para usar sys.platform
 block_cipher = None
 
 a = Analysis(
@@ -6,20 +7,23 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        # Carpetas funcionales y archivos de configuración
         ('app/db', 'app/db'),
         ('app/data', 'app/data'),
         ('app/printer', 'app/printer'),
         ('app/logs', 'app/logs'),
         ('app/exportados', 'app/exportados'),
+        ('app/output', 'app/output'),
+        ('app/config', 'app/config'),
 
-        # Archivos individuales importantes
         ('app/db/.keep', 'app/db'),
         ('app/logs/.keep', 'app/logs'),
         ('app/exportados/.keep', 'app/exportados'),
+        ('app/output/.keep', 'app/output'),
+        ('app/config/.keep', 'app/config'),
 
         ('app/excel_printer.db', 'app'),
         ('app/excel_printer_config.json', 'app'),
+        ('app/plantilla_etiqueta.xlsx', 'app'),
     ],
     hiddenimports=[
         'tkinter',
@@ -29,6 +33,8 @@ a = Analysis(
         'fpdf',
         'yaml',
         'PIL',
+        'win32com.client' if sys.platform == "win32" else '',
+        'win32print' if sys.platform == "win32" else '',
     ],
     hookspath=[],
     runtime_hooks=[],
