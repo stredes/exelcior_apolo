@@ -21,6 +21,7 @@ Transformador de archivos Excel para operaciones logísticas, generación de rep
 - 🧠 Modos inteligentes de operación: `FedEx`, `Urbano`, `Listados`
 - 🌗 Interfaz moderna, clara y ligera con soporte para modo oscuro
 - 💻 Compatible con Linux y Windows
+- 🪵 Sistema de logs inteligentes con visor GUI y fallbacks de excepción global
 
 ---
 
@@ -119,8 +120,12 @@ También puedes modificar manualmente el archivo `excel_printer_config.json`.
 
 ## 🧪 Debug y Logs
 
-Los errores y operaciones se registran automáticamente en `logs/logs_app.log`.  
-Puedes acceder a ellos desde la GUI (📋 Ver Logs).
+Todos los eventos, errores, transformaciones, exportaciones e impresiones se registran automáticamente en la carpeta `logs/`, organizada por módulo:
+
+- 🧠 Logs por archivo: `main_app_log_YYYYMMDD.log`, `printer_log_YYYYMMDD.log`, etc.
+- 🧪 Captura de excepciones globales mediante `sys.excepthook`
+- 📋 Visualizador gráfico de logs integrado en la GUI (botón "Ver Logs")
+- 📁 Fallback de registro en `logs/fallback_log_YYYYMMDD.log` si ocurre algún error fuera de control
 
 ---
 
