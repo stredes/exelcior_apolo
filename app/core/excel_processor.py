@@ -1,8 +1,8 @@
-import pandas as pd
 from pathlib import Path
+import pandas as pd
 from typing import Optional
 from tkinter import messagebox
-from app.core.logger_bod1 import capturar_log_bod1  # ✅ Correcto
+
 
 def validate_file(file_path: str) -> bool:
     path = Path(file_path)
@@ -13,6 +13,7 @@ def validate_file(file_path: str) -> bool:
         messagebox.showerror("Error", "Formato de archivo no soportado.")
         return False
     return True
+
 
 def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
     path_obj = Path(file_path).resolve()
@@ -51,9 +52,18 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
 
     return df
 
+
 def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
     if mode == "fedex":
-        columns_needed = ['shipDate', 'masterTrackingNumber', 'reference', 'recipientCity', 'pieceTrackingNumber']
+        columns_needed = [
+            'shipDate',
+            'masterTrackingNumber',
+            'reference',
+            'recipientCity',
+            'recipientContactName',
+            'pieceTrackingNumber'
+        ]
+
         df_fedex = df[columns_needed].copy()
         df_fedex = df_fedex[df_fedex['masterTrackingNumber'].notna()]
 
@@ -61,10 +71,11 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
             'shipDate': 'first',
             'reference': 'first',
             'recipientCity': 'first',
+            'recipientContactName': 'first',
             'pieceTrackingNumber': 'count'
         }).reset_index()
 
-        grouped.columns = ['Tracking Number', 'Fecha', 'Referencia', 'Ciudad', 'BULTOS']
+        grouped.columns = ['Tracking Number', 'Fecha', 'Referencia', 'Ciudad', 'Receptor', 'BULTOS']
         total_bultos = grouped['BULTOS'].sum()
 
         return grouped, total_bultos
@@ -87,48 +98,8 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
             df_transformed[col] = pd.to_numeric(df_transformed[col], errors='coerce')
             resumen[col] = df_transformed[col].sum()
 
-    # ✅ En lugar de agregar fila, devolver el resumen por separado
     total = None
     if resumen:
-        total = list(resumen.values())[0]  # asumimos un solo campo a sumar
+        total = list(resumen.values())[0]
 
     return df_transformed, total
-
-import logging
-from pathlib import Path
-from datetime import datetime
-import inspect
-import os
-
-def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
-    """
-
-    # Detectar el nombre del archivo que llama a esta función
-    frame = inspect.stack()[1]
-    archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
-    log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
-
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"{log_name}.log"
-
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-
-    # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
-        handler = logging.FileHandler(log_file, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical
-    }.get(nivel.lower(), logger.info)(mensaje)
