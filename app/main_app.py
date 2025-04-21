@@ -236,46 +236,52 @@ class ExcelPrinterApp(tk.Tk):
 
     def _auto_load_latest_file(self):
         self._update_status("Buscando archivo más reciente...")
+        log_evento("Inicio de carga automática", "info")
+
+        archivo = None
+        estado = None
+
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
 
             if estado == "ok" and archivo and validate_file(str(archivo)):
                 self._update_status(f"✅ Cargado: {archivo.name}")
+                log_evento(f"Archivo autocargado: {archivo.name}", "info")
                 self._process_file(str(archivo))
+
             elif estado == "no_match":
                 self._update_status("⚠️ No se encontraron archivos compatibles.")
+                log_evento(f"No se encontraron archivos válidos para modo: {self.mode}", "warning")
                 messagebox.showwarning("Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'.")
+
             elif estado == "empty_folder":
                 self._update_status("📂 Carpeta vacía o inexistente.")
+                log_evento("Carpeta vacía detectada en carga automática", "warning")
                 messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
+
             else:
                 self._update_status("❌ Error en la autocarga.")
+                log_evento(f"Estado desconocido recibido: {estado}", "error")
                 messagebox.showerror("Error", "Ocurrió un error inesperado.")
+
         except Exception as e:
             self._update_status("❌ Fallo crítico")
-            logging.error(f"Error en carga automática: {e}")
+            log_evento(f"Error inesperado en autocarga: {e}", "error")
             messagebox.showerror("Error", f"No se pudo cargar automáticamente:\n{e}")
+
         finally:
             self.processing = False
-
-
-        log_evento("Inicio de carga automática", "info")
-        ...
-        log_evento(f"Archivo autocargado: {archivo.name}", "info")
-        ...
-        log_evento(f"No se encontraron archivos válidos para modo: {self.mode}", "warning")
-        ...
-        log_evento(f"Error inesperado en autocarga: {e}", "error")
 
 
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
+        log_evento(f"Procesando archivo: {file_path}", "info")
+        
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
 
-            # ✅ Capturar correctamente la tupla
             self.transformed_df, self.total_bultos = apply_transformation(df, self.config_columns, self.mode)
 
             if self.mode == "fedex":
@@ -289,21 +295,19 @@ class ExcelPrinterApp(tk.Tk):
 
             save_file_history(file_path, self.mode)
             capturar_log_bod1(f"Archivo procesado correctamente: {file_path}", "info")
+            log_evento(f"Archivo procesado exitosamente: {file_path}", "info")
             self.after(0, self._show_preview)
 
         except Exception as exc:
             capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
+            log_evento(f"Error al procesar archivo: {file_path} - {exc}", "error")
             messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
             logging.error(f"Error: {exc}")
+
         finally:
             self.processing = False
             self._update_status("Listo")
 
-        log_evento(f"Procesando archivo: {file_path}", "info")
-        ...
-        log_evento(f"Archivo procesado exitosamente: {file_path}", "info")
-        ...
-        log_evento(f"Error al procesar archivo: {file_path} - {exc}", "error")
 
 
     def _show_preview(self):

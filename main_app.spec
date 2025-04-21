@@ -8,14 +8,13 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        # Comentado hasta que el archivo esté disponible
-        # ('app/config/excel_printer_config.json', 'app/config'),
-        ('app/db/excel_printer.db', 'app/db'),
+        ('app/config', 'app/config'),
         ('app/db', 'app/db'),
         ('app/printer', 'app/printer'),
+        ('app/gui', 'app/gui'),
         ('logs', 'logs'),
-        ('exportados', 'exportados'),  # Agrega carpeta completa, aunque esté vacía
-        # ('etiqueta pedido.xlsx', '.'),  # Comentado temporalmente
+        ('exportados', 'exportados'),
+        ('etiqueta pedido.xlsx', '.'),  # Si quieres incluir una plantilla
     ],
     hiddenimports=[
         'tkinter',
@@ -26,13 +25,15 @@ a = Analysis(
         'yaml',
         'PIL',
         'app.utils.utils',
+        'app.utils.logger_setup',
+        'app.utils.logger_viewer',
         'app.config.config_dialog',
         'app.core.excel_processor',
         'app.core.herramientas',
-        'app.db.database',
-        'app.db.models',
         'app.core.autoloader',
         'app.core.logger_bod1',
+        'app.db.database',
+        'app.db.models',
         'app.printer.printer',
         'app.printer.printer_linux',
         'app.gui.etiqueta_editor'
@@ -57,7 +58,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,  # Puedes poner False si quieres ocultar la consola en Windows
     icon='assets/icono.ico',
 )
 
