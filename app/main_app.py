@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime
 import tempfile
 import platform
+import sys
 
 # ✅ IMPORTS AJUSTADOS A LA NUEVA ESTRUCTURA
 from app.config.config_dialog import ConfigDialog
@@ -22,6 +23,20 @@ from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
+from app.utils.logger_setup import setup_logging, log_evento
+from app.utils.logger_viewer import abrir_visor_logs
+from app.utils.logger_setup import log_evento
+
+def global_exception_handler(exctype, value, traceback):
+    log_evento(f"Excepción no capturada: {value}", "critical")
+
+sys.excepthook = global_exception_handler
+
+
+
+setup_logging()
+log_evento("Aplicación iniciada", "info")
+
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -85,7 +100,7 @@ class ExcelPrinterApp(tk.Tk):
             ("Carga Automática 🚀", self._threaded_auto_load),
             ("Configuración ⚙️", self._open_config_menu),
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
-            ("Ver Logs 📋", self.view_logs),
+            ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
         ]
@@ -201,6 +216,9 @@ class ExcelPrinterApp(tk.Tk):
             self.mode_vars[mode].set(mode == selected_mode)
         self.mode = selected_mode
 
+        log_evento(f"Modo cambiado a: {selected_mode}", "info")
+
+
     def _threaded_select_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
 
@@ -240,6 +258,16 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self.processing = False
 
+
+        log_evento("Inicio de carga automática", "info")
+        ...
+        log_evento(f"Archivo autocargado: {archivo.name}", "info")
+        ...
+        log_evento(f"No se encontraron archivos válidos para modo: {self.mode}", "warning")
+        ...
+        log_evento(f"Error inesperado en autocarga: {e}", "error")
+
+
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
@@ -270,6 +298,13 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self.processing = False
             self._update_status("Listo")
+
+        log_evento(f"Procesando archivo: {file_path}", "info")
+        ...
+        log_evento(f"Archivo procesado exitosamente: {file_path}", "info")
+        ...
+        log_evento(f"Error al procesar archivo: {file_path} - {exc}", "error")
+
 
     def _show_preview(self):
 
@@ -393,6 +428,15 @@ class ExcelPrinterApp(tk.Tk):
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
 
+        log_evento("Inicio de impresión de documento", "info")
+        ...
+        log_evento(f"Archivo exportado correctamente: {output_file}", "info")
+        ...
+        log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
+        ...
+        log_evento(f"Error en impresión: {e}", "error")
+
+
 
 
     def _open_config_menu(self):
@@ -414,6 +458,9 @@ class ExcelPrinterApp(tk.Tk):
             crear_editor_etiqueta(df_clientes)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
+
+    log_evento("Editor de etiquetas abierto", "info")
+
 
 
     def open_config_dialog(self, mode: str):

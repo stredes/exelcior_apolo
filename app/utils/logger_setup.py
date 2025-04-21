@@ -1,7 +1,10 @@
-# utils/logger_setup.py
 from datetime import datetime
 from logging import basicConfig, INFO
 from pathlib import Path
+import logging
+import inspect
+import os
+
 
 def setup_logging():
     LOG_FILE = Path("logs") / f"fallback_log_{datetime.now().strftime('%Y%m%d')}.log"
@@ -14,20 +17,18 @@ def setup_logging():
         encoding="utf-8"
     )
 
+    # También enviar logs a consola (opcional pero recomendado)
+    console = logging.StreamHandler()
+    console.setLevel(INFO)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    console.setFormatter(formatter)
+    logging.getLogger().addHandler(console)
 
-import logging
-from pathlib import Path
-from datetime import datetime
-import inspect
-import os
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
+    Guarda logs por módulo con nombre automático del archivo llamador.
     """
-
-    # Detectar el nombre del archivo que llama a esta función
     frame = inspect.stack()[1]
     archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
     log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
@@ -39,17 +40,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
-    # Evitar duplicar handlers
     if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical
-    }.get(nivel.lower(), logger.info)(mensaje)
+    getattr(logger, nivel.lower(), logger.info)(mensaje)

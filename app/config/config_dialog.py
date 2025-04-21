@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import List, Set, Dict
 from app.db.utils_db import CONFIG_FILE, save_config
+from app.utils.logger_setup import log_evento 
 
 def get_default_config():
     return DEFAULT_CONFIG
@@ -157,6 +158,9 @@ class ConfigDialog(tk.Toplevel):
         save_config(self.config_columns)
         self.destroy()
 
+        log_evento(f"Configuración guardada para modo: {self.mode}", "info")
+
+
     def _reset_to_default(self):
         if self.mode in DEFAULT_CONFIG:
             self.config_columns[self.mode] = DEFAULT_CONFIG[self.mode]
@@ -166,6 +170,9 @@ class ConfigDialog(tk.Toplevel):
                 self.nombre_archivo_digitos.set(",".join(map(str, DEFAULT_CONFIG[self.mode].get("nombre_archivo_digitos", []))))
             self.preview_font_size.set(DEFAULT_CONFIG[self.mode].get("vista_previa_fuente", 10))
             self._load_initial_selection()
+
+            log_evento(f"Configuración restablecida por defecto para modo: {self.mode}", "warning")
+
 
 import logging
 from pathlib import Path
