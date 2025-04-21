@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import List, Set, Dict
 from app.db.utils_db import CONFIG_FILE, save_config
 
+def get_default_config():
+    return DEFAULT_CONFIG
+
+
 DEFAULT_CONFIG = {
     "fedex": {
         "eliminar": [
@@ -17,6 +21,7 @@ DEFAULT_CONFIG = {
             "height", "returnReason", "width", "etdEnabled", "quoteId", "recipientLine2", "recipientCountry",
             "senderResidential", "recipientLine1", "pickupId", "returnTrackingId", "senderLine3", "shipmentType",
             "senderCountry"
+            # 👈 recipientContactName ha sido eliminado de esta lista
         ],
         "sumar": ["numberOfPackages"],
         "mantener_formato": ["masterTrackingNumber"],

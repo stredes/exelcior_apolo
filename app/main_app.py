@@ -272,11 +272,23 @@ class ExcelPrinterApp(tk.Tk):
             self._update_status("Listo")
 
     def _show_preview(self):
+
+        
         if self.transformed_df is None or self.transformed_df.empty:
             messagebox.showerror("Error", "No hay datos para mostrar.")
             return
 
         df_vista = self.transformed_df.copy()
+
+        # Forzar la reinserción de 'Receptor' si no aparece
+        if "recipientContactName" in self.transformed_df.columns:
+            df_vista["Receptor"] = self.transformed_df["recipientContactName"]
+
+        # Opcional: mover 'Receptor' al final
+        if "Receptor" in df_vista.columns:
+            cols = [col for col in df_vista.columns if col != "Receptor"] + ["Receptor"]
+            df_vista = df_vista[cols]
+
 
         # 🔍 Eliminar columnas no deseadas por modo
         columnas_ocultas = []
@@ -343,6 +355,7 @@ class ExcelPrinterApp(tk.Tk):
 
         elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
             ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+
 
 
 
