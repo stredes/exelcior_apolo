@@ -395,9 +395,6 @@ class ExcelPrinterApp(tk.Tk):
         elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
             ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
 
-
-
-
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
             messagebox.showerror("Error", "Primero debe cargar un archivo Excel válido.")

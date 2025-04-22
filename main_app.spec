@@ -1,6 +1,4 @@
-# main_app.spec
 # -*- mode: python ; coding: utf-8 -*-
-
 block_cipher = None
 
 a = Analysis(
@@ -14,7 +12,7 @@ a = Analysis(
         ('app/gui', 'app/gui'),
         ('logs', 'logs'),
         ('exportados', 'exportados'),
-        ('etiqueta pedido.xlsx', '.'),  # Si quieres incluir una plantilla
+        ('etiqueta pedido.xlsx', '.'),
     ],
     hiddenimports=[
         'tkinter',
@@ -33,17 +31,16 @@ a = Analysis(
         'app.core.autoloader',
         'app.core.logger_bod1',
         'app.db.database',
-        'app.db.models',
-        'app.printer.printer',
-        'app.printer.printer_linux',
-        'app.gui.etiqueta_editor'
+        'app.db.models'
     ],
     hookspath=[],
+    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
+    noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -51,15 +48,19 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name='ExelciorApolo',
+    name='excelcior_apolo',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Puedes poner False si quieres ocultar la consola en Windows
-    icon='assets/icono.ico',
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,  # Cambia a True si quieres ver la terminal
+    icon='icono_apolo.ico'
 )
 
 coll = COLLECT(
@@ -70,5 +71,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ExelciorApolo'
+    name='excelcior_apolo'
 )
