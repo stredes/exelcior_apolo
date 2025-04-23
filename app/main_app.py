@@ -14,6 +14,7 @@ from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
 from app.core.herramientas import abrir_herramientas
+from app.core.buscador_postal import crear_widget_postal
 from app.db.database import init_db
 from app.db.database import save_file_history
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
@@ -26,6 +27,7 @@ from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate 
 from app.utils.logger_setup import setup_logging, log_evento
 from app.utils.logger_viewer import abrir_visor_logs
 from app.utils.logger_setup import log_evento
+
 
 def global_exception_handler(exctype, value, traceback):
     log_evento(f"Excepción no capturada: {value}", "critical")
@@ -119,7 +121,7 @@ class ExcelPrinterApp(tk.Tk):
         self.main_frame.pack(side="left", fill="both", expand=True)
 
         tk.Label(self.main_frame, text="Transformador Excel",
-                 bg="#F9FAFB", fg="#111827", font=("Segoe UI", 18, "bold")).pack(pady=20)
+                bg="#F9FAFB", fg="#111827", font=("Segoe UI", 18, "bold")).pack(pady=20)
 
         mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
         mode_frame.pack(pady=10)
@@ -128,6 +130,9 @@ class ExcelPrinterApp(tk.Tk):
             ttk.Checkbutton(mode_frame, text=m.capitalize(),
                             variable=self.mode_vars[m],
                             command=lambda m=m: self._update_mode(m)).pack(side=tk.LEFT, padx=10)
+
+        # 🔍 Integración buscador de códigos postales
+        crear_widget_postal(self.main_frame)
 
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
@@ -395,14 +400,10 @@ class ExcelPrinterApp(tk.Tk):
         elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
             ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
 
-    def _threaded_print(self):
-        if self.processing or self.transformed_df is None:
-            messagebox.showerror("Error", "Primero debe cargar un archivo Excel válido.")
-            return
-        threading.Thread(target=self._print_document, daemon=True).start()
-
     def _print_document(self):
         try:
+            log_evento("Inicio de impresión de documento", "info")
+
             if self.transformed_df is None or self.transformed_df.empty:
                 messagebox.showerror("Error", "No hay datos para imprimir.")
                 return
@@ -413,32 +414,26 @@ class ExcelPrinterApp(tk.Tk):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
 
-            # Guardar solamente los datos procesados
+            # Guardar datos procesados
             self.transformed_df.to_excel(output_file, index=False)
 
             capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
+            log_evento(f"Archivo exportado correctamente: {output_file}", "info")
 
             # Enviar a impresión
             self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
 
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
             capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
-
+            log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
+            log_evento(f"Error en impresión: {e}", "error")
 
-        log_evento("Inicio de impresión de documento", "info")
-        ...
-        log_evento(f"Archivo exportado correctamente: {output_file}", "info")
-        ...
-        log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
-        ...
-        log_evento(f"Error en impresión: {e}", "error")
-
-
-
+    def _threaded_print(self):
+        threading.Thread(target=self._print_document, daemon=True).start()
 
     def _open_config_menu(self):
         if self.df is None:
@@ -461,7 +456,6 @@ class ExcelPrinterApp(tk.Tk):
             messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
 
     log_evento("Editor de etiquetas abierto", "info")
-
 
 
     def open_config_dialog(self, mode: str):
