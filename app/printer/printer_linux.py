@@ -5,11 +5,14 @@ from pathlib import Path
 from datetime import datetime
 from tkinter import messagebox
 
+from app.utils.logger_setup import log_evento  # ✅ Importa desde tu sistema central
+
 
 def print_document(filepath, mode, config_columns, df):
     try:
         if platform.system().lower() != "linux":
             messagebox.showerror("Error", "Este método solo es compatible con Linux.")
+            log_evento("Intento de impresión fuera de Linux", "error")
             return
 
         # Verificar comandos necesarios
@@ -47,45 +50,8 @@ def print_document(filepath, mode, config_columns, df):
         subprocess.run(print_cmd)
 
         messagebox.showinfo("Impresión", f"Archivo PDF impreso:\n{pdf_output.name}")
+        log_evento(f"Etiqueta enviada a impresora: {pdf_output.name}", "info")
 
     except Exception as e:
         messagebox.showerror("Error", f"Error impresión en Linux:\n{e}")
-
-import logging
-from pathlib import Path
-from datetime import datetime
-import inspect
-import os
-
-def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
-    """
-
-    # Detectar el nombre del archivo que llama a esta función
-    frame = inspect.stack()[1]
-    archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
-    log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
-
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"{log_name}.log"
-
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-
-    # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
-        handler = logging.FileHandler(log_file, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical
-    }.get(nivel.lower(), logger.info)(mensaje)
+        log_evento(f"Error al imprimir documento: {e}", "error")

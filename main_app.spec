@@ -1,6 +1,4 @@
-# main_app.spec
 # -*- mode: python ; coding: utf-8 -*-
-
 block_cipher = None
 
 a = Analysis(
@@ -8,14 +6,13 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        # Comentado hasta que el archivo esté disponible
-        # ('app/config/excel_printer_config.json', 'app/config'),
-        ('app/db/excel_printer.db', 'app/db'),
+        ('app/config', 'app/config'),
         ('app/db', 'app/db'),
         ('app/printer', 'app/printer'),
+        ('app/gui', 'app/gui'),
         ('logs', 'logs'),
-        ('exportados', 'exportados'),  # Agrega carpeta completa, aunque esté vacía
-        # ('etiqueta pedido.xlsx', '.'),  # Comentado temporalmente
+        ('exportados', 'exportados'),
+        ('etiqueta pedido.xlsx', '.'),
     ],
     hiddenimports=[
         'tkinter',
@@ -26,23 +23,24 @@ a = Analysis(
         'yaml',
         'PIL',
         'app.utils.utils',
+        'app.utils.logger_setup',
+        'app.utils.logger_viewer',
         'app.config.config_dialog',
         'app.core.excel_processor',
         'app.core.herramientas',
-        'app.db.database',
-        'app.db.models',
         'app.core.autoloader',
         'app.core.logger_bod1',
-        'app.printer.printer',
-        'app.printer.printer_linux',
-        'app.gui.etiqueta_editor'
+        'app.db.database',
+        'app.db.models'
     ],
     hookspath=[],
+    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
+    noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -50,15 +48,19 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name='ExelciorApolo',
+    name='excelcior_apolo',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
-    icon='assets/icono.ico',
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,  # Cambia a True si quieres ver la terminal
+    icon='icono_apolo.ico'
 )
 
 coll = COLLECT(
@@ -69,5 +71,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ExelciorApolo'
+    name='excelcior_apolo'
 )

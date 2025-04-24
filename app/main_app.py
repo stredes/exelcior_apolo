@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime
 import tempfile
 import platform
+import sys
 
 # ✅ IMPORTS AJUSTADOS A LA NUEVA ESTRUCTURA
 from app.config.config_dialog import ConfigDialog
@@ -23,6 +24,20 @@ from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
 from app.core.buscador_postal import crear_widget_postal
+from app.utils.logger_setup import setup_logging, log_evento
+from app.utils.logger_viewer import abrir_visor_logs
+from app.utils.logger_setup import log_evento
+
+def global_exception_handler(exctype, value, traceback):
+    log_evento(f"Excepción no capturada: {value}", "critical")
+
+sys.excepthook = global_exception_handler
+
+
+
+setup_logging()
+log_evento("Aplicación iniciada", "info")
+
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -86,7 +101,7 @@ class ExcelPrinterApp(tk.Tk):
             ("Carga Automática 🚀", self._threaded_auto_load),
             ("Configuración ⚙️", self._open_config_menu),
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
-            ("Ver Logs 📋", self.view_logs),
+            ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
         ]
@@ -207,6 +222,9 @@ class ExcelPrinterApp(tk.Tk):
             self.mode_vars[mode].set(mode == selected_mode)
         self.mode = selected_mode
 
+        log_evento(f"Modo cambiado a: {selected_mode}", "info")
+
+
     def _threaded_select_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
 
@@ -224,36 +242,52 @@ class ExcelPrinterApp(tk.Tk):
 
     def _auto_load_latest_file(self):
         self._update_status("Buscando archivo más reciente...")
+        log_evento("Inicio de carga automática", "info")
+
+        archivo = None
+        estado = None
+
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
 
             if estado == "ok" and archivo and validate_file(str(archivo)):
                 self._update_status(f"✅ Cargado: {archivo.name}")
+                log_evento(f"Archivo autocargado: {archivo.name}", "info")
                 self._process_file(str(archivo))
+
             elif estado == "no_match":
                 self._update_status("⚠️ No se encontraron archivos compatibles.")
+                log_evento(f"No se encontraron archivos válidos para modo: {self.mode}", "warning")
                 messagebox.showwarning("Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'.")
+
             elif estado == "empty_folder":
                 self._update_status("📂 Carpeta vacía o inexistente.")
+                log_evento("Carpeta vacía detectada en carga automática", "warning")
                 messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
+
             else:
                 self._update_status("❌ Error en la autocarga.")
+                log_evento(f"Estado desconocido recibido: {estado}", "error")
                 messagebox.showerror("Error", "Ocurrió un error inesperado.")
+
         except Exception as e:
             self._update_status("❌ Fallo crítico")
-            logging.error(f"Error en carga automática: {e}")
+            log_evento(f"Error inesperado en autocarga: {e}", "error")
             messagebox.showerror("Error", f"No se pudo cargar automáticamente:\n{e}")
+
         finally:
             self.processing = False
+
 
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
+        log_evento(f"Procesando archivo: {file_path}", "info")
+        
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
 
-            # ✅ Capturar correctamente la tupla
             self.transformed_df, self.total_bultos = apply_transformation(df, self.config_columns, self.mode)
 
             if self.mode == "fedex":
@@ -267,22 +301,39 @@ class ExcelPrinterApp(tk.Tk):
 
             save_file_history(file_path, self.mode)
             capturar_log_bod1(f"Archivo procesado correctamente: {file_path}", "info")
+            log_evento(f"Archivo procesado exitosamente: {file_path}", "info")
             self.after(0, self._show_preview)
 
         except Exception as exc:
             capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
+            log_evento(f"Error al procesar archivo: {file_path} - {exc}", "error")
             messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
             logging.error(f"Error: {exc}")
+
         finally:
             self.processing = False
             self._update_status("Listo")
 
+
+
     def _show_preview(self):
+
+        
         if self.transformed_df is None or self.transformed_df.empty:
             messagebox.showerror("Error", "No hay datos para mostrar.")
             return
 
         df_vista = self.transformed_df.copy()
+
+        # Forzar la reinserción de 'Receptor' si no aparece
+        if "recipientContactName" in self.transformed_df.columns:
+            df_vista["Receptor"] = self.transformed_df["recipientContactName"]
+
+        # Opcional: mover 'Receptor' al final
+        if "Receptor" in df_vista.columns:
+            cols = [col for col in df_vista.columns if col != "Receptor"] + ["Receptor"]
+            df_vista = df_vista[cols]
+
 
         # 🔍 Eliminar columnas no deseadas por modo
         columnas_ocultas = []
@@ -350,8 +401,6 @@ class ExcelPrinterApp(tk.Tk):
         elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
             ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
 
-
-
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
             messagebox.showerror("Error", "Primero debe cargar un archivo Excel válido.")
@@ -386,6 +435,15 @@ class ExcelPrinterApp(tk.Tk):
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
 
+        log_evento("Inicio de impresión de documento", "info")
+        ...
+        log_evento(f"Archivo exportado correctamente: {output_file}", "info")
+        ...
+        log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
+        ...
+        log_evento(f"Error en impresión: {e}", "error")
+
+
 
 
     def _open_config_menu(self):
@@ -407,6 +465,9 @@ class ExcelPrinterApp(tk.Tk):
             crear_editor_etiqueta(df_clientes)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
+
+    log_evento("Editor de etiquetas abierto", "info")
+
 
 
     def open_config_dialog(self, mode: str):

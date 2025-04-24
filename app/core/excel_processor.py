@@ -1,25 +1,32 @@
-import pandas as pd
 from pathlib import Path
+import pandas as pd
 from typing import Optional
 from tkinter import messagebox
-from app.core.logger_bod1 import capturar_log_bod1  # ✅ Correcto
+from app.utils.logger_setup import log_evento  # ✅ Importación correcta
+
 
 def validate_file(file_path: str) -> bool:
     path = Path(file_path)
     if not path.exists():
         messagebox.showerror("Error", "El archivo no existe.")
+        log_evento(f"Archivo no encontrado: {file_path}", "error")
         return False
     if path.suffix.lower() not in ('.xlsx', '.xls', '.csv'):
         messagebox.showerror("Error", "Formato de archivo no soportado.")
+        log_evento(f"Formato no soportado: {file_path}", "error")
         return False
     return True
+
 
 def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
     path_obj = Path(file_path).resolve()
     file_extension = path_obj.suffix.lower()
     file_path_str = path_obj.as_posix()
 
+    log_evento(f"Cargando archivo Excel: {file_path}", "info")
+
     if not path_obj.exists():
+        log_evento(f"Archivo no encontrado: {file_path_str}", "error")
         raise FileNotFoundError(f"El archivo no existe en la ruta: {file_path_str}")
 
     if file_extension in [".xlsx", ".xlsm", ".xltx", ".xltm"]:
@@ -33,6 +40,7 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
     elif file_extension in [".csv", ".txt"]:
         engine = None
     else:
+        log_evento(f"Formato no soportado: {file_extension}", "error")
         raise ValueError(f"Formato de archivo no soportado: {file_extension}")
 
     start_row = config_columns.get(mode, {}).get("start_row", 0)
@@ -44,16 +52,30 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
         else:
             df = pd.read_csv(file_path_str, skiprows=skiprows, nrows=max_rows)
     except Exception as e:
+        log_evento(f"Error al cargar archivo: {e}", "error")
         raise ValueError(f"Error al cargar archivo: {e}")
 
     if df.empty:
+        log_evento("Archivo cargado pero vacío", "warning")
         raise ValueError("El archivo está vacío o no tiene datos válidos")
 
+    log_evento("Archivo cargado correctamente", "info")
     return df
 
+
 def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
+    log_evento(f"Transformando archivo en modo: {mode}", "info")
+
     if mode == "fedex":
-        columns_needed = ['shipDate', 'masterTrackingNumber', 'reference', 'recipientCity', 'pieceTrackingNumber']
+        columns_needed = [
+            'shipDate',
+            'masterTrackingNumber',
+            'reference',
+            'recipientCity',
+            'recipientContactName',
+            'pieceTrackingNumber'
+        ]
+
         df_fedex = df[columns_needed].copy()
         df_fedex = df_fedex[df_fedex['masterTrackingNumber'].notna()]
 
@@ -61,12 +83,14 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
             'shipDate': 'first',
             'reference': 'first',
             'recipientCity': 'first',
+            'recipientContactName': 'first',
             'pieceTrackingNumber': 'count'
         }).reset_index()
 
-        grouped.columns = ['Tracking Number', 'Fecha', 'Referencia', 'Ciudad', 'BULTOS']
+        grouped.columns = ['Tracking Number', 'Fecha', 'Referencia', 'Ciudad', 'Receptor', 'BULTOS']
         total_bultos = grouped['BULTOS'].sum()
 
+        log_evento(f"Transformación FedEx completada con {len(grouped)} registros", "info")
         return grouped, total_bultos
 
     # --- Genérico para urbano, listados, etc. ---
@@ -87,48 +111,9 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str):
             df_transformed[col] = pd.to_numeric(df_transformed[col], errors='coerce')
             resumen[col] = df_transformed[col].sum()
 
-    # ✅ En lugar de agregar fila, devolver el resumen por separado
     total = None
     if resumen:
-        total = list(resumen.values())[0]  # asumimos un solo campo a sumar
+        total = list(resumen.values())[0]
 
+    log_evento(f"Transformación en modo {mode} completada. Total: {total}", "info")
     return df_transformed, total
-
-import logging
-from pathlib import Path
-from datetime import datetime
-import inspect
-import os
-
-def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
-    """
-
-    # Detectar el nombre del archivo que llama a esta función
-    frame = inspect.stack()[1]
-    archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
-    log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
-
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"{log_name}.log"
-
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-
-    # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
-        handler = logging.FileHandler(log_file, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical
-    }.get(nivel.lower(), logger.info)(mensaje)
