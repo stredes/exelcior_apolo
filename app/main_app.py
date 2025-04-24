@@ -22,6 +22,7 @@ from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
+from app.core.buscador_postal import crear_widget_postal
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -104,7 +105,7 @@ class ExcelPrinterApp(tk.Tk):
         self.main_frame.pack(side="left", fill="both", expand=True)
 
         tk.Label(self.main_frame, text="Transformador Excel",
-                 bg="#F9FAFB", fg="#111827", font=("Segoe UI", 18, "bold")).pack(pady=20)
+                bg="#F9FAFB", fg="#111827", font=("Segoe UI", 18, "bold")).pack(pady=20)
 
         mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
         mode_frame.pack(pady=10)
@@ -113,6 +114,11 @@ class ExcelPrinterApp(tk.Tk):
             ttk.Checkbutton(mode_frame, text=m.capitalize(),
                             variable=self.mode_vars[m],
                             command=lambda m=m: self._update_mode(m)).pack(side=tk.LEFT, padx=10)
+
+        # ✅ Añadir buscador de código postal UNA SOLA VEZ
+        from app.core.buscador_postal import crear_widget_postal
+        crear_widget_postal(self.main_frame)
+
 
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
