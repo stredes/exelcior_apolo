@@ -1,7 +1,6 @@
 """
 ✅ Código completo unificado para impresión de etiquetas Zebra en versión Desktop
-- Configuración guardada en `app/config/user_config.json`
-- GUI con edición, búsqueda por RUT y escaneo Zebra
+✔️ Con verificación de conexión y almacenamiento correcto de ruta de Excel
 """
 
 import tkinter as tk
@@ -14,7 +13,6 @@ from datetime import datetime
 import threading
 import logging
 
-# -------------------- CONFIGURACIÓN --------------------
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "user_config.json"
 LOG_PATH = Path("logs")
 LOG_PATH.mkdir(exist_ok=True)
@@ -38,9 +36,16 @@ def guardar_configuracion(config):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
+def verificar_conexion_zebra(ip: str, port: int, timeout: float = 1.0) -> bool:
+    try:
+        with socket.create_connection((ip, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
 def obtener_ruta_excel():
     config = cargar_configuracion()
-    ruta = config.get("ruta_excel", "")
+    ruta = config.get("ruta_excel")
     if ruta and Path(ruta).exists():
         return ruta
     nueva_ruta = filedialog.askopenfilename(
@@ -56,6 +61,22 @@ def obtener_ruta_excel():
         exit()
 
 def imprimir_zebra_zpl(zpl: str, ip: str, port: int, cantidad: int = 1):
+    if not verificar_conexion_zebra(ip, port):
+        if messagebox.askretrycancel("Conexión fallida", f"No se pudo conectar con Zebra en {ip}:{port}.
+
+¿Quieres escanear y actualizar la IP automáticamente?"):
+            encontrados = escanear_dispositivos_zebra()
+            if encontrados:
+                ip_nuevo = encontrados[0]
+                config = cargar_configuracion()
+                config["zebra_ip"] = ip_nuevo
+                guardar_configuracion(config)
+                messagebox.showinfo("Zebra encontrada", f"Nueva IP detectada: {ip_nuevo}
+Configuración actualizada.")
+            else:
+                messagebox.showwarning("Escaneo fallido", "No se detectó ninguna impresora Zebra en la red.")
+        return
+        return
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((ip, port))
@@ -66,6 +87,8 @@ def imprimir_zebra_zpl(zpl: str, ip: str, port: int, cantidad: int = 1):
     except Exception as e:
         logging.error(f"Error al imprimir en Zebra: {str(e)}")
         messagebox.showerror("Error en impresión", str(e))
+
+# (El resto del código permanece igual...)
 
 def generar_zpl_10x10(data: dict) -> str:
     return f"""^XA
