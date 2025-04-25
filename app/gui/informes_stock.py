@@ -1,4 +1,3 @@
-# Reescritura optimizada del módulo de informes de stock físico con autocarga, configuración dinámica y CRUD extendido
 from pathlib import Path
 import pandas as pd
 from datetime import datetime, timedelta
@@ -6,17 +5,18 @@ from tkinter import filedialog, messagebox, ttk, simpledialog
 import tkinter as tk
 import os, re, json
 
-# Placeholder para configuración externa
+# =================== Configuración básica ===================
 load_config = lambda: {"carpeta_informes": str(Path.home() / "Documentos" / "StockFísico")}
 save_config = lambda config: None
 
-# =================== Funciones Auxiliares ===================
 def obtener_descargas():
     return Path.home() / ("Downloads" if os.name == 'nt' else "Descargas")
 
 def buscar_último_archivo(base: Path) -> Path | None:
-    regex = re.compile(r"Informe_stock_fisico_(\d{8}_\d{6})\.xlsx")
-    archivos = [(f, regex.search(f.name).group(1)) for f in base.glob("Informe_stock_fisico_*.xlsx") if regex.search(f.name)]
+    regex = re.compile(r"Informe_stock_fisico_(\d{8}_\d{6})")
+    archivos = []
+    for ext in ("*.xlsx", "*.xls"):
+        archivos += [(f, regex.search(f.name).group(1)) for f in base.glob(ext) if regex.search(f.name)]
     return sorted(archivos, key=lambda x: x[1], reverse=True)[0][0] if archivos else None
 
 def cargar_excel_stock(path: Path) -> pd.DataFrame:
@@ -31,71 +31,51 @@ def cargar_excel_stock(path: Path) -> pd.DataFrame:
         messagebox.showerror("Error cargando archivo", str(e))
         return pd.DataFrame()
 
-# =================== Configuración personalizada ===================
-def cargar_configuracion_columnas_stock() -> dict:
-    config_path = Path.home() / ".exelcior_stock_config.json"
-    if config_path.exists():
-        try:
-            with open(config_path, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+# =================== Filtros Avanzados ===================
+class FiltroAvanzado:
+    def __init__(self, frame_visores):
+        self.filtros = []
+        self.frame_visores = frame_visores
 
-def guardar_configuracion_columnas_stock(config_dict: dict):
-    config_path = Path.home() / ".exelcior_stock_config.json"
-    try:
-        with open(config_path, 'w') as f:
-            json.dump(config_dict, f, indent=2)
-    except Exception as e:
-        messagebox.showerror("Error guardando configuración", str(e))
+    def agregar(self, columna, condicion, valor, actualizar_callback):
+        if columna and valor:
+            self.filtros.append((columna, condicion, valor.strip().lower()))
+            self.refrescar_visores(actualizar_callback)
 
-# =================== Lógica de Informes ===================
-def generar_informes(df: pd.DataFrame, dias: int = 60, ubicaciones=None, config_columns: dict = None) -> dict:
-    hoy = datetime.today()
-    proximo = hoy + timedelta(days=dias)
-    out = {}
-    try:
-        out["Caducidad Próxima"] = df[df['fecha vencimiento'].between(hoy, proximo)].sort_values(by='fecha vencimiento', ascending=False)
-        out["Productos Vencidos"] = df[df['fecha vencimiento'] < hoy].sort_values(by='fecha vencimiento', ascending=False)
-        out["Múltiples Lotes"] = df.groupby('código').filter(lambda x: x['lote'].nunique() > 1).sort_values(by='saldo stock', ascending=False)
-        if 'bodega' in df:
-            out["Bodega Temporal"] = df[df['bodega'].str.contains("temporal", case=False, na=False)].sort_values(by='saldo stock', ascending=False)
-        if 'reserva' in df:
-            out["Stock Reservado"] = df[df['reserva'] > 0].sort_values(by='reserva', ascending=False)
-        if 'saldo stock' in df:
-            out["Stock por Producto"] = df.groupby('producto')['saldo stock'].sum().reset_index().sort_values(by='saldo stock', ascending=False)
-        if 'ubicación' in df:
-            ubicaciones_validas = sorted(df['ubicación'].dropna().unique())
-            df_ubic = df.copy()
-            if config_columns and 'stock_general' in config_columns:
-                columnas = config_columns['stock_general']
-                df_ubic = df_ubic[[col for col in columnas if col in df_ubic.columns]]
-            df_ubic['fecha vencimiento'] = df_ubic['fecha vencimiento'].dt.strftime('%d/%m/%Y')
-            out["Ubicación: Todas"] = df_ubic.sort_values(by='saldo stock', ascending=False)
-            for ubic in ubicaciones_validas:
-                if ubicaciones and not any(ubic.startswith(u) for u in ubicaciones):
-                    continue
-                filtro = df[df['ubicación'].str.startswith(ubic)].copy()
-                if config_columns and 'stock_ubicacion' in config_columns:
-                    columnas = config_columns['stock_ubicacion']
-                    filtro = filtro[[col for col in columnas if col in filtro.columns]]
-                filtro['fecha vencimiento'] = filtro['fecha vencimiento'].dt.strftime('%d/%m/%Y')
-                out[f"Ubicación: {ubic}"] = filtro.sort_values(by='saldo stock', ascending=False)
-    except Exception as e:
-        messagebox.showerror("Error generando informes", str(e))
-    return out
+    def eliminar(self, idx, actualizar_callback):
+        if 0 <= idx < len(self.filtros):
+            self.filtros.pop(idx)
+            self.refrescar_visores(actualizar_callback)
 
-# =================== UI Helpers ===================
-def mostrar_en_treeview(tree: ttk.Treeview, df: pd.DataFrame):
-    tree.delete(*tree.get_children())
-    tree["columns"] = list(df.columns)
-    tree["show"] = "headings"
-    for col in df.columns:
-        tree.heading(col, text=col)
-        tree.column(col, width=120)
-    for _, row in df.iterrows():
-        tree.insert("", "end", values=list(row))
+    def limpiar(self, actualizar_callback):
+        self.filtros.clear()
+        self.refrescar_visores(actualizar_callback)
+
+    def aplicar(self, df):
+        for col, cond, val in self.filtros:
+            if col in df.columns:
+                serie = df[col].astype(str).str.lower()
+                if cond == 'Contiene':
+                    df = df[serie.str.contains(val, na=False)]
+                elif cond == 'Empieza con':
+                    df = df[serie.str.startswith(val, na=False)]
+                elif cond == 'Termina con':
+                    df = df[serie.str.endswith(val, na=False)]
+                elif cond == 'Igual a':
+                    df = df[serie == val]
+        return df
+
+    def refrescar_visores(self, actualizar_callback):
+        for widget in self.frame_visores.winfo_children():
+            widget.destroy()
+        for idx, (col, cond, val) in enumerate(self.filtros):
+            chip = tk.Frame(self.frame_visores, bg="#E0E7FF", bd=1, relief="solid")
+            chip.pack(side="left", padx=5, pady=2)
+            lbl = tk.Label(chip, text=f"{col} {cond} {val}", bg="#E0E7FF", font=("Segoe UI", 9))
+            lbl.pack(side="left", padx=(5,0))
+            btn = tk.Button(chip, text="✖", command=lambda i=idx: self.eliminar(i, actualizar_callback),
+                            bg="#F87171", fg="white", font=("Segoe UI", 8), relief="flat")
+            btn.pack(side="right", padx=5)
 
 # =================== CRUD sobre Treeview ===================
 class TableEditor:
@@ -109,7 +89,8 @@ class TableEditor:
 
     def edit_cell(self, event):
         region = self.tree.identify('region', event.x, event.y)
-        if region != 'cell': return
+        if region != 'cell':
+            return
         row_id = self.tree.identify_row(event.y)
         col = self.tree.identify_column(event.x)
         col_idx = int(col.replace('#', '')) - 1
@@ -155,78 +136,83 @@ class TableEditor:
         if nombre in self.df.columns:
             self.df.drop(columns=[nombre], inplace=True)
             mostrar_en_treeview(self.tree, self.df)
+
+# =================== Mostrar en Treeview ===================
+def mostrar_en_treeview(tree: ttk.Treeview, df: pd.DataFrame):
+    tree.delete(*tree.get_children())
+    tree["columns"] = list(df.columns)
+    tree["show"] = "headings"
+    for col in df.columns:
+        tree.heading(col, text=col)
+        tree.column(col, width=120)
+    for _, row in df.iterrows():
+        tree.insert("", "end", values=list(row))
+
 # =================== Ventana Principal ===================
 def crear_ventana_informes_stock():
     config = load_config()
     app = tk.Toplevel()
     app.title("Informes de Stock Físico")
-    app.geometry("1200x700")
-
-    frame_config = tk.Frame(app)
-    frame_config.pack(pady=3)
-
-    def cambiar_carpeta():
-        nueva = filedialog.askdirectory(title="Editar carpeta de informes")
-        if nueva:
-            config["carpeta_informes"] = nueva
-            save_config(config)
-            messagebox.showinfo("Configuración actualizada", f"Nueva carpeta: {nueva}")
-            generar()
-
-    tk.Button(frame_config, text="📁 Cambiar carpeta de informes", command=cambiar_carpeta).pack(side=tk.RIGHT, padx=10)
-
+    app.geometry("1300x780")
 
     frame_top = tk.Frame(app)
     frame_top.pack(pady=5)
 
-    tk.Label(frame_top, text="Archivo cargado:").pack(side=tk.LEFT)
     entry_archivo = tk.Entry(frame_top, width=80)
     entry_archivo.pack(side=tk.LEFT, padx=5)
 
-    frame_filtros = tk.LabelFrame(app, text="Opciones de Informe")
-    frame_filtros.pack(pady=5, fill="x", padx=10)
+    ttk.Button(frame_top, text="Generar Informes", command=lambda: generar()).pack(side=tk.LEFT, padx=5)
+    ttk.Button(frame_top, text="Inventariado", command=lambda: inventariado()).pack(side=tk.LEFT, padx=5)
 
-    combo_general = ttk.Combobox(frame_filtros, state="readonly", width=40)
+    combo_general = ttk.Combobox(frame_top, state="readonly", width=40)
     combo_general.pack(side=tk.LEFT, padx=5)
 
-    combo_ubic = ttk.Combobox(frame_filtros, state="readonly", width=30)
-    combo_ubic.pack(side=tk.LEFT, padx=5)
+    frame_chips = tk.Frame(app)
+    frame_chips.pack(pady=3, fill="x")
 
-    entry_busqueda = tk.Entry(frame_filtros, width=25)
-    entry_busqueda.pack(side=tk.LEFT, padx=5)
-    entry_busqueda.insert(0, "Buscar...")
+    columnas_disponibles = ['código', 'producto', 'ubicación', 'n° serie', 'lote', 'fecha vencimiento', 'saldo stock']
+    condiciones_disponibles = ['Contiene', 'Empieza con', 'Termina con', 'Igual a']
+
+    combo_columna = ttk.Combobox(frame_chips, values=columnas_disponibles, width=15, state="readonly")
+    combo_columna.set("producto")
+    combo_columna.pack(side=tk.LEFT, padx=5)
+
+    combo_condicion = ttk.Combobox(frame_chips, values=condiciones_disponibles, width=12, state="readonly")
+    combo_condicion.set("Contiene")
+    combo_condicion.pack(side=tk.LEFT, padx=5)
+
+    entry_valor = tk.Entry(frame_chips, width=20)
+    entry_valor.pack(side=tk.LEFT, padx=5)
+
+    filtros_aplicados = FiltroAvanzado(frame_chips)
 
     tree = ttk.Treeview(app)
     tree.pack(fill="both", expand=True, padx=10, pady=10)
-
-    frame_crud = tk.Frame(app)
-    frame_crud.pack(pady=5)
 
     informes = {}
     editor = None
 
     def actualizar(event=None):
         nonlocal editor
-        clave = combo_general.get() or combo_ubic.get()
+        clave = combo_general.get()
         if clave in informes:
-            df = informes[clave]
-            if entry_busqueda.get().strip() not in ("", "Buscar..."):
-                texto = entry_busqueda.get().strip().lower()
-                df = df[df.apply(lambda r: texto in str(r.values).lower(), axis=1)]
+            df = informes[clave].copy()
+            df = filtros_aplicados.aplicar(df)
             mostrar_en_treeview(tree, df)
-            editor = TableEditor(tree, informes[clave])
+            editor = TableEditor(tree, df)
+
+    def agregar_filtro():
+        col = combo_columna.get()
+        cond = combo_condicion.get()
+        val = entry_valor.get().strip()
+        if col and val:
+            filtros_aplicados.agregar(col, cond, val, actualizar)
+            entry_valor.delete(0, tk.END)
 
     def generar():
-        config = load_config()
-        carpeta_configurada = config.get("carpeta_informes", "")
-        carpeta = Path(carpeta_configurada)
-
+        carpeta = Path(config.get("carpeta_informes", ""))
         if not carpeta.exists():
-            nueva = filedialog.askdirectory(title="Selecciona carpeta de informes de stock")
-            if not nueva:
-                messagebox.showwarning("Carpeta requerida", "Debes seleccionar una carpeta para continuar.")
-                return
-            carpeta = Path(nueva)
+            carpeta = Path(filedialog.askdirectory(title="Selecciona carpeta de informes de stock"))
             config["carpeta_informes"] = str(carpeta)
             save_config(config)
 
@@ -243,48 +229,49 @@ def crear_ventana_informes_stock():
             return
 
         informes.clear()
-        informes.update(generar_informes(df))
-
-        generales = sorted(k for k in informes if not k.startswith("Ubicación: "))
-        por_ubic = sorted(k for k in informes if k.startswith("Ubicación: "))
-
-        combo_general["values"] = generales
-        combo_ubic["values"] = por_ubic
-        if generales:
-            combo_general.current(0)
-        if por_ubic:
-            combo_ubic.current(0)
+        informes["Inventariado"] = df[df['ubicación'].notna()].sort_values(by='ubicación')
+        combo_general.set("Inventariado")
         actualizar()
 
-    def exportar():
-        clave = combo_general.get() or combo_ubic.get()
+    def inventariado():
+        ubic = simpledialog.askstring("Inventariado", "Ubicación base para filtrar (ej: 14-B):")
+        if not ubic:
+            return
+        filtros_aplicados.limpiar(actualizar)
+        filtros_aplicados.agregar('ubicación', 'Empieza con', ubic, actualizar)
+        filtros_aplicados.agregar('saldo stock', 'Mayor que', '0', actualizar)
+        combo_general.set("Inventariado")
+        actualizar()
+
+    ttk.Button(frame_chips, text="➕ Agregar Filtro", command=agregar_filtro).pack(side=tk.LEFT, padx=5)
+    ttk.Button(frame_chips, text="🧹 Mostrar Todo", command=lambda: filtros_aplicados.limpiar(actualizar)).pack(side=tk.LEFT, padx=5)
+
+    def exportar_inventariado():
+        clave = combo_general.get()
         if clave not in informes:
             messagebox.showwarning("Exportar", "Selecciona un informe.")
             return
-        df = informes[clave]
-        if df.empty:
+        df_exportar = filtros_aplicados.aplicar(informes[clave].copy())
+        if df_exportar.empty:
             messagebox.showinfo("Vacío", "No hay datos para exportar.")
             return
-        nombre = f"{clave.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        config = load_config()
-        carpeta = Path(config.get("carpeta_informes", obtener_descargas()))
-        carpeta.mkdir(parents=True, exist_ok=True)
-        ruta = carpeta / nombre
+        ubicacion = "general"
+        if filtros_aplicados.filtros:
+            for col, cond, val in filtros_aplicados.filtros:
+                if col == "ubicación":
+                    ubicacion = val.replace(" ", "_")
+                    break
+        nombre = f"inventariado_{ubicacion}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        carpeta_export = Path(config.get("carpeta_informes", obtener_descargas()))
+        carpeta_export.mkdir(parents=True, exist_ok=True)
+        ruta = carpeta_export / nombre
         try:
-            df.to_excel(ruta, index=False)
-            messagebox.showinfo("Exportado", f"Guardado en:\n{ruta}")
+            df_exportar.to_excel(ruta, index=False)
+            messagebox.showinfo("Exportado", f"Inventariado guardado en:\n{ruta}")
         except Exception as e:
             messagebox.showerror("Error al exportar", str(e))
 
-    tk.Button(frame_crud, text="➕ Fila", command=lambda: editor.agregar_fila() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="❌ Fila", command=lambda: editor.eliminar_filas() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="➕ Columna", command=lambda: editor.agregar_columna() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="🗑️ Columna", command=lambda: editor.eliminar_columna() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="Exportar", command=exportar).pack(side=tk.LEFT, padx=5)
-
-    combo_general.bind("<<ComboboxSelected>>", actualizar)
-    combo_ubic.bind("<<ComboboxSelected>>", actualizar)
-    entry_busqueda.bind("<KeyRelease>", actualizar)
+    ttk.Button(frame_chips, text="📤 Exportar Inventariado", command=exportar_inventariado).pack(side=tk.LEFT, padx=5)
 
     generar()
     app.mainloop()

@@ -433,21 +433,14 @@ class ExcelPrinterApp(tk.Tk):
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
             capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
 
+            log_evento("Inicio de impresión de documento", "info")
+            log_evento(f"Archivo exportado correctamente: {output_file}", "info")
+            log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
-
-        log_evento("Inicio de impresión de documento", "info")
-        ...
-        log_evento(f"Archivo exportado correctamente: {output_file}", "info")
-        ...
-        log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
-        ...
-        log_evento(f"Error en impresión: {e}", "error")
-
-
-
+            log_evento(f"Error en impresión: {e}", "error")
 
     def _open_config_menu(self):
         if self.df is None:
@@ -510,49 +503,9 @@ class ExcelPrinterApp(tk.Tk):
         txt.pack(fill=tk.BOTH, expand=True)
         with latest_log.open("r", encoding="utf-8", errors="replace") as f:
             txt.insert(tk.END, f.read())
-
-
-import logging
-from pathlib import Path
-from datetime import datetime
-import inspect
-import os
-
-def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
-    """
-
-    # Detectar el nombre del archivo que llama a esta función
-    frame = inspect.stack()[1]
-    archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
-    log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
-
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"{log_name}.log"
-
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-
-    # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
-        handler = logging.FileHandler(log_file, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical
-    }.get(nivel.lower(), logger.info)(mensaje)
-
-
-
-if __name__ == "__main__":
+def main():
     app = ExcelPrinterApp()
     app.mainloop()
+
+if __name__ == "__main__":
+    main()
