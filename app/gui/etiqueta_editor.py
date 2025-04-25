@@ -62,20 +62,19 @@ def obtener_ruta_excel():
 
 def imprimir_zebra_zpl(zpl: str, ip: str, port: int, cantidad: int = 1):
     if not verificar_conexion_zebra(ip, port):
-        if messagebox.askretrycancel("Conexión fallida", f"No se pudo conectar con Zebra en {ip}:{port}.
-
-¿Quieres escanear y actualizar la IP automáticamente?"):
+        if messagebox.askretrycancel(
+            "Conexión fallida",
+            f"No se pudo conectar con Zebra en {ip}:{port}.\n\n¿Quieres escanear y actualizar la IP automáticamente?"
+        ):
             encontrados = escanear_dispositivos_zebra()
             if encontrados:
                 ip_nuevo = encontrados[0]
                 config = cargar_configuracion()
                 config["zebra_ip"] = ip_nuevo
                 guardar_configuracion(config)
-                messagebox.showinfo("Zebra encontrada", f"Nueva IP detectada: {ip_nuevo}
-Configuración actualizada.")
+                messagebox.showinfo("Zebra encontrada", f"Nueva IP detectada: {ip_nuevo}\nConfiguración actualizada.")
             else:
                 messagebox.showwarning("Escaneo fallido", "No se detectó ninguna impresora Zebra en la red.")
-        return
         return
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -87,8 +86,6 @@ Configuración actualizada.")
     except Exception as e:
         logging.error(f"Error al imprimir en Zebra: {str(e)}")
         messagebox.showerror("Error en impresión", str(e))
-
-# (El resto del código permanece igual...)
 
 def generar_zpl_10x10(data: dict) -> str:
     return f"""^XA

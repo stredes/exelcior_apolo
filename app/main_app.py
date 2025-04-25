@@ -27,6 +27,8 @@ from app.core.buscador_postal import crear_widget_postal
 from app.utils.logger_setup import setup_logging, log_evento
 from app.utils.logger_viewer import abrir_visor_logs
 from app.utils.logger_setup import log_evento
+from app.gui.informes_stock import crear_ventana_informes_stock
+
 
 def global_exception_handler(exctype, value, traceback):
     log_evento(f"Excepción no capturada: {value}", "critical")
@@ -60,7 +62,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("750x700") 
+        self.geometry("790x700") 
 
 
      
@@ -104,6 +106,7 @@ class ExcelPrinterApp(tk.Tk):
             ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
+            ("Informes Stock 📊", crear_ventana_informes_stock),
         ]
 
         for text, command in buttons:
