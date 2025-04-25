@@ -1,13 +1,13 @@
-# Reescritura optimizada del módulo de informes de stock físico con CRUD extendido
+# Reescritura optimizada del módulo de informes de stock físico con autocarga, configuración dinámica y CRUD extendido
 from pathlib import Path
 import pandas as pd
 from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox, ttk, simpledialog
 import tkinter as tk
-import os, re
+import os, re, json
 
 # Placeholder para configuración externa
-load_config = lambda: {}
+load_config = lambda: {"carpeta_informes": str(Path.home() / "Documentos" / "StockFísico")}
 save_config = lambda config: None
 
 # =================== Funciones Auxiliares ===================
@@ -31,27 +31,57 @@ def cargar_excel_stock(path: Path) -> pd.DataFrame:
         messagebox.showerror("Error cargando archivo", str(e))
         return pd.DataFrame()
 
+# =================== Configuración personalizada ===================
+def cargar_configuracion_columnas_stock() -> dict:
+    config_path = Path.home() / ".exelcior_stock_config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def guardar_configuracion_columnas_stock(config_dict: dict):
+    config_path = Path.home() / ".exelcior_stock_config.json"
+    try:
+        with open(config_path, 'w') as f:
+            json.dump(config_dict, f, indent=2)
+    except Exception as e:
+        messagebox.showerror("Error guardando configuración", str(e))
+
 # =================== Lógica de Informes ===================
-def generar_informes(df: pd.DataFrame, dias: int = 60, ubicaciones=None) -> dict:
+def generar_informes(df: pd.DataFrame, dias: int = 60, ubicaciones=None, config_columns: dict = None) -> dict:
     hoy = datetime.today()
     proximo = hoy + timedelta(days=dias)
     out = {}
     try:
-        out["Caducidad Próxima"] = df[df['fecha vencimiento'].between(hoy, proximo)]
-        out["Productos Vencidos"] = df[df['fecha vencimiento'] < hoy]
-        out["Múltiples Lotes"] = df.groupby('código').filter(lambda x: x['lote'].nunique() > 1)
+        out["Caducidad Próxima"] = df[df['fecha vencimiento'].between(hoy, proximo)].sort_values(by='fecha vencimiento', ascending=False)
+        out["Productos Vencidos"] = df[df['fecha vencimiento'] < hoy].sort_values(by='fecha vencimiento', ascending=False)
+        out["Múltiples Lotes"] = df.groupby('código').filter(lambda x: x['lote'].nunique() > 1).sort_values(by='saldo stock', ascending=False)
         if 'bodega' in df:
-            out["Bodega Temporal"] = df[df['bodega'].str.contains("temporal", case=False, na=False)]
+            out["Bodega Temporal"] = df[df['bodega'].str.contains("temporal", case=False, na=False)].sort_values(by='saldo stock', ascending=False)
         if 'reserva' in df:
-            out["Stock Reservado"] = df[df['reserva'] > 0]
+            out["Stock Reservado"] = df[df['reserva'] > 0].sort_values(by='reserva', ascending=False)
         if 'saldo stock' in df:
             out["Stock por Producto"] = df.groupby('producto')['saldo stock'].sum().reset_index().sort_values(by='saldo stock', ascending=False)
         if 'ubicación' in df:
-            for ubic in sorted(df['ubicación'].dropna().unique()):
-                if ubicaciones and ubic not in ubicaciones: continue
-                filtro = df[df['ubicación'] == ubic].copy()
+            ubicaciones_validas = sorted(df['ubicación'].dropna().unique())
+            df_ubic = df.copy()
+            if config_columns and 'stock_general' in config_columns:
+                columnas = config_columns['stock_general']
+                df_ubic = df_ubic[[col for col in columnas if col in df_ubic.columns]]
+            df_ubic['fecha vencimiento'] = df_ubic['fecha vencimiento'].dt.strftime('%d/%m/%Y')
+            out["Ubicación: Todas"] = df_ubic.sort_values(by='saldo stock', ascending=False)
+            for ubic in ubicaciones_validas:
+                if ubicaciones and not any(ubic.startswith(u) for u in ubicaciones):
+                    continue
+                filtro = df[df['ubicación'].str.startswith(ubic)].copy()
+                if config_columns and 'stock_ubicacion' in config_columns:
+                    columnas = config_columns['stock_ubicacion']
+                    filtro = filtro[[col for col in columnas if col in filtro.columns]]
                 filtro['fecha vencimiento'] = filtro['fecha vencimiento'].dt.strftime('%d/%m/%Y')
-                out[f"Ubicación: {ubic}"] = filtro[['código', 'producto', 'ubicación', 'n° serie', 'lote', 'fecha vencimiento', 'saldo stock']]
+                out[f"Ubicación: {ubic}"] = filtro.sort_values(by='saldo stock', ascending=False)
     except Exception as e:
         messagebox.showerror("Error generando informes", str(e))
     return out
@@ -125,35 +155,33 @@ class TableEditor:
         if nombre in self.df.columns:
             self.df.drop(columns=[nombre], inplace=True)
             mostrar_en_treeview(self.tree, self.df)
-
 # =================== Ventana Principal ===================
 def crear_ventana_informes_stock():
+    config = load_config()
     app = tk.Toplevel()
     app.title("Informes de Stock Físico")
     app.geometry("1200x700")
 
+    frame_config = tk.Frame(app)
+    frame_config.pack(pady=3)
+
+    def cambiar_carpeta():
+        nueva = filedialog.askdirectory(title="Editar carpeta de informes")
+        if nueva:
+            config["carpeta_informes"] = nueva
+            save_config(config)
+            messagebox.showinfo("Configuración actualizada", f"Nueva carpeta: {nueva}")
+            generar()
+
+    tk.Button(frame_config, text="📁 Cambiar carpeta de informes", command=cambiar_carpeta).pack(side=tk.RIGHT, padx=10)
+
+
     frame_top = tk.Frame(app)
     frame_top.pack(pady=5)
 
-    tk.Label(frame_top, text="Archivo:").pack(side=tk.LEFT)
-    entry_archivo = tk.Entry(frame_top, width=60)
+    tk.Label(frame_top, text="Archivo cargado:").pack(side=tk.LEFT)
+    entry_archivo = tk.Entry(frame_top, width=80)
     entry_archivo.pack(side=tk.LEFT, padx=5)
-
-    def seleccionar_archivo():
-        config = load_config()
-        carpeta = Path(config.get("carpeta_informes", ""))
-        archivo = buscar_último_archivo(carpeta) if carpeta.exists() else None
-        if not archivo:
-            ruta = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xls")])
-            if ruta:
-                archivo = Path(ruta)
-                config["carpeta_informes"] = str(archivo.parent)
-                save_config(config)
-        if archivo:
-            entry_archivo.delete(0, tk.END)
-            entry_archivo.insert(0, str(archivo))
-
-    tk.Button(frame_top, text="Seleccionar", command=seleccionar_archivo).pack(side=tk.LEFT)
 
     frame_filtros = tk.LabelFrame(app, text="Opciones de Informe")
     frame_filtros.pack(pady=5, fill="x", padx=10)
@@ -189,16 +217,32 @@ def crear_ventana_informes_stock():
             editor = TableEditor(tree, informes[clave])
 
     def generar():
-        ruta = entry_archivo.get()
-        if not ruta:
-            messagebox.showwarning("Falta archivo", "Selecciona un archivo Excel válido.")
+        config = load_config()
+        carpeta_configurada = config.get("carpeta_informes", "")
+        carpeta = Path(carpeta_configurada)
+
+        if not carpeta.exists():
+            nueva = filedialog.askdirectory(title="Selecciona carpeta de informes de stock")
+            if not nueva:
+                messagebox.showwarning("Carpeta requerida", "Debes seleccionar una carpeta para continuar.")
+                return
+            carpeta = Path(nueva)
+            config["carpeta_informes"] = str(carpeta)
+            save_config(config)
+
+        archivo = buscar_último_archivo(carpeta)
+        if not archivo:
+            messagebox.showwarning("Archivo no encontrado", f"No se encontró archivo en {carpeta}")
             return
-        df = cargar_excel_stock(Path(ruta))
+
+        entry_archivo.delete(0, tk.END)
+        entry_archivo.insert(0, str(archivo))
+
+        df = cargar_excel_stock(archivo)
         if df.empty:
             return
 
         informes.clear()
-        ubicaciones = df['ubicación'].dropna().unique().tolist() if 'ubicación' in df else []
         informes.update(generar_informes(df))
 
         generales = sorted(k for k in informes if not k.startswith("Ubicación: "))
@@ -222,23 +266,25 @@ def crear_ventana_informes_stock():
             messagebox.showinfo("Vacío", "No hay datos para exportar.")
             return
         nombre = f"{clave.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        ruta = obtener_descargas() / nombre
+        config = load_config()
+        carpeta = Path(config.get("carpeta_informes", obtener_descargas()))
+        carpeta.mkdir(parents=True, exist_ok=True)
+        ruta = carpeta / nombre
         try:
             df.to_excel(ruta, index=False)
             messagebox.showinfo("Exportado", f"Guardado en:\n{ruta}")
         except Exception as e:
             messagebox.showerror("Error al exportar", str(e))
 
-    tk.Button(frame_crud, text="➕ Agregar Fila", command=lambda: editor.agregar_fila() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="❌ Eliminar Fila", command=lambda: editor.eliminar_filas() if editor else None).pack(side=tk.LEFT, padx=5)
+    tk.Button(frame_crud, text="➕ Fila", command=lambda: editor.agregar_fila() if editor else None).pack(side=tk.LEFT, padx=5)
+    tk.Button(frame_crud, text="❌ Fila", command=lambda: editor.eliminar_filas() if editor else None).pack(side=tk.LEFT, padx=5)
     tk.Button(frame_crud, text="➕ Columna", command=lambda: editor.agregar_columna() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="🗑️ Eliminar Columna", command=lambda: editor.eliminar_columna() if editor else None).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="Exportar Informe", command=exportar).pack(side=tk.LEFT, padx=5)
-    tk.Button(frame_crud, text="Generar Informes", command=generar).pack(side=tk.LEFT, padx=5)
+    tk.Button(frame_crud, text="🗑️ Columna", command=lambda: editor.eliminar_columna() if editor else None).pack(side=tk.LEFT, padx=5)
+    tk.Button(frame_crud, text="Exportar", command=exportar).pack(side=tk.LEFT, padx=5)
 
     combo_general.bind("<<ComboboxSelected>>", actualizar)
     combo_ubic.bind("<<ComboboxSelected>>", actualizar)
     entry_busqueda.bind("<KeyRelease>", actualizar)
 
-    seleccionar_archivo()
+    generar()
     app.mainloop()

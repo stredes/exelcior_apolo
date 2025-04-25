@@ -62,7 +62,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("790x700") 
+        self.geometry("790x790") 
 
 
      
