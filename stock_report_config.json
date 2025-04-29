@@ -1,0 +1,21 @@
+{
+    "stock": {
+      "eliminar": [
+        "Código de Ubicación",
+        "Descripción Larga",
+        "Proveedor",
+        "Categoría",
+        "Precio Unitario"
+      ],
+      "sumar": [
+        "Cantidad"
+      ],
+      "mantener_formato": [
+        "SKU"
+      ],
+      "date_field": "Fecha",
+      "start_row": 1,
+      "export_dir": "exportados/stock"
+    }
+  }
+  
