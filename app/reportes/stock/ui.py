@@ -1,5 +1,3 @@
-# app/reportes/stock/ui.py
-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from tkcalendar import DateEntry
@@ -11,180 +9,157 @@ from app.reportes.stock.config import StockReportConfig
 from app.reportes.stock.service import StockReportService
 from app.db.utils_db import save_file_history
 
-
 class StockReportUI:
     """
-    Interfaz para filtrar y visualizar inventario físico con:
-      • Fecha inventario (rango)
-      • Fecha de vencimiento (rango)
-      • SKU / Descripción / Lote (busqueda libre)
-      • Bodega
-      • Ubicación exacta
-      • Familia / Categoría
-      • Nivel de stock (cero, por llegar, reserva)
-      • Criticidad (según thresholds)
-      • Estado de calidad (caducado, por vencer pronto)
-      • Usuario snapshot (si aplica)
+    GUI para cargar automáticamente el último Informe_stock_fisico_*
+    desde una carpeta y aplicar filtros:
+      • Vencimiento
+      • Stock
+      • Criticidad
+      • Bodega, Ubicación, Familia, Subfamilia
+      • Búsqueda libre
     """
 
     def __init__(self, parent: tk.Misc, config_json: str = "stock_report_config.json"):
-        # Carga config y servicio
-        cfg_path = Path(config_json)
-        self.cfg = StockReportConfig.load(cfg_path)
+        self.cfg     = StockReportConfig.load(Path(config_json))
         self.service = StockReportService(self.cfg)
+        self._df     = pd.DataFrame()
 
-        # Ventana
         self.win = tk.Toplevel(parent)
         self.win.title("Informe de Stock Físico")
         self.win.geometry("1200x700")
 
-        # --- FRAME CONTROLES FILTROS ---
-        frm = ttk.Frame(self.win, padding=10)
-        frm.pack(fill="x", padx=5, pady=5)
+        frm = ttk.Frame(self.win, padding=8)
+        frm.pack(fill="x")
 
-        # Fecha inventario
-        ttk.Label(frm, text="Fecha Inventario Desde:").grid(row=0, column=0, sticky="w")
-        self.d1 = DateEntry(frm, date_pattern="yyyy-MM-dd")
-        self.d1.set_date(date.today() - timedelta(days=30))
-        self.d1.grid(row=0, column=1, padx=5)
-
-        ttk.Label(frm, text="Hasta:").grid(row=0, column=2, sticky="w", padx=(10,0))
-        self.d2 = DateEntry(frm, date_pattern="yyyy-MM-dd")
-        self.d2.set_date(date.today())
-        self.d2.grid(row=0, column=3, padx=5)
-
-        # Fecha de vencimiento
-        ttk.Label(frm, text="Vencimiento Desde:").grid(row=1, column=0, sticky="w", pady=(10,0))
+        # Vencimiento
+        ttk.Label(frm, text="Ven Desde:").grid(row=0, column=0)
         self.v1 = DateEntry(frm, date_pattern="yyyy-MM-dd")
-        self.v1.grid(row=1, column=1, padx=5, pady=(10,0))
+        self.v1.set_date(date.today() - timedelta(days=self.cfg.vencimiento_alert_days))
+        self.v1.grid(row=0, column=1, padx=4)
 
-        ttk.Label(frm, text="Hasta:").grid(row=1, column=2, sticky="w", padx=(10,0), pady=(10,0))
+        ttk.Label(frm, text="Ven Hasta:").grid(row=0, column=2)
         self.v2 = DateEntry(frm, date_pattern="yyyy-MM-dd")
-        self.v2.grid(row=1, column=3, padx=5, pady=(10,0))
+        self.v2.set_date(date.today() + timedelta(days=self.cfg.vencimiento_alert_days))
+        self.v2.grid(row=0, column=3, padx=4)
 
-        # Búsqueda libre (SKU, Descripción, Lote)
-        ttk.Label(frm, text="Buscar (SKU/Desc/Lote):").grid(row=0, column=4, sticky="w", padx=(20,0))
-        self.e_search = ttk.Entry(frm, width=25)
-        self.e_search.grid(row=0, column=5, padx=5, pady=2, columnspan=2)
-
-        # Bodega
-        ttk.Label(frm, text="Bodega:").grid(row=1, column=4, sticky="w", padx=(20,0))
-        self.cb_bodega = ttk.Combobox(frm, values=["Todos"], state="readonly", width=15)
-        self.cb_bodega.current(0)
-        self.cb_bodega.grid(row=1, column=5, padx=5, pady=(10,0))
-
-        # Ubicación exacta
-        ttk.Label(frm, text="Ubicación:").grid(row=1, column=6, sticky="w", padx=(10,0), pady=(10,0))
-        self.cb_ubic = ttk.Combobox(frm, values=["Todos"], state="readonly", width=15)
-        self.cb_ubic.current(0)
-        self.cb_ubic.grid(row=1, column=7, padx=5, pady=(10,0))
-
-        # Familia / Categoría
-        ttk.Label(frm, text="Familia:").grid(row=2, column=0, sticky="w", pady=(10,0))
-        self.cb_familia = ttk.Combobox(frm, values=["Todos"], state="readonly", width=20)
-        self.cb_familia.current(0)
-        self.cb_familia.grid(row=2, column=1, padx=5, pady=(10,0), columnspan=2)
-
-        # Nivel de stock
-        ttk.Label(frm, text="Nivel Stock:").grid(row=2, column=3, sticky="w", pady=(10,0))
-        self.cb_nivel = ttk.Combobox(
-            frm, values=["Todos", "Stock 0", "Por llegar", "Reserva"], state="readonly", width=15
-        )
-        self.cb_nivel.current(0)
-        self.cb_nivel.grid(row=2, column=4, padx=5, pady=(10,0))
+        # Stock
+        ttk.Label(frm, text="Stock:").grid(row=1, column=0)
+        self.cb_stock = ttk.Combobox(frm,
+            values=["Todos","=0","<0",">0 Llegan",">0 Reserva"],
+            width=12, state="readonly")
+        self.cb_stock.set("Todos"); self.cb_stock.grid(row=1, column=1, padx=4)
 
         # Criticidad
-        ttk.Label(frm, text="Criticidad:").grid(row=2, column=5, sticky="w", pady=(10,0))
-        crits = ["Todos", "Crítico", "Bajo", "Normal", "Exceso"]
-        self.cb_crit = ttk.Combobox(frm, values=crits, state="readonly", width=15)
-        self.cb_crit.current(0)
-        self.cb_crit.grid(row=2, column=6, padx=5, pady=(10,0))
+        ttk.Label(frm, text="Criticidad:").grid(row=1, column=2)
+        crits = ["Todos","Crítico","Bajo","Normal","Exceso"]
+        self.cb_crit = ttk.Combobox(frm, values=crits, width=12, state="readonly")
+        self.cb_crit.set("Todos"); self.cb_crit.grid(row=1, column=3, padx=4)
 
-        # Estado de caducidad
-        ttk.Label(frm, text="Caducidad:").grid(row=2, column=7, sticky="w", pady=(10,0))
-        self.cb_cadu = ttk.Combobox(
-            frm, values=["Todos", "Caducado", "Por vencer pronto"], state="readonly", width=15
-        )
-        self.cb_cadu.current(0)
-        self.cb_cadu.grid(row=2, column=8, padx=5, pady=(10,0))
+        # Categóricos
+        ttk.Label(frm, text="Bodega:").grid(row=2, column=0)
+        self.cb_bod = ttk.Combobox(frm, values=["Todos"], width=15, state="readonly")
+        self.cb_bod.grid(row=2, column=1, padx=4)
+
+        ttk.Label(frm, text="Ubicación:").grid(row=2, column=2)
+        self.cb_ubic = ttk.Combobox(frm, values=["Todos"], width=15, state="readonly")
+        self.cb_ubic.grid(row=2, column=3, padx=4)
+
+        ttk.Label(frm, text="Familia:").grid(row=3, column=0)
+        self.cb_fam = ttk.Combobox(frm, values=["Todos"], width=20, state="readonly")
+        self.cb_fam.grid(row=3, column=1, padx=4)
+
+        ttk.Label(frm, text="Subfamilia:").grid(row=3, column=2)
+        self.cb_sub = ttk.Combobox(frm, values=["Todos"], width=20, state="readonly")
+        self.cb_sub.grid(row=3, column=3, padx=4)
+
+        # Búsqueda libre
+        ttk.Label(frm, text="Buscar:").grid(row=4, column=0)
+        self.search = ttk.Entry(frm, width=30)
+        self.search.grid(row=4, column=1, columnspan=3, padx=4)
 
         # Botones
-        btn_load = ttk.Button(frm, text="Cargar Inventario", command=self._on_load)
-        btn_load.grid(row=3, column=0, pady=15)
-        btn_appf = ttk.Button(frm, text="Aplicar Filtros", command=self._on_apply)
-        btn_appf.grid(row=3, column=1, pady=15, padx=5)
-        btn_export = ttk.Button(frm, text="Exportar", command=self._on_export)
-        btn_export.grid(row=3, column=2, pady=15, padx=5)
+        ttk.Button(frm, text="Seleccionar carpeta y cargar último", command=self._on_load_folder)\
+            .grid(row=5, column=0, pady=12)
+        ttk.Button(frm, text="Exportar a Excel", command=self._on_export)\
+            .grid(row=5, column=1, padx=4)
 
-        # --- TREEVIEW ---
+        # Treeview
         self.tree = ttk.Treeview(self.win, show="headings")
         self.tree.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # DataFrame en memoria
-        self._df_master = pd.DataFrame()
-
-    def _on_load(self):
-        path = filedialog.askopenfilename(
-            title="Seleccionar stock físico",
-            filetypes=[("Excel","*.xls *.xlsx"),("CSV","*.csv")]
-        )
-        if not path:
+    def _on_load_folder(self):
+        folder = filedialog.askdirectory(title="Selecciona carpeta de informes")
+        if not folder:
             return
-        df = self.service.generate(
-            Path(path),
-            pd.to_datetime(self.d1.get_date()),
-            pd.to_datetime(self.d2.get_date())
-        )
-        self._df_master = df.copy()
+        p = Path(folder)
+        files = list(p.glob("Informe_stock_fisico_*.*"))
+        if not files:
+            messagebox.showerror("Error", "No se encontró ningún Informe_stock_fisico_.")
+            return
+        latest = max(files, key=lambda f: f.stat().st_mtime)
 
-        # rellenar valores únicos en comboboxes
-        self.cb_bodega.config(values=["Todos"] + sorted(df["Bodega"].dropna().unique()))
-        self.cb_ubic .config(values=["Todos"] + sorted(df["Ubicación"].dropna().unique()))
-        self.cb_familia.config(values=["Todos"] + sorted(df["Familia"].dropna().unique()))
+        df = self.service.generate(latest, None, None)
+        self._df = df.copy()
 
-        self._populate(df)
-        try: save_file_history(path, modo="stock")
-        except: pass
+        # Rellenar combos
+        for cb, col in [
+            (self.cb_bod,  "Bodega"),
+            (self.cb_ubic, "Ubicación"),
+            (self.cb_fam,  "Familia"),
+            (self.cb_sub,  "Subfamilia")
+        ]:
+            vals = ["Todos"] + sorted(df[col].dropna().unique().tolist())
+            cb.config(values=vals)
+            cb.set("Todos")
 
-    def _on_apply(self):
-        df = self._df_master.copy()
-        # Bodega
-        val = self.cb_bodega.get()
-        if val != "Todos": df = df[df["Bodega"] == val]
-        # Ubicación
-        val = self.cb_ubic.get()
-        if val != "Todos": df = df[df["Ubicación"] == val]
-        # Familia
-        val = self.cb_familia.get()
-        if val != "Todos": df = df[df["Familia"] == val]
-        # Nivel Stock
-        lvl = self.cb_nivel.get()
-        if lvl == "Stock 0": df = df[df["saldo_stock"] == 0]
-        elif lvl == "Por llegar": df = df[df["por_llegar"] > 0]
-        elif lvl == "Reserva": df = df[df["reserva"] > 0]
+        self._apply_filters()
+        try:
+            save_file_history(str(latest), modo="stock")
+        except:
+            pass
+        messagebox.showinfo("Cargado", f"Archivo cargado:\n{latest.name}")
+
+    def _apply_filters(self):
+        df = self._df.copy()
+
+        # Vencimiento
+        mask = ((pd.to_datetime(df["Fecha Vencimiento"]) >= pd.to_datetime(self.v1.get_date())) &
+                (pd.to_datetime(df["Fecha Vencimiento"]) <= pd.to_datetime(self.v2.get_date())))
+        df = df.loc[mask]
+
+        # Stock
+        st = self.cb_stock.get()
+        if   st == "=0":      df = df[df["Saldo stock"] == 0]
+        elif st == "<0":      df = df[df["Saldo stock"] <  0]
+        elif st == ">0 Llegan": df = df[df["Por llegar"]  >  0]
+        elif st == ">0 Reserva":df = df[df["Reserva"]      >  0]
+
         # Criticidad
-        crit = self.cb_crit.get()
-        th = self.cfg.thresholds
-        if crit == "Crítico": df = df[df["Cantidad"] < th["critico"]]
-        elif crit == "Bajo":    df = df[(df["Cantidad"] >= th["critico"]) & (df["Cantidad"] < th["bajo"])]
-        elif crit == "Normal":  df = df[(df["Cantidad"] >= th["bajo"])   & (df["Cantidad"] <= th["alto"])]
-        elif crit == "Exceso":  df = df[df["Cantidad"] > th["alto"]]
-        # Caducidad
-        cad = self.cb_cadu.get()
-        hoy = pd.to_datetime(date.today())
-        if cad == "Caducado": df = df[pd.to_datetime(df["fecha_vencimiento"]) < hoy]
-        elif cad == "Por vencer pronto":
-            prox = hoy + pd.Timedelta(days=7)
-            df = df[(pd.to_datetime(df["fecha_vencimiento"]) >= hoy) & (pd.to_datetime(df["fecha_vencimiento"]) <= prox)]
-        # Búsqueda libre
-        key = self.e_search.get().strip().lower()
+        th, c = self.cfg.thresholds, self.cb_crit.get()
+        if   c == "Crítico": df = df[df["Saldo stock"] <  th["critico"]]
+        elif c == "Bajo":    df = df[(df["Saldo stock"] >= th["critico"]) & (df["Saldo stock"] < th["bajo"])]
+        elif c == "Normal":  df = df[(df["Saldo stock"] >= th["bajo"])   & (df["Saldo stock"] <= th["alto"])]
+        elif c == "Exceso":  df = df[df["Saldo stock"] >  th["alto"]]
+
+        # Categóricos
+        for cb, col in [
+            (self.cb_bod,  "Bodega"),
+            (self.cb_ubic, "Ubicación"),
+            (self.cb_fam,  "Familia"),
+            (self.cb_sub,  "Subfamilia")
+        ]:
+            v = cb.get()
+            if v != "Todos":
+                df = df[df[col] == v]
+
+        # Búsqueda
+        key = self.search.get().strip().lower()
         if key:
-            mask = (
-                df["SKU"].astype(str).str.lower().str.contains(key) |
-                df["Descripción"].astype(str).str.lower().str.contains(key) |
-                df["Lote"].astype(str).str.lower().str.contains(key)
-            )
-            df = df[mask]
+            m = (df["Código"].astype(str).str.lower().str.contains(key) |
+                 df["Producto"].astype(str).str.lower().str.contains(key) |
+                 df["Lote"].astype(str).str.lower().str.contains(key))
+            df = df.loc[m]
 
         self._populate(df)
 
@@ -199,19 +174,13 @@ class StockReportUI:
             self.tree.insert("", "end", values=list(row))
 
     def _on_export(self):
-        if self.tree.get_children()==():
+        if not self.tree.get_children():
             messagebox.showwarning("Aviso","No hay datos para exportar.")
             return
         rows = [self.tree.item(i)["values"] for i in self.tree.get_children()]
-        df = pd.DataFrame(rows, columns=self.tree["columns"])
-        save = filedialog.asksaveasfilename(
-            title="Guardar Informe",
-            defaultextension=".xlsx",
-            filetypes=[("Excel","*.xlsx")]
-        )
-        if not save: return
-        try:
-            self.service.export(df, Path(save).name)
-            messagebox.showinfo("Éxito",f"Exportado a:\n{save}")
-        except Exception as e:
-            messagebox.showerror("Error al exportar", str(e))
+        df   = pd.DataFrame(rows, columns=self.tree["columns"])
+        path = filedialog.asksaveasfilename(title="Guardar Informe", defaultextension=".xlsx",
+                                            filetypes=[("Excel","*.xlsx")])
+        if path:
+            self.service.export(df, Path(path).name)
+            messagebox.showinfo("Éxito", f"Exportado a:\n{path}")

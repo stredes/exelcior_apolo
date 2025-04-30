@@ -3,139 +3,136 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from tkcalendar import DateEntry
+from pathlib import Path
 import pandas as pd
 
-from app.core.excel_processor import load_excel, apply_transformation
+from app.reportes.stock.config import StockReportConfig
+from app.reportes.stock.service import StockReportService
 from app.db.utils_db import save_file_history
 from app.core.logger_bod1 import capturar_log_bod1
-from app.utils.utils import load_config
 
-
-def crear_ventana_informes_stock(root=None):
-    """
-    Abre una ventana Toplevel con:
-    - Selector de rango de fechas (Fecha Desde / Fecha Hasta)
-    - Botón para cargar un Excel de stock físico
-    - Treeview para mostrar los datos filtrados
-    - Botón para exportar el filtrado a Excel
-    """
-    # ------------------------------
-    # Inicialización de la ventana
-    # ------------------------------
+def crear_ventana_informes_stock(root=None, config_json="stock_report_config.json"):
+    # --- Inicializar ventana ---
     if root is None:
-        root = tk._default_root if tk._default_root else tk.Tk()
-    ventana = tk.Toplevel(root)
-    ventana.title("Informes de Stock Físico")
-    ventana.geometry("900x600")
+        root = tk._default_root or tk.Tk()
+    win = tk.Toplevel(root)
+    win.title("Informes de Stock Físico")
+    win.geometry("1000x700")
 
-    # ------------------------------
-    # Cargar configuración de columnas
-    # ------------------------------
-    config_columns = load_config()
-    mode = "listados"  
-    # Si tienes un modo específico para stock, añádelo en excel_printer_config.json y cámbialo aquí:
-    # mode = "stock"
+    # --- Cargar configuración y servicio ---
+    cfg = StockReportConfig.load(Path(config_json))
+    service = StockReportService(cfg)
+    df_original = None
 
-    # ------------------------------
-    # Frame de controles (fecha + botones)
-    # ------------------------------
-    frame_ctrl = ttk.Frame(ventana, padding=10)
-    frame_ctrl.pack(fill="x", padx=10, pady=5)
+    # --- Frame de controles ---
+    frm = ttk.Frame(win, padding=10)
+    frm.pack(fill="x")
 
-    ttk.Label(frame_ctrl, text="Fecha Desde:").pack(side="left")
-    fecha_desde = DateEntry(frame_ctrl, width=12, date_pattern='yyyy-MM-dd')
-    fecha_desde.pack(side="left", padx=(5, 20))
+    ttk.Label(frm, text="Inv Desde:").grid(row=0, column=0)
+    d1 = DateEntry(frm, date_pattern="yyyy-MM-dd")
+    d1.set_date(pd.to_datetime("1900-01-01"))
+    d1.grid(row=0, column=1, padx=5)
 
-    ttk.Label(frame_ctrl, text="Fecha Hasta:").pack(side="left")
-    fecha_hasta = DateEntry(frame_ctrl, width=12, date_pattern='yyyy-MM-dd')
-    fecha_hasta.pack(side="left", padx=(5, 20))
+    ttk.Label(frm, text="Inv Hasta:").grid(row=0, column=2)
+    d2 = DateEntry(frm, date_pattern="yyyy-MM-dd")
+    d2.set_date(pd.to_datetime("2100-01-01"))
+    d2.grid(row=0, column=3, padx=5)
 
-    def cargar_y_filtrar():
-        ruta = filedialog.askopenfilename(
-            title="Seleccionar informe de stock físico",
-            filetypes=[("Excel", "*.xlsx *.xls"), ("CSV", "*.csv")]
-        )
-        if not ruta:
+    ttk.Label(frm, text="Ven Desde:").grid(row=0, column=4, padx=(20,0))
+    v1 = DateEntry(frm, date_pattern="yyyy-MM-dd")
+    v1.set_date(pd.to_datetime("1900-01-01"))
+    v1.grid(row=0, column=5, padx=5)
+
+    ttk.Label(frm, text="Ven Hasta:").grid(row=0, column=6)
+    v2 = DateEntry(frm, date_pattern="yyyy-MM-dd")
+    v2.set_date(pd.to_datetime("2100-01-01"))
+    v2.grid(row=0, column=7, padx=5)
+
+    btn_carga = ttk.Button(frm, text="Seleccionar Carpeta → Cargar Último",
+                           command=lambda: _cargar_ultimo())
+    btn_carga.grid(row=1, column=0, pady=10, sticky="w")
+
+    btn_export = ttk.Button(frm, text="Exportar Filtrado",
+                            command=lambda: _exportar())
+    btn_export.grid(row=1, column=1, pady=10, sticky="w")
+
+    # --- Treeview ---
+    tree = None
+    cols = []
+
+    def _mostrar_dataframe(df: pd.DataFrame):
+        nonlocal tree, cols
+        if tree:
+            tree.destroy()
+        cols = list(df.columns)
+        tree = ttk.Treeview(win, columns=cols, show="headings")
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=100, anchor="center")
+        for _, row in df.iterrows():
+            tree.insert("", "end", values=list(row))
+        tree.pack(fill="both", expand=True, padx=10, pady=5)
+
+    def _cargar_ultimo():
+        nonlocal df_original
+        carpeta = filedialog.askdirectory(title="Selecciona carpeta con informes")
+        if not carpeta:
             return
-
-        try:
-            capturar_log_bod1(f"Archivo seleccionado: {ruta}", nivel="info")
-            # 1) Carga del Excel con config_columns y mode
-            df = load_excel(ruta, config_columns, mode)
-            # 2) Aplicar transformación (drop/sum/format)
-            df_transformed, total = apply_transformation(df, config_columns, mode)
-            # 3) Filtrar por rango de fechas (asume que existe columna 'Fecha')
-            df_transformed['Fecha'] = pd.to_datetime(df_transformed['Fecha'], errors='coerce')
-            desde = pd.to_datetime(fecha_desde.get_date())
-            hasta = pd.to_datetime(fecha_hasta.get_date())
-            df_filtrado = df_transformed[
-                (df_transformed['Fecha'] >= desde) & 
-                (df_transformed['Fecha'] <= hasta)
-            ]
-        except Exception as e:
-            capturar_log_bod1(f"Error al procesar Excel: {e}", nivel="error")
-            messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{e}")
+        p = Path(carpeta)
+        archivos = list(p.glob("Informe_stock_fisico_*.*"))
+        if not archivos:
+            messagebox.showerror("Error", "No se encontraron archivos coincidentes.")
             return
-
-        # 4) Mostrar en el Treeview
-        for row in tree.get_children():
-            tree.delete(row)
-        for _, fila in df_filtrado.reset_index(drop=True).iterrows():
-            tree.insert("", "end", values=list(fila))
-
-        # 5) Guardar historial en la base de datos
+        ultimo = max(archivos, key=lambda f: f.stat().st_mtime)
         try:
-            save_file_history(ruta, modo=mode)
+            capturar_log_bod1(f"Cargando último informe: {ultimo}", "info")
+            df = service.generate(ultimo, None, None)
+            df_original = df.copy()
+            save_file_history(str(ultimo), modo="listados")
+            _filtrar_mostrar()
+            messagebox.showinfo("Cargado", f"Archivo cargado:\n{ultimo.name}")
         except Exception as e:
-            capturar_log_bod1(f"Error al guardar historial: {e}", nivel="error")
+            capturar_log_bod1(f"Error al cargar informe: {e}", "error")
+            messagebox.showerror("Error", f"No se pudo cargar:\n{e}")
 
-    btn_cargar = ttk.Button(frame_ctrl, text="Cargar y Filtrar", command=cargar_y_filtrar)
-    btn_cargar.pack(side="left", padx=5)
+    def _filtrar_mostrar():
+        if df_original is None:
+            return
+        df = df_original.copy()
+        # Filtro inventario si existe date_field
+        if cfg.date_field and cfg.date_field in df.columns:
+            df[cfg.date_field] = pd.to_datetime(df[cfg.date_field], dayfirst=True, errors="coerce")
+            desde = pd.to_datetime(d1.get_date())
+            hasta = pd.to_datetime(d2.get_date())
+            df = df[(df[cfg.date_field] >= desde) & (df[cfg.date_field] <= hasta)]
+        # Filtro vencimiento
+        if "Fecha Vencimiento" in df.columns:
+            df["Fecha Vencimiento"] = pd.to_datetime(df["Fecha Vencimiento"], format="%d/%m/%Y", errors="coerce")
+            vd = pd.to_datetime(v1.get_date())
+            vh = pd.to_datetime(v2.get_date())
+            df = df[(df["Fecha Vencimiento"] >= vd) & (df["Fecha Vencimiento"] <= vh)]
+        _mostrar_dataframe(df)
 
-    def exportar_filtrado():
-        # Extraer filas mostradas en el Treeview
-        rows = [tree.item(i)["values"] for i in tree.get_children()]
-        if not rows:
+    def _exportar():
+        if not cols:
             messagebox.showwarning("Aviso", "No hay datos para exportar.")
             return
-        df_export = pd.DataFrame(rows, columns=cols)
-        ruta_save = filedialog.asksaveasfilename(
-            title="Guardar informe filtrado",
-            defaultextension=".xlsx",
-            filetypes=[("Excel", "*.xlsx")]
-        )
-        if not ruta_save:
+        rows = [tree.item(i)["values"] for i in tree.get_children()]
+        df = pd.DataFrame(rows, columns=cols)
+        destino = filedialog.asksaveasfilename(title="Guardar informe",
+                                               defaultextension=".xlsx",
+                                               filetypes=[("Excel","*.xlsx")])
+        if not destino:
             return
         try:
-            df_export.to_excel(ruta_save, index=False)
-            capturar_log_bod1(f"Informe exportado: {ruta_save}", nivel="info")
-            messagebox.showinfo("Éxito", f"Informe exportado a:\n{ruta_save}")
+            df.to_excel(destino, index=False)
+            capturar_log_bod1(f"Informe exportado: {destino}", "info")
+            messagebox.showinfo("Éxito", f"Exportado a:\n{destino}")
         except Exception as e:
-            capturar_log_bod1(f"Error al exportar: {e}", nivel="error")
+            capturar_log_bod1(f"Error exportando informe: {e}", "error")
             messagebox.showerror("Error", f"No se pudo exportar:\n{e}")
 
-    btn_exportar = ttk.Button(frame_ctrl, text="Exportar a Excel", command=exportar_filtrado)
-    btn_exportar.pack(side="left", padx=5)
-
-    # ------------------------------
-    # Treeview para mostrar los datos
-    # ------------------------------
-    # Ajusta 'cols' con los nombres reales de tus columnas
-    cols = list(config_columns.get(mode, {}).get("mantener_formato", []))  
-    if not cols:
-        # Si no tienes 'mantener_formato' definido, tomamos todas las columnas del DataFrame tras cargar:
-        cols = ["Columna1", "Columna2", "Columna3"]  # reemplaza manualmente
-
-    tree = ttk.Treeview(ventana, columns=cols, show="headings")
-    for c in cols:
-        tree.heading(c, text=c)
-        tree.column(c, width=100, anchor="center")
-    tree.pack(fill="both", expand=True, padx=10, pady=10)
-
-    # ------------------------------
-    # Modalidad de la ventana
-    # ------------------------------
-    ventana.transient(root)
-    ventana.grab_set()
-    ventana.focus_set()
-    ventana.wait_window()
+    # Modal
+    win.transient(root)
+    win.grab_set()
+    win.wait_window()

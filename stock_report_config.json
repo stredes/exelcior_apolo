@@ -1,21 +1,16 @@
 {
-    "stock": {
-      "eliminar": [
-        "Código de Ubicación",
-        "Descripción Larga",
-        "Proveedor",
-        "Categoría",
-        "Precio Unitario"
-      ],
-      "sumar": [
-        "Cantidad"
-      ],
-      "mantener_formato": [
-        "SKU"
-      ],
-      "date_field": "Fecha",
-      "start_row": 1,
-      "export_dir": "exportados/stock"
-    }
+  "stock": {
+    "eliminar": [],
+    "sumar": [],
+    "mantener_formato": ["N° Serie", "Lote"],
+    "date_field": "",                 
+    "start_row": 0,
+    "export_dir": "exportados/stock",
+    "thresholds": {
+      "critico": 5,
+      "bajo": 20,
+      "alto": 50
+    },
+    "vencimiento_alert_days": 90
   }
-  
+}

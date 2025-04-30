@@ -1,73 +1,80 @@
-from pathlib import Path
 import pandas as pd
+from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 from app.reportes.stock.config import StockReportConfig
 from app.core.logger_bod1 import capturar_log_bod1
 
-
 class StockReportService:
     """
-    Servicio para generar y exportar informes de stock físico.
+    Carga y prepara el DataFrame de 'Stock físico':
+      - Lee .xls/.xlsx/.csv
+      - Elimina columnas
+      - Conserva formato
+      - Calcula 'Días a vencimiento'
+      - Salta filtro inventario si no hay date_field
     """
 
     def __init__(self, cfg: StockReportConfig):
         self.cfg = cfg
 
     def _read_file(self, file_path: Path) -> pd.DataFrame:
-        """
-        Lee el archivo (Excel .xls/.xlsx o CSV) saltándose las filas iniciales.
-        """
-        ext = file_path.suffix.lower()
-        skiprows = self.cfg.start_row
-        if ext in [".xlsx", ".xls"]:
-            engine = "xlrd" if ext == ".xls" else "openpyxl"
-            df = pd.read_excel(file_path, skiprows=skiprows, engine=engine)
-        elif ext == ".csv":
-            df = pd.read_csv(file_path, skiprows=skiprows)
-        else:
-            raise ValueError(f"Formato no soportado: {ext}")
-        return df
+        skip = self.cfg.start_row
+        ext  = file_path.suffix.lower()
+        if ext == ".xls":
+            return pd.read_excel(file_path, sheet_name="Stock físico", skiprows=skip, engine="xlrd")
+        if ext == ".xlsx":
+            return pd.read_excel(file_path, sheet_name="Stock físico", skiprows=skip, engine="openpyxl")
+        if ext == ".csv":
+            return pd.read_csv(file_path, skiprows=skip)
+        raise ValueError(f"Formato no soportado: {ext}")
 
-    def generate(self, file_path: Path, fecha_desde: datetime, fecha_hasta: datetime) -> pd.DataFrame:
-        """
-        Genera el DataFrame de informe, filtrado por el rango de fechas.
-        """
-        capturar_log_bod1(f"[StockReport] Cargando archivo: {file_path}", nivel="info")
-
-        # 1. Leer datos
+    def generate(self,
+                 file_path: Path,
+                 fecha_desde: Optional[datetime] = None,
+                 fecha_hasta: Optional[datetime] = None
+                 ) -> pd.DataFrame:
+        capturar_log_bod1(f"Cargando stock: {file_path}", nivel="info")
         df = self._read_file(file_path)
 
-        # 2. Eliminar columnas indeseadas
+        # DEBUG: columnas leídas
+        capturar_log_bod1(f"Columnas: {list(df.columns)}", nivel="info")
+
+        # 1) Eliminar columnas
         df = df.drop(columns=self.cfg.eliminar, errors="ignore")
 
-        # 3. Mantener formato en columnas específicas
+        # 2) Mantener formato en texto
         for col in self.cfg.mantener_formato:
             if col in df.columns:
                 df[col] = df[col].astype(str)
 
-        # 4. Convertir columna de fecha y filtrar por rango
-        date_col = self.cfg.date_field
-        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-        mask = (df[date_col] >= fecha_desde) & (df[date_col] <= fecha_hasta)
-        df_filtrado = df.loc[mask].reset_index(drop=True)
+        # 3) Filtro inventario condicional
+        if self.cfg.date_field and self.cfg.date_field in df.columns and fecha_desde and fecha_hasta:
+            df[self.cfg.date_field] = pd.to_datetime(df[self.cfg.date_field], dayfirst=True, errors="coerce")
+            mask = (df[self.cfg.date_field] >= fecha_desde) & (df[self.cfg.date_field] <= fecha_hasta)
+            df = df.loc[mask]
+        else:
+            capturar_log_bod1(f"Salto filtro inventario: '{self.cfg.date_field}'", nivel="warning")
 
-        capturar_log_bod1(
-            f"[StockReport] Filtrado: {len(df_filtrado)} filas entre {fecha_desde.date()} y {fecha_hasta.date()}",
-            nivel="info"
-        )
+        df = df.reset_index(drop=True)
 
-        return df_filtrado
+        # 4) Días a vencimiento
+        if "Fecha Vencimiento" in df.columns:
+            df["Fecha Vencimiento"] = pd.to_datetime(df["Fecha Vencimiento"], format="%d/%m/%Y", errors="coerce")
+            hoy = pd.to_datetime(datetime.today().date())
+            df["Días a vencimiento"] = (df["Fecha Vencimiento"] - hoy).dt.days
+        else:
+            df["Días a vencimiento"] = None
 
-    def export(self, df: pd.DataFrame, file_name: str = None) -> Path:
-        """
-        Exporta el DataFrame a un archivo Excel dentro de export_dir.
-        """
+        capturar_log_bod1(f"Total registros: {len(df)}", nivel="info")
+        return df
+
+    def export(self, df: pd.DataFrame, file_name: Optional[str] = None) -> Path:
         self.cfg.export_dir.mkdir(parents=True, exist_ok=True)
-        if not file_name:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"stock_report_{ts}.xlsx"
-        path = self.cfg.export_dir / file_name
-        df.to_excel(path, index=False)
-        capturar_log_bod1(f"[StockReport] Informe exportado a: {path}", nivel="info")
-        return path
+        ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = file_name or f"stock_{ts}.xlsx"
+        out   = self.cfg.export_dir / fname
+        df.to_excel(out, index=False)
+        capturar_log_bod1(f"Informe exportado: {out}", nivel="info")
+        return out

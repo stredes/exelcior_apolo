@@ -30,6 +30,7 @@ from app.utils.logger_setup import log_evento
 from app.gui.informes_stock import crear_ventana_informes_stock
 
 
+
 def global_exception_handler(exctype, value, traceback):
     log_evento(f"Excepción no capturada: {value}", "critical")
 
@@ -106,7 +107,8 @@ class ExcelPrinterApp(tk.Tk):
             ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
-            ("Informes Stock 📊", crear_ventana_informes_stock),
+            ("Informes Stock 📊", lambda: crear_ventana_informes_stock(self)),
+
         ]
 
         for text, command in buttons:
