@@ -21,7 +21,7 @@ from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_p
 from app.core.logger_bod1 import capturar_log_bod1
 from app.utils.utils import load_config
 from app.utils.platform_utils import is_windows, is_linux
-from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
+from app.gui.editor_etiquetas_zebra import crear_editor_etiqueta, cargar_clientes
 from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
 from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
 from app.utils.logger_setup import setup_logging, log_evento
