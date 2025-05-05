@@ -321,28 +321,20 @@ class ExcelPrinterApp(tk.Tk):
             self.processing = False
             self._update_status("Listo")
 
-
-
     def _show_preview(self):
-
-        
         if self.transformed_df is None or self.transformed_df.empty:
             messagebox.showerror("Error", "No hay datos para mostrar.")
             return
 
         df_vista = self.transformed_df.copy()
 
-        # Forzar la reinserción de 'Receptor' si no aparece
         if "recipientContactName" in self.transformed_df.columns:
             df_vista["Receptor"] = self.transformed_df["recipientContactName"]
 
-        # Opcional: mover 'Receptor' al final
         if "Receptor" in df_vista.columns:
             cols = [col for col in df_vista.columns if col != "Receptor"] + ["Receptor"]
             df_vista = df_vista[cols]
 
-
-        # 🔍 Eliminar columnas no deseadas por modo
         columnas_ocultas = []
         if self.mode == "fedex":
             columnas_ocultas = ["recipientCompany"]
@@ -362,7 +354,7 @@ class ExcelPrinterApp(tk.Tk):
         preview_win.configure(bg="#F9FAFB")
 
         tree_frame = ttk.Frame(preview_win, padding=10)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
+        tree_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         columns = list(df_vista.columns)
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
@@ -382,13 +374,14 @@ class ExcelPrinterApp(tk.Tk):
         for row in df_vista.itertuples(index=False):
             tree.insert("", "end", values=row)
 
+        # Botonera
         barra_botones = ttk.Frame(preview_win)
-        barra_botones.pack(pady=5)
+        barra_botones.pack(side=tk.BOTTOM, fill=tk.X)
 
-        ttk.Button(barra_botones, text="Imprimir", command=self._threaded_print).pack(side=tk.LEFT, padx=5)
-        ttk.Button(barra_botones, text="Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=5)
+        botones_centrados = ttk.Frame(barra_botones)
+        botones_centrados.pack(side=tk.TOP, pady=5)
 
-        def eliminar_filas_seleccionadas():
+        def eliminar_filas_seleccionadas(tree=tree):
             seleccion = tree.selection()
             if not seleccion:
                 messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila.")
@@ -400,13 +393,23 @@ class ExcelPrinterApp(tk.Tk):
             self.transformed_df.reset_index(drop=True, inplace=True)
             capturar_log_bod1(f"Filas eliminadas en vista previa: {filas_indices}", "info")
 
-        ttk.Button(barra_botones, text="Eliminar filas seleccionadas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=5)
+        # Botones con íconos
+        ttk.Button(botones_centrados, text="🖨️ Imprimir", command=self._threaded_print).pack(side=tk.LEFT, padx=10)
+        ttk.Button(botones_centrados, text="❌ Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=10)
+        ttk.Button(botones_centrados, text="🗑️ Eliminar filas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=10)
 
+        # Etiqueta derecha
         if self.mode == "fedex" and hasattr(self, 'total_bultos'):
-            ttk.Label(barra_botones, text=f"Total PIEZAS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
-
+            ttk.Label(barra_botones, text=f"📦 Total PIEZAS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
         elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
-            ttk.Label(barra_botones, text=f"Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+            ttk.Label(barra_botones, text=f"📦 Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+
+    def _threaded_print(self):
+        if self.processing:
+            return
+        self.processing = True
+        threading.Thread(target=self._print_document, daemon=True).start()
+
 
     def _print_document(self):
         try:
@@ -422,28 +425,22 @@ class ExcelPrinterApp(tk.Tk):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
 
-            # Guardar datos procesados
             self.transformed_df.to_excel(output_file, index=False)
 
             capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
             log_evento(f"Archivo exportado correctamente: {output_file}", "info")
 
-            # Enviar a impresión
             self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
 
             messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
             capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
-
-
-            log_evento("Inicio de impresión de documento", "info")
-            log_evento(f"Archivo exportado correctamente: {output_file}", "info")
             log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
             log_evento(f"Error en impresión: {e}", "error")
-            
+                
     def _open_config_menu(self):
         if self.df is None:
             messagebox.showerror("Error", "Primero cargue un archivo Excel.")
@@ -461,10 +458,9 @@ class ExcelPrinterApp(tk.Tk):
                 return
             df_clientes = cargar_clientes(path)
             crear_editor_etiqueta(df_clientes)
+            log_evento("Editor de etiquetas abierto", "info")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
-
-    log_evento("Editor de etiquetas abierto", "info")
 
 
     def open_config_dialog(self, mode: str):
