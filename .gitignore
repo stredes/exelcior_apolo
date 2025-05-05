@@ -30,7 +30,7 @@ pip-wheel-metadata/
 # Archivos de exportación generados
 *.pdf
 *.csv
-*.xlsx
+
 
 portable
 user_config.json

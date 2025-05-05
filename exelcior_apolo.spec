@@ -6,7 +6,8 @@ a = Analysis(
     ['app/main_app.py'],
     pathex=['.'],
     binaries=[],
-    datas=[
+    datas=[ 
+        # Directorios a incluir
         ('app/db', 'app/db'),
         ('app/data', 'app/data'),
         ('app/printer', 'app/printer'),
@@ -15,15 +16,19 @@ a = Analysis(
         ('app/output', 'app/output'),
         ('app/config', 'app/config'),
 
+        # Archivos .keep
         ('app/db/.keep', 'app/db'),
         ('app/logs/.keep', 'app/logs'),
         ('app/exportados/.keep', 'app/exportados'),
         ('app/output/.keep', 'app/output'),
         ('app/config/.keep', 'app/config'),
 
+        # Archivos de configuración
         ('app/excel_printer.db', 'app'),
         ('app/excel_printer_config.json', 'app'),
-        ('app/plantilla_etiqueta.xlsx', 'app'),
+        
+        # Verifica si el archivo plantilla_etiqueta.xlsx existe en la ruta indicada
+        ('app/plantilla_etiqueta.xlsx', 'app')  # Asegúrate de que este archivo esté en app/
     ],
     hiddenimports=[
         'tkinter',

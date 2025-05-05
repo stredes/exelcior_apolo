@@ -1,5 +1,6 @@
 {
     "impresora_por_defecto": "URBANO",
     "zebra_ip": "192.168.0.100",
-    "zebra_port": 9100
+    "zebra_port": 9100,
+    "ruta_excel": "C:/Users/Recepci\u00f3n 2/Desktop/etiqueta pedido.xlsx"
 }
