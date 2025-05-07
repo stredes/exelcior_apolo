@@ -29,6 +29,8 @@ from app.utils.logger_setup import setup_logging, log_evento
 from app.utils.logger_viewer import abrir_visor_logs
 from app.utils.logger_setup import log_evento
 from app.gui.informes_stock import crear_ventana_informes_stock
+from app.gui.consulta_codigo import ConsultaCodigoApp
+from app.gui.consulta_ubicacion import ConsultaUbicacionApp
 
 
 
@@ -109,7 +111,8 @@ class ExcelPrinterApp(tk.Tk):
             ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
-            ("Informes Stock 📊", lambda: crear_ventana_informes_stock(self)),
+            ("Consulta por Código 🔍", self.abrir_consulta_codigo),
+            ("Consulta por Ubicación 🧭", self.abrir_consulta_ubicacion),
 
         ]
 
@@ -320,6 +323,12 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self.processing = False
             self._update_status("Listo")
+
+    def abrir_consulta_codigo(self):
+        ConsultaCodigoApp(self)
+
+    def abrir_consulta_ubicacion(self):
+        ConsultaUbicacionApp(self)
 
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
