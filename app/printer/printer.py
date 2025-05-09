@@ -35,89 +35,6 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
         # 1) Generar PDF intermedio
         pdf_path = _generar_pdf(filepath, mode, config_columns, df)
 
-<<<<<<< HEAD
-        # Ajuste de columnas
-        sheet.Cells.EntireColumn.AutoFit()
-
-        # Configuración de impresión
-        sheet.PageSetup.Orientation = 2  # Horizontal
-        sheet.PageSetup.Zoom = False
-        sheet.PageSetup.FitToPagesWide = 1
-        sheet.PageSetup.FitToPagesTall = False
-
-        now = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-        # Título y totales
-        if mode == "fedex":
-            bultos_col = next((col for col in df.columns if col.strip().lower() == "bultos"), None)
-            total = df[bultos_col].sum() if bultos_col else len(df)
-            label = "Piezas"
-            titulo = "FIN DE DÍA FEDEX"
-        elif mode == "urbano":
-            piezas_col = next((col for col in df.columns if col.strip().lower() == "piezas"), None)
-            total = df[piezas_col].sum() if piezas_col else 0
-            label = "Bultos"
-            titulo = "FIN DE DÍA URBANO"
-        else:
-            total = len(df)
-            label = "Items"
-            titulo = "LISTADO GENERAL"
-
-        # Encabezado
-        sheet.PageSetup.CenterHeader = f"&\"Arial,Bold\"&14 {titulo}"
-
-        # Pie de página con firma
-        sheet.PageSetup.LeftFooter = "&\"Arial\"&10 ---------------------------\nFirma"
-        sheet.PageSetup.CenterFooter = f"&\"Arial,Bold\"&8 Impreso el: {now}  |  Total {label}: {total}"
-
-        # Formato de tabla
-        used_range = sheet.UsedRange
-        rows = used_range.Rows.Count
-        cols = used_range.Columns.Count
-
-        for r in range(1, rows + 1):
-            for c in range(1, cols + 1):
-                cell = sheet.Cells(r, c)
-                cell.HorizontalAlignment = -4108  # xlCenter
-                cell.VerticalAlignment = -4108    # xlCenter
-                cell.Borders.Weight = 2           # xlThin
-
-        for c in range(1, cols + 1):
-            header = str(sheet.Cells(1, c).Value).strip().lower()
-            if "pieza" in header or "bulto" in header:
-                sheet.Columns(c).ColumnWidth = 10
-            elif "rastreo" in header or "tracking" in header:
-                sheet.Columns(c).ColumnWidth = 18
-            else:
-                sheet.Columns(c).AutoFit()
-
-        # Tracking Number como texto
-        if (
-            mode == "fedex"
-            and config_columns.get(mode, {}).get("mantener_formato")
-            and "Tracking Number" in df.columns
-        ):
-            col_idx = df.columns.get_loc("Tracking Number") + 1
-            sheet.Columns(col_idx).NumberFormat = "@"
-            for row in range(2, rows + 1):
-                cell = sheet.Cells(row, col_idx)
-                val = cell.Value
-                if val is not None:
-                    try:
-                        cell.Value = str(int(val)) if isinstance(val, float) and val.is_integer() else str(val)
-                    except Exception:
-                        cell.Value = str(cell.Value)
-
-        # Imprimir
-        sheet.PrintOut()
-        wb.Close(SaveChanges=False)
-        excel.Quit()
-
-        logging.info(f"Impresión completada: {filepath}")
-        messagebox.showinfo("Impresión exitosa", f"Archivo enviado a imprimir:\n{filepath}")
-
-        pythoncom.CoUninitialize()
-=======
         # 2) Determinar backend de impresión
         system = platform.system()
         if system == 'Windows' and pythoncom and Dispatch:
@@ -132,13 +49,10 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
 
         messagebox.showinfo("Impresión exitosa", f"Enviado a imprimir: {pdf_path.name}")
         logging.info(f"Impresión completada: {pdf_path}")
->>>>>>> 5dd0e16175995cf203290d5fa8fccb43a79727c4
 
     except Exception as e:
         logging.error(f"Error al imprimir {filepath}: {e}")
         messagebox.showerror("Error de impresión", f"Ocurrió un error:\n{e}")
-<<<<<<< HEAD
-=======
 
 
 def _generar_pdf(filepath: Path, mode: str, config_columns: dict, df: pd.DataFrame) -> Path:
@@ -153,7 +67,12 @@ def _generar_pdf(filepath: Path, mode: str, config_columns: dict, df: pd.DataFra
     pdf.set_font("Arial", size=12)
 
     # Título
-    title = "FIN DÍA URBANO" if mode.lower() == "urbano" else "FIN DÍA FEDEX"
+    if mode.lower() == "fedex":
+        title = "FIN DÍA FEDEX"
+    elif mode.lower() == "urbano":
+        title = "FIN DÍA URBANO"
+    else:
+        title = "LISTADO GENERAL"
     pdf.cell(0, 10, title, ln=True, align="C")
 
     # Columnas según configuración
@@ -161,8 +80,8 @@ def _generar_pdf(filepath: Path, mode: str, config_columns: dict, df: pd.DataFra
     sub_df = df[cols]
 
     # Tabla cuadriculada
-    col_w = pdf.w / len(cols) - 1
-    row_h = pdf.font_size * 1.5
+    col_w = (pdf.w - 2 * pdf.l_margin) / len(cols)
+    row_h = pdf.font_size * 1.8
     for header in cols:
         pdf.cell(col_w, row_h, header, border=1, align="C")
     pdf.ln(row_h)
@@ -208,11 +127,13 @@ def _print_cups(pdf_path: Path):
         raise RuntimeError("No hay impresora por defecto configurada en CUPS.")
     conn.printFile(printer_name, str(pdf_path), pdf_path.name, {})
 
+
 # --------------------------------------
 # Función de logging genérico
 # --------------------------------------
 import inspect
 import os
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -228,7 +149,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
 
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         logger.addHandler(handler)
@@ -238,7 +162,6 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)
     level_fn(mensaje)
->>>>>>> 5dd0e16175995cf203290d5fa8fccb43a79727c4
