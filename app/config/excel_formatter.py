@@ -1,8 +1,10 @@
-from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from datetime import datetime
 from pathlib import Path
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
+
 
 def save_pretty_excel(df, output_filename):
     """Guarda el DataFrame editado con formato personalizado."""
@@ -14,15 +16,19 @@ def save_pretty_excel(df, output_filename):
     total_fill = PatternFill("solid", fgColor="00B0F0")
     bold_font_white = Font(bold=True, color="FFFFFF")
     bold_font_black = Font(bold=True, color="000000")
-    border = Border(left=Side(style='thin'), right=Side(style='thin'),
-                    top=Side(style='thin'), bottom=Side(style='thin'))
+    border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
 
     # Título con fecha
     today = datetime.now().strftime("%A, %d de %B de %Y").capitalize()
-    ws.merge_cells('A1:F1')
-    ws['A1'] = f"AMILAB-FEDEX      {today}"
-    ws['A1'].font = Font(bold=True, size=14)
-    ws['A1'].alignment = Alignment(horizontal="center")
+    ws.merge_cells("A1:F1")
+    ws["A1"] = f"AMILAB-FEDEX      {today}"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
 
     # Encabezados
     headers = list(df.columns)
@@ -44,7 +50,7 @@ def save_pretty_excel(df, output_filename):
     ws.cell(row=total_row, column=5).font = bold_font_black
     ws.cell(row=total_row, column=5).fill = total_fill
     ws.cell(row=total_row, column=5).alignment = Alignment(horizontal="center")
-    ws.cell(row=total_row, column=6).value = df['BULTOS'].sum()
+    ws.cell(row=total_row, column=6).value = df["BULTOS"].sum()
     ws.cell(row=total_row, column=6).font = bold_font_black
     ws.cell(row=total_row, column=6).fill = total_fill
     ws.cell(row=total_row, column=6).alignment = Alignment(horizontal="center")
@@ -73,11 +79,12 @@ def save_pretty_excel(df, output_filename):
     return output_path
 
 
-import logging
-from pathlib import Path
-from datetime import datetime
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -98,7 +105,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -109,5 +119,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

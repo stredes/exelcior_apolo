@@ -1,8 +1,10 @@
-from fpdf import FPDF
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-import os
+
+from fpdf import FPDF
+
 
 def export_to_pdf(df, parent_window, filename="reporte"):
     if df is None or df.empty:
@@ -29,21 +31,27 @@ def export_to_pdf(df, parent_window, filename="reporte"):
     # Pie de página con fecha y hora
     pdf.set_y(-15)
     pdf.set_font("Arial", size=8)
-    pdf.cell(0, 10, f"Generado el {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 0, 'C')
+    pdf.cell(
+        0, 10, f"Generado el {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 0, "C"
+    )
 
     # Guardar en carpeta "exportados/pdf/"
     output_dir = Path("exportados/pdf")
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    output_file = (
+        output_dir / f"{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    )
 
     pdf.output(str(output_file))
     print(f"✅ PDF generado: {output_file}")
 
-import logging
-from pathlib import Path
-from datetime import datetime
+
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -64,7 +72,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -75,5 +86,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

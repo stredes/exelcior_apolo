@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def drop_duplicates_reference_master(df: pd.DataFrame) -> pd.DataFrame:
     if "reference" in df.columns and "masterTrackingNumber" in df.columns:
         df_copy = df.copy()
@@ -9,11 +10,14 @@ def drop_duplicates_reference_master(df: pd.DataFrame) -> pd.DataFrame:
         df_dedup.drop(columns=["__ref__", "__master__"], inplace=True)
         return df_dedup.reset_index(drop=True)
     return df
-import logging
-from pathlib import Path
-from datetime import datetime
+
+
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -34,7 +38,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -45,5 +52,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

@@ -1,16 +1,18 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
+import json
 import os
 import smtplib
-from email.message import EmailMessage
-import json
 import tempfile
+import tkinter as tk
+from datetime import datetime
+from email.message import EmailMessage
+from pathlib import Path
+from tkinter import filedialog, messagebox, simpledialog, ttk
+
+import pandas as pd
 
 # ---------- Configuración de Usuario (almacenamiento) ----------
 USER_CONFIG_FILE = Path("config_usuario.json")
+
 
 def cargar_config_usuario():
     if USER_CONFIG_FILE.exists():
@@ -18,9 +20,11 @@ def cargar_config_usuario():
             return json.load(f)
     return {}
 
+
 def guardar_config_usuario(config):
     with open(USER_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
+
 
 # ---------- Estadísticas Dinámicas ----------
 def mostrar_estadisticas(df):
@@ -29,9 +33,9 @@ def mostrar_estadisticas(df):
         return
 
     total_filas, total_columnas = df.shape
-    suma_bultos = df['BULTOS'].sum() if 'BULTOS' in df.columns else 'N/A'
-    clientes_unicos = df['Cliente'].nunique() if 'Cliente' in df.columns else 'N/A'
-    fechas_envio = df['Fecha'].dropna().unique() if 'Fecha' in df.columns else 'N/A'
+    suma_bultos = df["BULTOS"].sum() if "BULTOS" in df.columns else "N/A"
+    clientes_unicos = df["Cliente"].nunique() if "Cliente" in df.columns else "N/A"
+    fechas_envio = df["Fecha"].dropna().unique() if "Fecha" in df.columns else "N/A"
 
     estadisticas = (
         f"📊 Total de filas: {total_filas}\n"
@@ -43,24 +47,31 @@ def mostrar_estadisticas(df):
 
     messagebox.showinfo("Estadísticas del Excel", estadisticas)
 
+
 # ---------- Exportaciones ----------
 def exportar_csv(df):
     if df is None or df.empty:
         messagebox.showerror("Error", "No hay datos para exportar.")
         return
-    file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".csv", filetypes=[("CSV files", "*.csv")]
+    )
     if file_path:
         df.to_csv(file_path, index=False)
         messagebox.showinfo("Exportar CSV", f"Archivo exportado: {file_path}")
+
 
 def exportar_xlsx(df):
     if df is None or df.empty:
         messagebox.showerror("Error", "No hay datos para exportar.")
         return
-    file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")]
+    )
     if file_path:
         df.to_excel(file_path, index=False)
         messagebox.showinfo("Exportar XLSX", f"Archivo exportado: {file_path}")
+
 
 def exportar_pdf(df):
     if df is None or df.empty:
@@ -70,7 +81,9 @@ def exportar_pdf(df):
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
 
-    file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")]
+    )
     if file_path:
         c = canvas.Canvas(file_path, pagesize=letter)
         width, height = letter
@@ -90,6 +103,7 @@ def exportar_pdf(df):
         c.save()
         messagebox.showinfo("Exportar PDF", f"Archivo exportado: {file_path}")
 
+
 # ---------- Editor Visual de Columnas ----------
 def editor_columnas(df, update_callback=None):
     if df is None or df.empty:
@@ -107,7 +121,10 @@ def editor_columnas(df, update_callback=None):
     canvas_frame = tk.Canvas(editor)
     scroll = ttk.Scrollbar(editor, orient="vertical", command=canvas_frame.yview)
     frame = tk.Frame(canvas_frame)
-    frame.bind("<Configure>", lambda e: canvas_frame.configure(scrollregion=canvas_frame.bbox("all")))
+    frame.bind(
+        "<Configure>",
+        lambda e: canvas_frame.configure(scrollregion=canvas_frame.bbox("all")),
+    )
     canvas_frame.create_window((0, 0), window=frame, anchor="nw")
     canvas_frame.configure(yscrollcommand=scroll.set)
     canvas_frame.pack(side="left", fill="both", expand=True)
@@ -124,7 +141,11 @@ def editor_columnas(df, update_callback=None):
     def aplicar():
         columnas_a_eliminar = [col for col in columnas if not seleccionadas[col].get()]
         df.drop(columns=columnas_a_eliminar, inplace=True)
-        rename_map = {col: nuevos_nombres[col].get() for col in columnas if col != nuevos_nombres[col].get()}
+        rename_map = {
+            col: nuevos_nombres[col].get()
+            for col in columnas
+            if col != nuevos_nombres[col].get()
+        }
         df.rename(columns=rename_map, inplace=True)
         if update_callback:
             update_callback()
@@ -132,6 +153,7 @@ def editor_columnas(df, update_callback=None):
         editor.destroy()
 
     tk.Button(editor, text="Aplicar", command=aplicar).pack(pady=10)
+
 
 # ---------- Búsqueda ----------
 def buscar_datos(df, parent):
@@ -145,7 +167,9 @@ def buscar_datos(df, parent):
         if criterio not in df.columns:
             messagebox.showerror("Error", f"Columna '{criterio}' no encontrada.")
             return
-        resultado = df[df[criterio].astype(str).str.contains(valor, case=False, na=False)]
+        resultado = df[
+            df[criterio].astype(str).str.contains(valor, case=False, na=False)
+        ]
         if resultado.empty:
             messagebox.showinfo("Búsqueda", "No se encontraron resultados.")
         else:
@@ -162,6 +186,7 @@ def buscar_datos(df, parent):
     entry = tk.Entry(buscar_win)
     entry.pack(pady=5)
     tk.Button(buscar_win, text="Buscar", command=buscar).pack(pady=10)
+
 
 # ---------- Envío por Email ----------
 def enviar_email(df, parent):
@@ -182,7 +207,7 @@ def enviar_email(df, parent):
         email_entry = tk.Entry(login_win)
         email_entry.pack(pady=5)
         tk.Label(login_win, text="Contraseña:").pack(pady=5)
-        password_entry = tk.Entry(login_win, show='*')
+        password_entry = tk.Entry(login_win, show="*")
         password_entry.pack(pady=5)
 
         def guardar():
@@ -202,18 +227,26 @@ def enviar_email(df, parent):
         return
 
     try:
-        temp_path = Path(tempfile.gettempdir()) / f"datos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        temp_path = (
+            Path(tempfile.gettempdir())
+            / f"datos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        )
         df.to_excel(temp_path, index=False)
 
         msg = EmailMessage()
-        msg['Subject'] = 'Datos Exportados'
-        msg['From'] = config["email"]
-        msg['To'] = to_email
+        msg["Subject"] = "Datos Exportados"
+        msg["From"] = config["email"]
+        msg["To"] = to_email
         msg.set_content("Adjunto los datos solicitados.")
         with open(temp_path, "rb") as f:
-            msg.add_attachment(f.read(), maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=temp_path.name)
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename=temp_path.name,
+            )
 
-        with smtplib.SMTP('smtp.tudominio.com', 587) as server:
+        with smtplib.SMTP("smtp.tudominio.com", 587) as server:
             server.starttls()
             server.login(config["email"], config["password"])
             server.send_message(msg)
@@ -222,6 +255,7 @@ def enviar_email(df, parent):
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo enviar el email:\n{e}")
+
 
 # ---------- Función Principal ----------
 def abrir_herramientas(parent, df):
@@ -232,20 +266,35 @@ def abrir_herramientas(parent, df):
     style = ttk.Style()
     style.configure("TButton", font=("Segoe UI", 11), padding=8)
 
-    ttk.Button(tools_win, text="📊 Ver Estadísticas", command=lambda: mostrar_estadisticas(df)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar CSV", command=lambda: exportar_csv(df)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar XLSX", command=lambda: exportar_xlsx(df)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar PDF", command=lambda: exportar_pdf(df)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="🎨 Editor Columnas", command=lambda: editor_columnas(df)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="🔍 Buscar Datos", command=lambda: buscar_datos(df, tools_win)).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📧 Enviar Email", command=lambda: enviar_email(df, tools_win)).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="📊 Ver Estadísticas", command=lambda: mostrar_estadisticas(df)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="📁 Exportar CSV", command=lambda: exportar_csv(df)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="📁 Exportar XLSX", command=lambda: exportar_xlsx(df)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="📁 Exportar PDF", command=lambda: exportar_pdf(df)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="🎨 Editor Columnas", command=lambda: editor_columnas(df)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="🔍 Buscar Datos", command=lambda: buscar_datos(df, tools_win)
+    ).pack(pady=10, fill="x", padx=20)
+    ttk.Button(
+        tools_win, text="📧 Enviar Email", command=lambda: enviar_email(df, tools_win)
+    ).pack(pady=10, fill="x", padx=20)
 
 
-import logging
-from pathlib import Path
-from datetime import datetime
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -266,7 +315,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -277,5 +329,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

@@ -1,43 +1,17 @@
-# Entorno virtual
+# Entornos virtuales
+.venv/
 venv/
-*.env
-.venv
 
-# Archivos de configuración de la IDE
-.vscode/
-.idea/
+# Bases de datos
+*.db
+*.sqlite3
 
-# Archivos de Python compilados
-*.pyc
-*.pyo
-*.pyd
-__pycache__/
-
-# Archivos de logs
-*.log
-
-# Archivos de sistema
-.DS_Store
-Thumbs.db
-
-# Archivos temporales
-*.swp
-*.bak
-
-# Dependencias de pip
-pip-wheel-metadata/
-*.egg-info/
-
-# Archivos de exportación generados
+# Artefactos y logs
+logs/
+output/
+exportados/
+*.xlsx
 *.pdf
-*.csv
 
-
-portable
-user_config.json
-dist
-build
-
-# Archivos de configuración locales
-
-
+# Configs de IDE
+.vscode/

@@ -1,16 +1,20 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import OperationalError
-from .models import Base, User, Configuracion, HistorialArchivo, RegistroImpresion
-from pathlib import Path
-from datetime import datetime
 import logging
+from datetime import datetime
+from pathlib import Path
+
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import sessionmaker
+
+from .models import (Base, Configuracion, HistorialArchivo, RegistroImpresion,
+                     User)
 
 DATABASE_URL = "sqlite:///excel_printer.db"
 BACKUP_PATH = Path("excel_printer_backup.db")
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def init_db():
     try:
@@ -32,12 +36,15 @@ def init_db():
             except Exception as err:
                 logging.error(f"No se pudo restaurar el respaldo: {err}")
         else:
-            logging.info("No se encontró respaldo. Intentando crear nueva base de datos.")
+            logging.info(
+                "No se encontró respaldo. Intentando crear nueva base de datos."
+            )
             try:
                 Base.metadata.create_all(bind=engine)
                 logging.info("Nueva base de datos creada exitosamente.")
             except Exception as err:
                 logging.error(f"Error creando nueva base de datos: {err}")
+
 
 def save_file_history(filepath, modo):
     session = SessionLocal()
@@ -45,7 +52,7 @@ def save_file_history(filepath, modo):
         nuevo_registro = HistorialArchivo(
             nombre_archivo=Path(filepath).name,
             modo=modo,
-            fecha=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            fecha=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
         session.add(nuevo_registro)
         session.commit()
@@ -56,11 +63,13 @@ def save_file_history(filepath, modo):
     finally:
         session.close()
 
-import logging
-from pathlib import Path
-from datetime import datetime
+
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -81,7 +90,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -92,5 +104,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

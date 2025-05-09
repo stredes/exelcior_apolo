@@ -1,9 +1,10 @@
-from datetime import datetime
-from logging import basicConfig, INFO
-from pathlib import Path
-import logging
 import inspect
+import logging
 import os
+from datetime import datetime
+from logging import INFO, basicConfig
+from pathlib import Path
+
 
 def setup_logging():
     LOG_FILE = Path("logs") / f"fallback_log_{datetime.now().strftime('%Y%m%d')}.log"
@@ -13,7 +14,7 @@ def setup_logging():
         filename=LOG_FILE,
         level=INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     # También enviar logs a consola (opcional pero recomendado)
@@ -44,7 +45,8 @@ def log_evento(mensaje: str, nivel: str = "info"):
 
         # Evitar duplicar handlers
         if not any(
-            isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+            isinstance(h, logging.FileHandler)
+            and h.baseFilename == str(log_file.resolve())
             for h in logger.handlers
         ):
             handler = logging.FileHandler(log_file, encoding="utf-8")
@@ -65,10 +67,17 @@ def log_evento(mensaje: str, nivel: str = "info"):
         fallback_logger = logging.getLogger("fallback_logger")
         fallback_logger.setLevel(logging.ERROR)
         fallback_file = Path("logs/fallback_error.log")
-        if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(fallback_file.resolve())
-                   for h in fallback_logger.handlers):
+        if not any(
+            isinstance(h, logging.FileHandler)
+            and h.baseFilename == str(fallback_file.resolve())
+            for h in fallback_logger.handlers
+        ):
             fallback_handler = logging.FileHandler(fallback_file, encoding="utf-8")
-            fallback_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+            fallback_formatter = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(message)s"
+            )
             fallback_handler.setFormatter(fallback_formatter)
             fallback_logger.addHandler(fallback_handler)
-        fallback_logger.error(f"Fallo al registrar log: {exc} :: Mensaje original: {mensaje}")
+        fallback_logger.error(
+            f"Fallo al registrar log: {exc} :: Mensaje original: {mensaje}"
+        )

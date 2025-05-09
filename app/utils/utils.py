@@ -1,10 +1,12 @@
 import json
 from pathlib import Path
-from app.core.logger_bod1 import capturar_log_bod1
+
 import pandas as pd
+from app.core.logger_bod1 import capturar_log_bod1
 
 # Ruta del archivo de configuración
 CONFIG_FILE = Path("excel_printer_config.json")
+
 
 # ---------- Cargar Configuración ----------
 def load_config():
@@ -18,8 +20,12 @@ def load_config():
             capturar_log_bod1(f"Error al cargar configuración: {e}", nivel="error")
             return {}
     else:
-        capturar_log_bod1("Archivo de configuración no encontrado. Se cargará configuración vacía", nivel="warning")
+        capturar_log_bod1(
+            "Archivo de configuración no encontrado. Se cargará configuración vacía",
+            nivel="warning",
+        )
         return {}
+
 
 # ---------- Guardar Configuración ----------
 def save_config(config_data):
@@ -40,10 +46,11 @@ def save_config(config_data):
     except Exception as e:
         capturar_log_bod1(f"Error al guardar configuración: {e}", nivel="error")
 
+
 # ---------- (Opcional) Inicializar Logging Base (si aún lo usas en alguna parte) ----------
 def setup_logging():
     from datetime import datetime
-    from logging import basicConfig, INFO
+    from logging import INFO, basicConfig
 
     LOG_FILE = Path("logs") / f"fallback_log_{datetime.now().strftime('%Y%m%d')}.log"
     LOG_FILE.parent.mkdir(exist_ok=True)
@@ -52,8 +59,9 @@ def setup_logging():
         filename=LOG_FILE,
         level=INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        encoding="utf-8"
+        encoding="utf-8",
     )
+
 
 def drop_duplicates_reference_master(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -67,11 +75,12 @@ def drop_duplicates_reference_master(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-import logging
-from pathlib import Path
-from datetime import datetime
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -92,7 +101,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -103,5 +115,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

@@ -1,6 +1,7 @@
 import re
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
+
 
 def analizar_logs():
     log_dir = Path("logs")
@@ -16,13 +17,17 @@ def analizar_logs():
     errores_encontrados = defaultdict(list)
 
     patrones = {
-        "Carga automática fallida": re.compile(r"Error en carga automática", re.IGNORECASE),
+        "Carga automática fallida": re.compile(
+            r"Error en carga automática", re.IGNORECASE
+        ),
         "Fallo de impresión": re.compile(r"Error en impresión", re.IGNORECASE),
         "Error de lectura": re.compile(r"Error al leer el archivo", re.IGNORECASE),
-        "Error en transformación": re.compile(r"Error en transformación", re.IGNORECASE),
+        "Error en transformación": re.compile(
+            r"Error en transformación", re.IGNORECASE
+        ),
         "Permiso denegado": re.compile(r"Permission denied", re.IGNORECASE),
         "Objeto sin atributo": re.compile(r"object has no attribute", re.IGNORECASE),
-        "Otros errores": re.compile(r"- ERROR - (.+)")
+        "Otros errores": re.compile(r"- ERROR - (.+)"),
     }
 
     for log_file in logs:
@@ -30,7 +35,9 @@ def analizar_logs():
             for linea in f:
                 for categoria, patron in patrones.items():
                     if patron.search(linea):
-                        errores_encontrados[categoria].append((log_file.name, linea.strip()))
+                        errores_encontrados[categoria].append(
+                            (log_file.name, linea.strip())
+                        )
                         break
 
     print("\n📊 RESUMEN DE ERRORES EN LOGS:")
@@ -43,6 +50,7 @@ def analizar_logs():
         print(f"\n🔹 {categoria} ({len(eventos)} encontrados)")
         for archivo, mensaje in eventos[-3:]:  # muestra los últimos 3
             print(f"  • {archivo} → {mensaje}")
+
 
 if __name__ == "__main__":
     analizar_logs()

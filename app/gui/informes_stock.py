@@ -1,15 +1,16 @@
 # app/gui/informes_stock.py
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from tkcalendar import DateEntry
 from pathlib import Path
-import pandas as pd
+from tkinter import filedialog, messagebox, ttk
 
+import pandas as pd
+from app.core.logger_bod1 import capturar_log_bod1
+from app.db.utils_db import save_file_history
 from app.reportes.stock.config import StockReportConfig
 from app.reportes.stock.service import StockReportService
-from app.db.utils_db import save_file_history
-from app.core.logger_bod1 import capturar_log_bod1
+from tkcalendar import DateEntry
+
 
 def crear_ventana_informes_stock(root=None, config_json="stock_report_config.json"):
     # --- Inicializar ventana ---
@@ -38,7 +39,7 @@ def crear_ventana_informes_stock(root=None, config_json="stock_report_config.jso
     d2.set_date(pd.to_datetime("2100-01-01"))
     d2.grid(row=0, column=3, padx=5)
 
-    ttk.Label(frm, text="Ven Desde:").grid(row=0, column=4, padx=(20,0))
+    ttk.Label(frm, text="Ven Desde:").grid(row=0, column=4, padx=(20, 0))
     v1 = DateEntry(frm, date_pattern="yyyy-MM-dd")
     v1.set_date(pd.to_datetime("1900-01-01"))
     v1.grid(row=0, column=5, padx=5)
@@ -48,12 +49,14 @@ def crear_ventana_informes_stock(root=None, config_json="stock_report_config.jso
     v2.set_date(pd.to_datetime("2100-01-01"))
     v2.grid(row=0, column=7, padx=5)
 
-    btn_carga = ttk.Button(frm, text="Seleccionar Carpeta → Cargar Último",
-                           command=lambda: _cargar_ultimo())
+    btn_carga = ttk.Button(
+        frm,
+        text="Seleccionar Carpeta → Cargar Último",
+        command=lambda: _cargar_ultimo(),
+    )
     btn_carga.grid(row=1, column=0, pady=10, sticky="w")
 
-    btn_export = ttk.Button(frm, text="Exportar Filtrado",
-                            command=lambda: _exportar())
+    btn_export = ttk.Button(frm, text="Exportar Filtrado", command=lambda: _exportar())
     btn_export.grid(row=1, column=1, pady=10, sticky="w")
 
     # --- Treeview ---
@@ -101,13 +104,17 @@ def crear_ventana_informes_stock(root=None, config_json="stock_report_config.jso
         df = df_original.copy()
         # Filtro inventario si existe date_field
         if cfg.date_field and cfg.date_field in df.columns:
-            df[cfg.date_field] = pd.to_datetime(df[cfg.date_field], dayfirst=True, errors="coerce")
+            df[cfg.date_field] = pd.to_datetime(
+                df[cfg.date_field], dayfirst=True, errors="coerce"
+            )
             desde = pd.to_datetime(d1.get_date())
             hasta = pd.to_datetime(d2.get_date())
             df = df[(df[cfg.date_field] >= desde) & (df[cfg.date_field] <= hasta)]
         # Filtro vencimiento
         if "Fecha Vencimiento" in df.columns:
-            df["Fecha Vencimiento"] = pd.to_datetime(df["Fecha Vencimiento"], format="%d/%m/%Y", errors="coerce")
+            df["Fecha Vencimiento"] = pd.to_datetime(
+                df["Fecha Vencimiento"], format="%d/%m/%Y", errors="coerce"
+            )
             vd = pd.to_datetime(v1.get_date())
             vh = pd.to_datetime(v2.get_date())
             df = df[(df["Fecha Vencimiento"] >= vd) & (df["Fecha Vencimiento"] <= vh)]
@@ -119,9 +126,11 @@ def crear_ventana_informes_stock(root=None, config_json="stock_report_config.jso
             return
         rows = [tree.item(i)["values"] for i in tree.get_children()]
         df = pd.DataFrame(rows, columns=cols)
-        destino = filedialog.asksaveasfilename(title="Guardar informe",
-                                               defaultextension=".xlsx",
-                                               filetypes=[("Excel","*.xlsx")])
+        destino = filedialog.asksaveasfilename(
+            title="Guardar informe",
+            defaultextension=".xlsx",
+            filetypes=[("Excel", "*.xlsx")],
+        )
         if not destino:
             return
         try:
