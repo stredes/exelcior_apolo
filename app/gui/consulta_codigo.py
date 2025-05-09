@@ -3,10 +3,8 @@ from tkinter import ttk, messagebox
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-import tempfile
-import os
-import pythoncom
-from win32com.client import Dispatch
+from app.printer.printer import print_document
+from app.core.logger_bod1 import capturar_log_bod1
 
 class ConsultaCodigoApp(tk.Toplevel):
     COLUMNAS = ["Código", "Producto", "Bodega", "Ubicación", "Lote", "Fecha Vencimiento", "Saldo stock"]
@@ -14,10 +12,10 @@ class ConsultaCodigoApp(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Consulta por Código")
-        self.geometry("1100x500")
+        self.geometry("1100x600")
         self.configure(bg="#e6e9e7")
 
-        tk.Label(self, text="Consulta por Codigo", font=("Segoe UI", 18, "bold", "italic"),
+        tk.Label(self, text="Consulta por Código", font=("Segoe UI", 18, "bold", "italic"),
                  fg="red", bg="#e6e9e7").pack(pady=10)
 
         filtro_frame = tk.Frame(self, bg="#e6e9e7")
@@ -27,7 +25,13 @@ class ConsultaCodigoApp(tk.Toplevel):
                  fg="red", bg="#e6e9e7").grid(row=0, column=0)
         self.codigo_entry = ttk.Entry(filtro_frame, width=20)
         self.codigo_entry.grid(row=0, column=1, padx=5)
+
         ttk.Button(filtro_frame, text="Buscar", command=self.buscar).grid(row=0, column=2, padx=5)
+
+        tk.Label(filtro_frame, text="Entregado a:", font=("Segoe UI", 10, "bold"),
+                 fg="red", bg="#e6e9e7").grid(row=0, column=3, padx=(30, 5))
+        self.entregado_entry = ttk.Entry(filtro_frame, width=30)
+        self.entregado_entry.grid(row=0, column=4)
 
         self.tree = ttk.Treeview(self, columns=self.COLUMNAS, show="headings")
         for col in self.COLUMNAS:
@@ -41,13 +45,13 @@ class ConsultaCodigoApp(tk.Toplevel):
 
         ttk.Button(self, text="Imprimir", command=self.imprimir).pack(pady=5)
 
-        self.df = self.cargar_ultimo_excel()
+        self.df = self._cargar_excel_reciente()
 
-    def cargar_ultimo_excel(self):
-        descargas = Path.home() / "Downloads"
-        archivos = sorted(descargas.glob("Informe_stock_fisico_*.xlsx"), key=os.path.getmtime, reverse=True)
+    def _cargar_excel_reciente(self):
+        path = Path.home() / "Downloads"
+        archivos = sorted(path.glob("Informe_stock_fisico_*.xlsx"), key=lambda x: x.stat().st_mtime, reverse=True)
         if not archivos:
-            messagebox.showerror("Error", "No se encontró archivo de stock en Descargas.")
+            messagebox.showerror("Error", "No se encontró ningún archivo de stock físico.")
             self.destroy()
             return pd.DataFrame()
         return pd.read_excel(archivos[0])
@@ -56,47 +60,34 @@ class ConsultaCodigoApp(tk.Toplevel):
         codigo = self.codigo_entry.get().strip()
         if not codigo or self.df.empty:
             return
-
-        self.resultado = self.df[self.df["Código"].astype(str) == codigo]
+        self.df_filtrado = self.df[self.df["Código"].astype(str) == codigo]
         self.tree.delete(*self.tree.get_children())
-
-        for _, row in self.resultado.iterrows():
-            valores = [row.get(col, "") for col in self.COLUMNAS]
-            self.tree.insert("", "end", values=valores)
-
-        total = self.resultado["Saldo stock"].sum()
-        self.total_label.config(text=f"Total Stock: {total}")
+        for _, row in self.df_filtrado.iterrows():
+            self.tree.insert("", "end", values=[row.get(col, "") for col in self.COLUMNAS])
+        self.total_label.config(text=f"Total Stock: {self.df_filtrado['Saldo stock'].sum()}")
 
     def imprimir(self):
-        if self.resultado.empty:
-            messagebox.showwarning("Advertencia", "No hay resultados para imprimir.")
+        if not hasattr(self, "df_filtrado") or self.df_filtrado.empty:
+            messagebox.showwarning("Advertencia", "No hay datos para imprimir.")
             return
 
-        temp_excel = Path(tempfile.gettempdir()) / f"listado_codigo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        self.resultado.to_excel(temp_excel, index=False)
+        entregado = self.entregado_entry.get().strip() or "Sin nombre"
+        codigo = self.codigo_entry.get().strip()
+        filename = f"Listado_Codigo_{codigo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filepath = Path("exportados/listados")
+        filepath.mkdir(parents=True, exist_ok=True)
+        full_path = filepath / filename
 
-        try:
-            pythoncom.CoInitialize()
-            excel = Dispatch("Excel.Application")
-            excel.Visible = False
-            wb = excel.Workbooks.Open(str(temp_excel))
-            ws = wb.Sheets(1)
-            ws.Columns.AutoFit()
+        self.df_filtrado = self.df_filtrado[self.COLUMNAS]
 
-            ws.PageSetup.Orientation = 2  # Horizontal
-            ws.PageSetup.Zoom = False
-            ws.PageSetup.FitToPagesWide = 1
-            ws.PageSetup.FitToPagesTall = False
+        with pd.ExcelWriter(full_path, engine='xlsxwriter') as writer:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet("Listado")
+            writer.sheets["Listado"] = worksheet
+            worksheet.write("A1", "Listado por Código")
+            worksheet.write("A2", f"Entregado a: {entregado}")
+            worksheet.write("A3", f"Código consultado: {codigo}")
+            self.df_filtrado.to_excel(writer, sheet_name="Listado", startrow=4, index=False)
 
-            fecha_hora = datetime.now().strftime("%d/%m/%Y %H:%M")
-            total = self.resultado["Saldo stock"].sum()
-            ws.PageSetup.CenterFooter = f"&\"Arial,Bold\"&8 Impreso: {fecha_hora}  |  Total Stock: {total}"
-
-            ws.PrintOut()
-            wb.Close(SaveChanges=False)
-            excel.Quit()
-            messagebox.showinfo("Impresión", "Listado enviado a impresora correctamente.")
-        except Exception as e:
-            messagebox.showerror("Error de impresión", f"No se pudo imprimir:\n{e}")
-        finally:
-            pythoncom.CoUninitialize()
+        print_document(full_path, mode="codigo", config_columns={}, df=self.df_filtrado)
+        capturar_log_bod1(f"Listado por código entregado a: {entregado} | Archivo: {full_path.name}", "info")
