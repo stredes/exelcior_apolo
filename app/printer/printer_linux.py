@@ -1,11 +1,12 @@
 import os
 import platform
 import subprocess
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from tkinter import messagebox
 
-from app.utils.logger_setup import log_evento  # ✅ Importa desde tu sistema central
+from app.utils.logger_setup import \
+    log_evento  # ✅ Importa desde tu sistema central
 
 
 def print_document(filepath, mode, config_columns, df):
@@ -17,7 +18,12 @@ def print_document(filepath, mode, config_columns, df):
 
         # Verificar comandos necesarios
         for cmd in ["libreoffice", "lp"]:
-            if subprocess.call(["which", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+            if (
+                subprocess.call(
+                    ["which", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                != 0
+            ):
                 raise EnvironmentError(f"{cmd} no está disponible en el sistema.")
 
         # Directorio para PDF exportado
@@ -29,17 +35,22 @@ def print_document(filepath, mode, config_columns, df):
 
         # Convertir Excel a PDF con libreoffice
         convert_cmd = [
-            "libreoffice", "--headless",
-            "--convert-to", "pdf",
-            "--outdir", str(output_dir),
-            str(filepath)
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            str(output_dir),
+            str(filepath),
         ]
-        result = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(
+            convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
 
         if result.returncode != 0:
             raise RuntimeError(f"Error al convertir a PDF:\n{result.stderr.decode()}")
 
-        generated_pdf = output_dir / Path(filepath).with_suffix('.pdf').name
+        generated_pdf = output_dir / Path(filepath).with_suffix(".pdf").name
         if not generated_pdf.exists():
             raise FileNotFoundError("No se encontró el PDF generado.")
 

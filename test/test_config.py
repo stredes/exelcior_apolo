@@ -1,5 +1,6 @@
 from app.config import config_dialog
 
+
 def test_get_default_config():
     config = config_dialog.get_default_config()
 

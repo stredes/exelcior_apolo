@@ -1,11 +1,13 @@
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-from pathlib import Path
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
-from .models import Base, User, Configuracion, HistorialArchivo, RegistroImpresion
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from .models import (Base, Configuracion, HistorialArchivo, RegistroImpresion,
+                     User)
 
 # Rutas de configuración
 CONFIG_FILE = Path("excel_printer_config.json")
@@ -15,6 +17,7 @@ LOG_FILE = Path("logs_app.log")
 DB_PATH = "sqlite:///excel_printer.db"
 engine = create_engine(DB_PATH)
 Session = sessionmaker(bind=engine)
+
 
 # ----------------- Configuración -----------------
 def load_config():
@@ -27,6 +30,7 @@ def load_config():
             return {}
     return {}
 
+
 def save_config(config_data):
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -34,6 +38,7 @@ def save_config(config_data):
         logging.info("Configuración guardada correctamente.")
     except Exception as e:
         logging.error(f"Error al guardar configuración: {e}")
+
 
 # ----------------- Usuarios -----------------
 def create_user(username, password):
@@ -49,6 +54,7 @@ def create_user(username, password):
     finally:
         session.close()
 
+
 def get_user(username):
     session = Session()
     try:
@@ -59,6 +65,7 @@ def get_user(username):
     finally:
         session.close()
 
+
 # ----------------- Historial Archivos -----------------
 def save_file_history(nombre_archivo, modo, usuario_id=None):
     session = Session()
@@ -67,31 +74,35 @@ def save_file_history(nombre_archivo, modo, usuario_id=None):
             usuario_id=usuario_id,
             nombre_archivo=str(nombre_archivo),
             fecha_procesado=datetime.utcnow(),
-            modo_utilizado=modo
+            modo_utilizado=modo,
         )
         session.add(record)
         session.commit()
-        logging.info(f"Historial guardado para archivo '{nombre_archivo}' en modo '{modo}'")
+        logging.info(
+            f"Historial guardado para archivo '{nombre_archivo}' en modo '{modo}'"
+        )
     except Exception as e:
         session.rollback()
         logging.error(f"Error al guardar historial: {e}")
     finally:
         session.close()
 
+
 # ----------------- Logging -----------------
 def setup_logging():
     logging.basicConfig(
         filename=LOG_FILE,
         level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
 
-import logging
-from pathlib import Path
-from datetime import datetime
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -112,7 +123,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -123,5 +137,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)

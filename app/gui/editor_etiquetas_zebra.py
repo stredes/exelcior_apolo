@@ -1,13 +1,14 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import pandas as pd
-from pathlib import Path
 import json
+import logging
 import platform
-from datetime import datetime
 import socket
 import threading
-import logging
+import tkinter as tk
+from datetime import datetime
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+
+import pandas as pd
 
 # -------------------- CONFIGURACIÓN LOG --------------------
 LOG_PATH = Path("logs")
@@ -18,11 +19,12 @@ logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 # -------------------- CONFIGURACIÓN APP --------------------
 CONFIG_PATH = Path("config.json")
+
 
 def cargar_configuracion():
     if CONFIG_PATH.exists():
@@ -30,9 +32,11 @@ def cargar_configuracion():
             return json.load(f)
     return {}
 
+
 def guardar_configuracion(config):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
+
 
 def obtener_ruta_excel():
     config = cargar_configuracion()
@@ -41,15 +45,18 @@ def obtener_ruta_excel():
         return ruta
     nueva_ruta = filedialog.askopenfilename(
         title="Selecciona el archivo 'etiqueta pedido.xlsx'",
-        filetypes=[("Archivos Excel", "*.xlsx")]
+        filetypes=[("Archivos Excel", "*.xlsx")],
     )
     if nueva_ruta:
         config["ruta_excel"] = nueva_ruta
         guardar_configuracion(config)
         return nueva_ruta
     else:
-        messagebox.showerror("Archivo no seleccionado", "No se seleccionó ningún archivo de etiquetas.")
+        messagebox.showerror(
+            "Archivo no seleccionado", "No se seleccionó ningún archivo de etiquetas."
+        )
         exit()
+
 
 def guardar_impresora_en_config(ip, port):
     config = cargar_configuracion()
@@ -58,9 +65,11 @@ def guardar_impresora_en_config(ip, port):
     guardar_configuracion(config)
     logging.info(f"Configuración de impresora guardada: IP={ip}, Puerto={port}")
 
+
 def obtener_impresora_guardada():
     config = cargar_configuracion()
     return config.get("zebra_ip", "192.168.0.100"), config.get("zebra_port", 9100)
+
 
 # -------------------- ZPL --------------------
 def generar_zpl_10x10(data: dict) -> str:
@@ -85,6 +94,7 @@ def generar_zpl_10x10(data: dict) -> str:
 ^FD{data['guia']}^FS
 ^XZ"""
 
+
 # -------------------- GUI --------------------
 def crear_editor_etiqueta(df_clientes: pd.DataFrame):
     root = tk.Tk()
@@ -101,7 +111,9 @@ def crear_editor_etiqueta(df_clientes: pd.DataFrame):
 
     def actualizar_config():
         guardar_impresora_en_config(ip_var.get(), int(port_var.get()))
-        messagebox.showinfo("Configuración guardada", f"IP: {ip_var.get()} | Puerto: {port_var.get()}")
+        messagebox.showinfo(
+            "Configuración guardada", f"IP: {ip_var.get()} | Puerto: {port_var.get()}"
+        )
 
     def actualizar_status(ip, port):
         try:
@@ -119,14 +131,23 @@ def crear_editor_etiqueta(df_clientes: pd.DataFrame):
                 guardar_impresora_en_config(ip_var.get(), int(port_var.get()))
                 actualizar_status(ip_var.get(), port_var.get())
                 logging.info(f"Zebra encontrada en {ip_var.get()}:9100")
-                messagebox.showinfo("Zebra encontrada", f"Zebra disponible en {ip_var.get()}:9100")
+                messagebox.showinfo(
+                    "Zebra encontrada", f"Zebra disponible en {ip_var.get()}:9100"
+                )
             else:
                 status_var.set("🔴 Zebra no encontrada")
                 logging.warning("Zebra no encontrada en red")
-                messagebox.showwarning("Zebra no encontrada", "No se encontraron dispositivos Zebra en la red.")
+                messagebox.showwarning(
+                    "Zebra no encontrada",
+                    "No se encontraron dispositivos Zebra en la red.",
+                )
+
         threading.Thread(target=_scan).start()
 
-    config_menu.add_command(label="Buscar Dispositivos Zebra", command=lambda: escanear_dispositivos(ip_var, port_var))
+    config_menu.add_command(
+        label="Buscar Dispositivos Zebra",
+        command=lambda: escanear_dispositivos(ip_var, port_var),
+    )
     config_menu.add_separator()
     config_menu.add_command(label="Guardar Configuración", command=actualizar_config)
     menu_bar.add_cascade(label="Conexión", menu=config_menu)
@@ -143,7 +164,7 @@ def crear_editor_etiqueta(df_clientes: pd.DataFrame):
         "ciudad": "Ciudad",
         "guia": "Guía",
         "bultos": "Bultos",
-        "transporte": "Transporte"
+        "transporte": "Transporte",
     }
 
     entradas = {}
@@ -172,7 +193,9 @@ def crear_editor_etiqueta(df_clientes: pd.DataFrame):
             entradas["ciudad"].insert(0, cliente["ciudad"])
         else:
             logging.warning(f"RUT no encontrado: {rut}")
-            messagebox.showerror("RUT no encontrado", "No se encontró el cliente para el RUT ingresado.")
+            messagebox.showerror(
+                "RUT no encontrado", "No se encontró el cliente para el RUT ingresado."
+            )
 
     entradas["rut"].bind("<Return>", cargar_datos_cliente)
 
@@ -185,27 +208,35 @@ def crear_editor_etiqueta(df_clientes: pd.DataFrame):
         imprimir_zebra_zpl(zpl, ip=ip, port=port, cantidad=cantidad)
         actualizar_status(ip, port)
 
-    ttk.Button(frame, text="🖨️ Imprimir Etiqueta", command=imprimir)\
-        .grid(row=fila_base+1, column=0, columnspan=2, pady=5)
+    ttk.Button(frame, text="🖨️ Imprimir Etiqueta", command=imprimir).grid(
+        row=fila_base + 1, column=0, columnspan=2, pady=5
+    )
 
     status_label = ttk.Label(frame, textvariable=status_var, foreground="blue")
-    status_label.grid(row=fila_base+2, column=0, columnspan=2, pady=5)
+    status_label.grid(row=fila_base + 2, column=0, columnspan=2, pady=5)
 
     actualizar_status(ip_var.get(), port_var.get())
     root.mainloop()
 
+
 # -------------------- IMPRESIÓN --------------------
-def imprimir_zebra_zpl(zpl: str, ip: str = "192.168.0.100", port: int = 9100, cantidad: int = 1):
+def imprimir_zebra_zpl(
+    zpl: str, ip: str = "192.168.0.100", port: int = 9100, cantidad: int = 1
+):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((ip, port))
             for _ in range(cantidad):
                 s.sendall(zpl.encode("utf-8"))
         logging.info(f"{cantidad} etiquetas enviadas a Zebra {ip}:{port}")
-        messagebox.showinfo("Impresión enviada", f"{cantidad} etiqueta(s) enviada(s) a Zebra ({ip}:{port})")
+        messagebox.showinfo(
+            "Impresión enviada",
+            f"{cantidad} etiqueta(s) enviada(s) a Zebra ({ip}:{port})",
+        )
     except Exception as e:
         logging.error(f"Error al imprimir en Zebra: {str(e)}")
         messagebox.showerror("Error en impresión", str(e))
+
 
 # -------------------- ESCANEO --------------------
 def escanear_dispositivos_zebra(puerto=9100):
@@ -220,22 +251,25 @@ def escanear_dispositivos_zebra(puerto=9100):
             continue
     return dispositivos
 
+
 # -------------------- CLIENTES --------------------
 def cargar_clientes(path_excel):
     xls = pd.ExcelFile(path_excel)
     return xls.parse("Clientes")
 
+
 def buscar_cliente_por_rut(df_clientes, rut):
-    fila = df_clientes[df_clientes['rut'] == rut.strip()]
+    fila = df_clientes[df_clientes["rut"] == rut.strip()]
     if not fila.empty:
         datos = fila.iloc[0]
         return {
             "razsoc": datos.get("razsoc", ""),
             "dir": datos.get("dir", ""),
             "comuna": datos.get("comuna", ""),
-            "ciudad": datos.get("ciudad", "")
+            "ciudad": datos.get("ciudad", ""),
         }
     return None
+
 
 if __name__ == "__main__":
     excel_path = obtener_ruta_excel()
@@ -243,11 +277,12 @@ if __name__ == "__main__":
     crear_editor_etiqueta(df_clientes)
 
 
-import logging
-from pathlib import Path
-from datetime import datetime
 import inspect
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
+
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
@@ -268,7 +303,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar handlers
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
+        for h in logger.handlers
+    ):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
@@ -279,6 +317,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)(mensaje)
-

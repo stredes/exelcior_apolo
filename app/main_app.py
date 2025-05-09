@@ -1,45 +1,46 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import threading
-import pandas as pd
 import logging
-from pathlib import Path
-from datetime import datetime
-import tempfile
 import platform
 import sys
+import tempfile
+import threading
+import tkinter as tk
+from datetime import datetime
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 
+import pandas as pd
 # ✅ IMPORTS AJUSTADOS A LA NUEVA ESTRUCTURA
 from app.config.config_dialog import ConfigDialog
-from app.core.excel_processor import validate_file, load_excel, apply_transformation
-from app.printer.exporter import export_to_pdf
+from app.core.autoloader import (find_latest_file_by_mode,
+                                 set_carpeta_descarga_personalizada)
+from app.core.buscador_postal import crear_widget_postal
+from app.core.excel_processor import (apply_transformation, load_excel,
+                                      validate_file)
 from app.core.herramientas import abrir_herramientas
-from app.core.buscador_postal import crear_widget_postal
-from app.db.database import init_db
-from app.db.database import save_file_history
-from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_bod1 import capturar_log_bod1
-from app.utils.utils import load_config
-from app.utils.platform_utils import is_windows, is_linux
-from app.gui.editor_etiquetas_zebra import crear_editor_etiqueta, cargar_clientes
-from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
-from app.utils.dedupe import drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
-from app.core.buscador_postal import crear_widget_postal
-from app.utils.logger_setup import setup_logging, log_evento
-from app.utils.logger_viewer import abrir_visor_logs
-from app.utils.logger_setup import log_evento
-from app.gui.informes_stock import crear_ventana_informes_stock
+from app.db.database import init_db, save_file_history
 from app.gui.consulta_codigo import ConsultaCodigoApp
 from app.gui.consulta_ubicacion import ConsultaUbicacionApp
+from app.gui.editor_etiquetas_zebra import (cargar_clientes,
+                                            crear_editor_etiqueta)
+from app.gui.informes_stock import crear_ventana_informes_stock
+from app.printer.exporter import export_to_pdf
+from app.printer.printer_linux import \
+    print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
+from app.utils.dedupe import \
+    drop_duplicates_reference_master  # ✅ Asegúrate de tener este import
+from app.utils.logger_setup import log_evento, setup_logging
+from app.utils.logger_viewer import abrir_visor_logs
+from app.utils.platform_utils import is_linux, is_windows
+from app.utils.utils import load_config
 
 
-
-
-def global_exception_handler(exctype, value, traceback):
+def global_exception_handler(exctype, value, tb):
+    logging.critical(f"Excepción no capturada: {value}", exc_info=(exctype, value, tb))
+    from app.utils.logger_setup import log_evento
     log_evento(f"Excepción no capturada: {value}", "critical")
 
 sys.excepthook = global_exception_handler
-
 
 
 setup_logging()
@@ -47,10 +48,8 @@ log_evento("Aplicación iniciada", "info")
 
 import sys
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-
-
 
 
 def _get_print_function():
@@ -67,10 +66,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("790x790") 
-
-
-     
+        self.geometry("790x790")
 
         self.configure(bg="#F9FAFB")
 
@@ -81,7 +77,10 @@ class ExcelPrinterApp(tk.Tk):
         self.mode = "listados"
         self.processing = False
         self.print_document = _get_print_function()
-        self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
+        self.mode_vars = {
+            m: tk.BooleanVar(value=(m == "listados"))
+            for m in ["urbano", "fedex", "listados"]
+        }
         self.config_columns = load_config()
 
         self._setup_styles()
@@ -91,7 +90,7 @@ class ExcelPrinterApp(tk.Tk):
 
     def _setup_styles(self):
         style = ttk.Style(self)
-        style.theme_use('clam')
+        style.theme_use("clam")
         style.configure("TButton", font=("Segoe UI", 11), padding=8)
         style.configure("TLabel", font=("Segoe UI", 11))
         style.configure("TCheckbutton", font=("Segoe UI", 11))
@@ -100,8 +99,13 @@ class ExcelPrinterApp(tk.Tk):
         sidebar = tk.Frame(self, bg="#111827", width=200)
         sidebar.pack(side="left", fill="y")
 
-        tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
-                font=("Segoe UI", 14, "bold")).pack(pady=20)
+        tk.Label(
+            sidebar,
+            text="Menú",
+            bg="#111827",
+            fg="white",
+            font=("Segoe UI", 14, "bold"),
+        ).pack(pady=20)
 
         buttons = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
@@ -110,52 +114,70 @@ class ExcelPrinterApp(tk.Tk):
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", lambda: abrir_visor_logs(self)),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
-            ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
+            (
+                "Etiquetas 🏷️",
+                self._abrir_editor_etiquetas,
+            ),  # 👈 Aquí está el nuevo botón
             ("Consulta por Código 🔍", self.abrir_consulta_codigo),
             ("Consulta por Ubicación 🧭", self.abrir_consulta_ubicacion),
-
         ]
 
         for text, command in buttons:
-            ttk.Button(sidebar, text=text, command=command).pack(pady=10, fill="x", padx=10)
+            ttk.Button(sidebar, text=text, command=command).pack(
+                pady=10, fill="x", padx=10
+            )
 
         # Botón "Acerca de"
-        ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
+        ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(
+            pady=10, fill="x", padx=10
+        )
 
         # Botón salir al final
-        ttk.Button(sidebar, text="Salir ❌", command=self.quit).pack(side="bottom", pady=20, fill="x", padx=10)
+        ttk.Button(sidebar, text="Salir ❌", command=self.quit).pack(
+            side="bottom", pady=20, fill="x", padx=10
+        )
 
     def _setup_main_area(self):
         self.main_frame = tk.Frame(self, bg="#F9FAFB")
         self.main_frame.pack(side="left", fill="both", expand=True)
 
-        tk.Label(self.main_frame, text="Transformador Excel",
-                bg="#F9FAFB", fg="#111827", font=("Segoe UI", 18, "bold")).pack(pady=20)
+        tk.Label(
+            self.main_frame,
+            text="Transformador Excel",
+            bg="#F9FAFB",
+            fg="#111827",
+            font=("Segoe UI", 18, "bold"),
+        ).pack(pady=20)
 
-        mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
+        mode_frame = ttk.LabelFrame(
+            self.main_frame, text="Modo de Operación", padding=15
+        )
         mode_frame.pack(pady=10)
 
         for m in self.mode_vars:
-            ttk.Checkbutton(mode_frame, text=m.capitalize(),
-                            variable=self.mode_vars[m],
-                            command=lambda m=m: self._update_mode(m)).pack(side=tk.LEFT, padx=10)
-
+            ttk.Checkbutton(
+                mode_frame,
+                text=m.capitalize(),
+                variable=self.mode_vars[m],
+                command=lambda m=m: self._update_mode(m),
+            ).pack(side=tk.LEFT, padx=10)
 
         # ✅ Añadir buscador de código postal UNA SOLA VEZ
         from app.core.buscador_postal import crear_widget_postal
+
         crear_widget_postal(self.main_frame)
 
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
-        ttk.Label(self, textvariable=self.status_var,
-                  relief=tk.SUNKEN, anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
-        
+        ttk.Label(
+            self, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=5
+        ).pack(side=tk.BOTTOM, fill=tk.X)
 
     def _mostrar_acerca_de(self):
         acerca_win = tk.Toplevel(self)
         acerca_win.title("Acerca de Exelcior Apolo")
         acerca_win.geometry("900x900")
-        acerca_win.configure(bg="#F9FAFB")  
+        acerca_win.configure(bg="#F9FAFB")
 
         contenido = (
             "🧬 Sistema Exelcior Apolo\n\n"
@@ -211,7 +233,7 @@ class ExcelPrinterApp(tk.Tk):
             font=("Segoe UI", 10),
             bg="#F9FAFB",
             relief="flat",
-            borderwidth=0
+            borderwidth=0,
         )
         text_widget.insert("1.0", contenido)
         text_widget.config(state="disabled")
@@ -220,8 +242,6 @@ class ExcelPrinterApp(tk.Tk):
         scrollbar.config(command=text_widget.yview)
 
         ttk.Button(acerca_win, text="Cerrar", command=acerca_win.destroy).pack(pady=10)
-
-
 
     def _update_status(self, message):
         self.status_var.set(message)
@@ -234,16 +254,19 @@ class ExcelPrinterApp(tk.Tk):
 
         log_evento(f"Modo cambiado a: {selected_mode}", "info")
 
-
     def _threaded_select_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Excel files", "*.xlsx *.xls")]
+        )
 
         if file_path and validate_file(file_path):
             # Calibrar la carpeta automáticamente
             set_carpeta_descarga_personalizada(Path(file_path).parent, self.mode)
 
             self.processing = True
-            threading.Thread(target=self._process_file, args=(file_path,), daemon=True).start()
+            threading.Thread(
+                target=self._process_file, args=(file_path,), daemon=True
+            ).start()
 
     def _threaded_auto_load(self):
         if self.processing:
@@ -267,13 +290,21 @@ class ExcelPrinterApp(tk.Tk):
 
             elif estado == "no_match":
                 self._update_status("⚠️ No se encontraron archivos compatibles.")
-                log_evento(f"No se encontraron archivos válidos para modo: {self.mode}", "warning")
-                messagebox.showwarning("Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'.")
+                log_evento(
+                    f"No se encontraron archivos válidos para modo: {self.mode}",
+                    "warning",
+                )
+                messagebox.showwarning(
+                    "Sin coincidencias",
+                    f"No hay archivos válidos para el modo '{self.mode}'.",
+                )
 
             elif estado == "empty_folder":
                 self._update_status("📂 Carpeta vacía o inexistente.")
                 log_evento("Carpeta vacía detectada en carga automática", "warning")
-                messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
+                messagebox.showerror(
+                    "Carpeta vacía", "La carpeta de descargas está vacía o no existe."
+                )
 
             else:
                 self._update_status("❌ Error en la autocarga.")
@@ -288,25 +319,30 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self.processing = False
 
-
     def _process_file(self, file_path: str):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
         log_evento(f"Procesando archivo: {file_path}", "info")
-        
+
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
 
-            self.transformed_df, self.total_bultos = apply_transformation(df, self.config_columns, self.mode)
+            self.transformed_df, self.total_bultos = apply_transformation(
+                df, self.config_columns, self.mode
+            )
 
             if self.mode == "fedex":
-                self.transformed_df = drop_duplicates_reference_master(self.transformed_df)
+                self.transformed_df = drop_duplicates_reference_master(
+                    self.transformed_df
+                )
 
             if "Reference" not in self.transformed_df.columns:
                 for col in self.transformed_df.columns:
                     if col.strip().lower() == "reference":
-                        self.transformed_df.rename(columns={col: "Reference"}, inplace=True)
+                        self.transformed_df.rename(
+                            columns={col: "Reference"}, inplace=True
+                        )
                         break
 
             save_file_history(file_path, self.mode)
@@ -315,7 +351,9 @@ class ExcelPrinterApp(tk.Tk):
             self.after(0, self._show_preview)
 
         except Exception as exc:
-            capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
+            capturar_log_bod1(
+                f"Error al procesar archivo: {file_path} - {exc}", "error"
+            )
             log_evento(f"Error al procesar archivo: {file_path} - {exc}", "error")
             messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
             logging.error(f"Error: {exc}")
@@ -393,32 +431,53 @@ class ExcelPrinterApp(tk.Tk):
         def eliminar_filas_seleccionadas(tree=tree):
             seleccion = tree.selection()
             if not seleccion:
-                messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila.")
+                messagebox.showinfo(
+                    "Sin selección", "Debes seleccionar al menos una fila."
+                )
                 return
             filas_indices = [tree.index(i) for i in seleccion]
             for item in seleccion:
                 tree.delete(item)
-            self.transformed_df.drop(index=self.transformed_df.index[filas_indices], inplace=True)
+            self.transformed_df.drop(
+                index=self.transformed_df.index[filas_indices], inplace=True
+            )
             self.transformed_df.reset_index(drop=True, inplace=True)
-            capturar_log_bod1(f"Filas eliminadas en vista previa: {filas_indices}", "info")
+            capturar_log_bod1(
+                f"Filas eliminadas en vista previa: {filas_indices}", "info"
+            )
 
         # Botones con íconos
-        ttk.Button(botones_centrados, text="🖨️ Imprimir", command=self._threaded_print).pack(side=tk.LEFT, padx=10)
-        ttk.Button(botones_centrados, text="❌ Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=10)
-        ttk.Button(botones_centrados, text="🗑️ Eliminar filas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=10)
+        ttk.Button(
+            botones_centrados, text="🖨️ Imprimir", command=self._threaded_print
+        ).pack(side=tk.LEFT, padx=10)
+        ttk.Button(
+            botones_centrados, text="❌ Cerrar", command=preview_win.destroy
+        ).pack(side=tk.LEFT, padx=10)
+        ttk.Button(
+            botones_centrados,
+            text="🗑️ Eliminar filas",
+            command=eliminar_filas_seleccionadas,
+        ).pack(side=tk.LEFT, padx=10)
 
         # Etiqueta derecha
-        if self.mode == "fedex" and hasattr(self, 'total_bultos'):
-            ttk.Label(barra_botones, text=f"📦 Total PIEZAS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
-        elif self.mode == "urbano" and hasattr(self, 'total_bultos'):
-            ttk.Label(barra_botones, text=f"📦 Total BULTOS: {self.total_bultos}", font=("Segoe UI", 10, "bold")).pack(side=tk.RIGHT, padx=20)
+        if self.mode == "fedex" and hasattr(self, "total_bultos"):
+            ttk.Label(
+                barra_botones,
+                text=f"📦 Total PIEZAS: {self.total_bultos}",
+                font=("Segoe UI", 10, "bold"),
+            ).pack(side=tk.RIGHT, padx=20)
+        elif self.mode == "urbano" and hasattr(self, "total_bultos"):
+            ttk.Label(
+                barra_botones,
+                text=f"📦 Total BULTOS: {self.total_bultos}",
+                font=("Segoe UI", 10, "bold"),
+            ).pack(side=tk.RIGHT, padx=20)
 
     def _threaded_print(self):
         if self.processing:
             return
         self.processing = True
         threading.Thread(target=self._print_document, daemon=True).start()
-
 
     def _print_document(self):
         try:
@@ -439,9 +498,14 @@ class ExcelPrinterApp(tk.Tk):
             capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
             log_evento(f"Archivo exportado correctamente: {output_file}", "info")
 
-            self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
+            self.print_document(
+                output_file, self.mode, self.config_columns, self.transformed_df
+            )
 
-            messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
+            messagebox.showinfo(
+                "Impresión",
+                f"El documento se ha exportado e impreso correctamente:\n{output_file}",
+            )
             capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
             log_evento(f"Archivo enviado a imprimir: {output_file.name}", "info")
         except Exception as e:
@@ -449,7 +513,7 @@ class ExcelPrinterApp(tk.Tk):
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
             log_evento(f"Error en impresión: {e}", "error")
-                
+
     def _open_config_menu(self):
         if self.df is None:
             messagebox.showerror("Error", "Primero cargue un archivo Excel.")
@@ -461,7 +525,7 @@ class ExcelPrinterApp(tk.Tk):
         try:
             path = filedialog.askopenfilename(
                 title="Selecciona el archivo de etiquetas",
-                filetypes=[("Excel Files", "*.xlsx")]
+                filetypes=[("Excel Files", "*.xlsx")],
             )
             if not path:
                 return
@@ -469,15 +533,18 @@ class ExcelPrinterApp(tk.Tk):
             crear_editor_etiqueta(df_clientes)
             log_evento("Editor de etiquetas abierto", "info")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
-
+            messagebox.showerror(
+                "Error", f"No se pudo abrir el editor de etiquetas:\n{e}"
+            )
 
     def open_config_dialog(self, mode: str):
         dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
         self.wait_window(dialog)
 
         # ✅ Ajuste al nuevo retorno de apply_transformation
-        self.transformed_df, self.total_bultos = apply_transformation(self.df, self.config_columns, self.mode)
+        self.transformed_df, self.total_bultos = apply_transformation(
+            self.df, self.config_columns, self.mode
+        )
 
         # 🧼 Aplicar limpieza solo si corresponde
         if self.mode == "fedex":
@@ -488,7 +555,6 @@ class ExcelPrinterApp(tk.Tk):
                 if col.strip().lower() == "reference":
                     self.transformed_df.rename(columns={col: "Reference"}, inplace=True)
                     break
-
 
     def view_logs(self):
         log_dir = Path("logs")
@@ -505,13 +571,33 @@ class ExcelPrinterApp(tk.Tk):
         log_win = tk.Toplevel(self)
         log_win.title(f"Logs: {latest_log.name}")
         log_win.geometry("600x400")
-        txt = tk.Text(log_win)
-        txt.pack(fill=tk.BOTH, expand=True)
+
+        # Text widget + scrollbars
+        txt = tk.Text(log_win, wrap="none")
+        vsb = tk.Scrollbar(log_win, orient="vertical", command=txt.yview)
+        hsb = tk.Scrollbar(log_win, orient="horizontal", command=txt.xview)
+        txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        vsb.pack(side="right", fill="y")
+        hsb.pack(side="bottom", fill="x")
+        txt.pack(side="left", fill="both", expand=True)
+
+        # Definir tag para errores (rojo)
+        txt.tag_configure("error", foreground="red")
+
+        # Insertar línea a línea para aplicar color sólo a errores
         with latest_log.open("r", encoding="utf-8", errors="replace") as f:
-            txt.insert(tk.END, f.read())
+            for line in f:
+                if "[ERROR]" in line or "[CRITICAL]" in line:
+                    txt.insert("end", line, "error")
+                else:
+                    txt.insert("end", line)
+
+        txt.configure(state="disabled")
+
 def main():
     app = ExcelPrinterApp()
     app.mainloop()
+
 
 if __name__ == "__main__":
     main()

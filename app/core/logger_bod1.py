@@ -1,10 +1,11 @@
 import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Creamos un logger dedicado y lo configuramos solo una vez
 logger = logging.getLogger("bod1")
 logger.setLevel(logging.INFO)
+
 
 def capturar_log_bod1(mensaje: str, nivel: str = "info"):
     # Directorio y nombre de archivo según la fecha
@@ -19,9 +20,7 @@ def capturar_log_bod1(mensaje: str, nivel: str = "info"):
         for h in logger.handlers
     ):
         fh = logging.FileHandler(nombre_log, encoding="utf-8")
-        fh.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         logger.addHandler(fh)
 
     # Disparar el mensaje con el nivel correspondiente
@@ -30,7 +29,7 @@ def capturar_log_bod1(mensaje: str, nivel: str = "info"):
         "info": logger.info,
         "warning": logger.warning,
         "error": logger.error,
-        "critical": logger.critical
+        "critical": logger.critical,
     }.get(nivel.lower(), logger.info)
 
     log_func(mensaje)

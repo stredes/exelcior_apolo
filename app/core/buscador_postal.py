@@ -1,11 +1,12 @@
-import pandas as pd
-import tkinter as tk
-from tkinter import messagebox, filedialog
-from pathlib import Path
 import difflib
+import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog, messagebox
 
-from app.utils.utils import load_config, save_config
+import pandas as pd
 from app.core.logger_bod1 import capturar_log_bod1
+from app.utils.utils import load_config, save_config
+
 
 def cargar_codigos_postales():
     try:
@@ -17,22 +18,27 @@ def cargar_codigos_postales():
         else:
             ruta_manual = filedialog.askopenfilename(
                 title="Selecciona el archivo 'Codigos Postales SAM.xlsx'",
-                filetypes=[("Excel Files", "*.xlsx *.xls")]
+                filetypes=[("Excel Files", "*.xlsx *.xls")],
             )
             if not ruta_manual:
                 raise FileNotFoundError("Archivo no seleccionado.")
             df = pd.read_excel(ruta_manual)
             config["postal_file"] = ruta_manual
             save_config(config)
-            capturar_log_bod1(f"Ruta del archivo postal guardada: {ruta_manual}", "info")
+            capturar_log_bod1(
+                f"Ruta del archivo postal guardada: {ruta_manual}", "info"
+            )
 
         df.columns = [col.strip().lower() for col in df.columns]
         return df
 
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo cargar el archivo de códigos postales:\n{e}")
+        messagebox.showerror(
+            "Error", f"No se pudo cargar el archivo de códigos postales:\n{e}"
+        )
         capturar_log_bod1(f"Error al cargar códigos postales: {e}", "error")
         return pd.DataFrame()
+
 
 def crear_widget_postal(parent):
     df_codigos = cargar_codigos_postales()
@@ -72,12 +78,30 @@ def crear_widget_postal(parent):
             messagebox.showwarning("Atención", "Por favor escribe una comuna válida.")
             return
 
-        comuna_col = next((col for col in df_codigos.columns if "comuna" in col.lower()), None)
-        region_col = next((col for col in df_codigos.columns if "región" in col.lower() or "region" in col.lower()), None)
-        codigo_col = next((col for col in df_codigos.columns if "código" in col.lower() or "codigo" in col.lower()), None)
+        comuna_col = next(
+            (col for col in df_codigos.columns if "comuna" in col.lower()), None
+        )
+        region_col = next(
+            (
+                col
+                for col in df_codigos.columns
+                if "región" in col.lower() or "region" in col.lower()
+            ),
+            None,
+        )
+        codigo_col = next(
+            (
+                col
+                for col in df_codigos.columns
+                if "código" in col.lower() or "codigo" in col.lower()
+            ),
+            None,
+        )
 
         if not comuna_col or not codigo_col:
-            messagebox.showerror("Error", "El archivo no tiene columnas 'Comuna' y 'Código'.")
+            messagebox.showerror(
+                "Error", "El archivo no tiene columnas 'Comuna' y 'Código'."
+            )
             return
 
         df_filtrado = df_codigos[df_codigos[comuna_col].str.lower() == query]
@@ -97,14 +121,18 @@ def crear_widget_postal(parent):
     def copiar_codigo():
         seleccion = listbox_resultados.curselection()
         if not seleccion or not codigos_memoria:
-            messagebox.showinfo("Selecciona una comuna", "Debes buscar y seleccionar una comuna.")
+            messagebox.showinfo(
+                "Selecciona una comuna", "Debes buscar y seleccionar una comuna."
+            )
             return
         idx = seleccion[0]
         codigo = codigos_memoria[idx]
         parent.clipboard_clear()
         parent.clipboard_append(codigo)
         parent.update()
-        messagebox.showinfo("Copiado", f"Código postal '{codigo}' copiado al portapapeles.")
+        messagebox.showinfo(
+            "Copiado", f"Código postal '{codigo}' copiado al portapapeles."
+        )
 
     tk.Button(frame, text="Buscar", command=buscar).pack(pady=5)
     tk.Button(frame, text="Copiar código", command=copiar_codigo).pack(pady=5)

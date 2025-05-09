@@ -1,8 +1,9 @@
 # app/printer/etiquetas_zebra.py
-import socket
 import json
+import socket
 from pathlib import Path
 from tkinter import messagebox
+
 
 def cargar_configuracion():
     config_path = Path("config.json")
@@ -11,15 +12,19 @@ def cargar_configuracion():
             return json.load(f)
     return {}
 
+
 def imprimir_zebra_zpl(zpl: str, ip: str, port: int, cantidad: int = 1):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((ip, port))
             for _ in range(cantidad):
                 s.sendall(zpl.encode("utf-8"))
-        messagebox.showinfo("Impresión enviada", f"{cantidad} etiqueta(s) enviada(s) a {ip}:{port}")
+        messagebox.showinfo(
+            "Impresión enviada", f"{cantidad} etiqueta(s) enviada(s) a {ip}:{port}"
+        )
     except Exception as e:
         messagebox.showerror("Error en impresión", f"No se pudo imprimir: {e}")
+
 
 def generar_zpl(data: dict) -> str:
     return f"""^XA
@@ -36,6 +41,7 @@ def generar_zpl(data: dict) -> str:
 ^FO50,420^BCN,100,Y,N,N
 ^FD{data['guia']}^FS
 ^XZ"""
+
 
 def imprimir_etiqueta_desde_datos(data: dict):
     config = cargar_configuracion()

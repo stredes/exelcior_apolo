@@ -1,7 +1,9 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
-import pandas as pd
 from datetime import datetime
+from tkinter import messagebox, ttk
+
+import pandas as pd
+
 
 class ConsultaUbicacionApp(tk.Toplevel):
     def __init__(self, parent):
@@ -10,26 +12,55 @@ class ConsultaUbicacionApp(tk.Toplevel):
         self.geometry("1000x500")
         self.configure(bg="#d7e3ea")
 
-        tk.Label(self, text="Consulta Stock por Ubicacion", font=("Segoe UI", 18, "bold", "italic"),
-                 fg="red", bg="#d7e3ea").pack(pady=10)
+        tk.Label(
+            self,
+            text="Consulta Stock por Ubicacion",
+            font=("Segoe UI", 18, "bold", "italic"),
+            fg="red",
+            bg="#d7e3ea",
+        ).pack(pady=10)
 
         filtro_frame = tk.Frame(self, bg="#d7e3ea")
         filtro_frame.pack(pady=10)
 
-        tk.Label(filtro_frame, text="Ubicación:", font=("Segoe UI", 10, "bold"),
-                 fg="red", bg="#d7e3ea").grid(row=0, column=0)
+        tk.Label(
+            filtro_frame,
+            text="Ubicación:",
+            font=("Segoe UI", 10, "bold"),
+            fg="red",
+            bg="#d7e3ea",
+        ).grid(row=0, column=0)
         self.ubicacion_entry = ttk.Entry(filtro_frame, width=20)
         self.ubicacion_entry.grid(row=0, column=1, padx=5)
-        ttk.Button(filtro_frame, text="Buscar", command=self.buscar).grid(row=0, column=2, padx=5)
+        ttk.Button(filtro_frame, text="Buscar", command=self.buscar).grid(
+            row=0, column=2, padx=5
+        )
 
-        self.tree = ttk.Treeview(self, columns=["Código", "Producto", "Bodega", "Ubicación", "Lote", "Fecha Vencimiento", "Saldo stock"], show="headings")
+        self.tree = ttk.Treeview(
+            self,
+            columns=[
+                "Código",
+                "Producto",
+                "Bodega",
+                "Ubicación",
+                "Lote",
+                "Fecha Vencimiento",
+                "Saldo stock",
+            ],
+            show="headings",
+        )
         for col in self.tree["columns"]:
             self.tree.heading(col, text=col)
             self.tree.column(col, width=120)
         self.tree.pack(padx=10, pady=10, fill="both", expand=True)
 
-        self.total_label = tk.Label(self, text="Stock Total: 0", font=("Segoe UI", 12, "bold"),
-                                    fg="red", bg="#d7e3ea")
+        self.total_label = tk.Label(
+            self,
+            text="Stock Total: 0",
+            font=("Segoe UI", 12, "bold"),
+            fg="red",
+            bg="#d7e3ea",
+        )
         self.total_label.pack(pady=5)
 
         ttk.Button(self, text="Imprimir", command=self.exportar).pack(pady=5)
