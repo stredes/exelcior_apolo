@@ -8,6 +8,7 @@ from datetime import datetime
 from app.printer.printer import print_document
 from app.core.logger_bod1 import capturar_log_bod1
 
+
 class ConsultaCodigoApp(tk.Toplevel):
     COLUMNS = ["Código", "Producto", "Bodega", "Ubicación", "Lote", "Fecha Vencimiento", "Saldo stock"]
 
@@ -107,5 +108,5 @@ class ConsultaCodigoApp(tk.Toplevel):
             worksheet.write("A3", f"Código consultado: {codigo}")
             self.df_filtrado.to_excel(writer, sheet_name="Listado", startrow=4, index=False)
 
-        print_document(filepath, mode="codigo", config_columns={}, df=self.df_filtrado)
+        print_document(filepath, mode="urbano", config_columns={}, df=self.df_filtrado)
         capturar_log_bod1(f"Listado por código entregado a: {entregado} | Archivo: {filepath.name}", "info")

@@ -1,144 +1,74 @@
+import os
 import logging
 import platform
-from datetime import datetime
+import pythoncom
 from pathlib import Path
+from datetime import datetime
 from tkinter import messagebox
+from win32com.client import Dispatch
+import inspect
 
-import pandas as pd
-from fpdf import FPDF
-
-# Intentar importar backends de impresión
-try:
-    import pythoncom  # type: ignore[import]
-    from win32com.client import Dispatch  # type: ignore[import]
-except ImportError:
-    pythoncom = None
-    Dispatch = None
-
-try:
-    import cups  # type: ignore[import]
-except ImportError:
-    cups = None
-
-
-def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataFrame):
-    """
-    Genera un PDF con los datos filtrados y envía a imprimir usando:
-      - Windows COM si está disponible (pythoncom + win32com.client).
-      - CUPS si está disponible en Linux.
-    """
+def print_document(filepath: Path, mode: str, config_columns: dict, df):
     try:
-        # Verificar existencia del archivo
         if not filepath.exists():
             raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
 
-        # 1) Generar PDF intermedio
-        pdf_path = _generar_pdf(filepath, mode, config_columns, df)
+        pythoncom.CoInitialize()
 
-        # 2) Determinar backend de impresión
-        system = platform.system()
-        if system == 'Windows' and pythoncom and Dispatch:
-            _print_windows(pdf_path)
-        elif cups:
-            _print_cups(pdf_path)
-        else:
-            raise EnvironmentError(
-                "No se encontró un backend de impresión válido. "
-                "Instala pywin32 en Windows o python3-cups/pycups en Linux."
-            )
+        excel = Dispatch("Excel.Application")
+        excel.Visible = False
+        wb = excel.Workbooks.Open(str(filepath.resolve()))
+        sheet = wb.Sheets(1)
 
-        messagebox.showinfo("Impresión exitosa", f"Enviado a imprimir: {pdf_path.name}")
-        logging.info(f"Impresión completada: {pdf_path}")
+        # Ajustar columnas automáticamente
+        sheet.Cells.EntireColumn.AutoFit()
+
+        # Insertar título en la fila 1 (desplazando datos hacia abajo)
+        title = {
+            "fedex": "FIN DÍA FEDEX",
+            "urbano": "FIN DÍA URBANO"
+        }.get(mode.lower(), "LISTADO GENERAL")
+
+        sheet.Rows("1:1").Insert()
+        sheet.Cells(1, 1).Value = title
+        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
+        sheet.Cells(1, 1).Font.Bold = True
+        sheet.Cells(1, 1).Font.Size = 14
+        sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
+
+        # Agregar firma al final (solo para fedex y urbano)
+        if mode.lower() in ["fedex", "urbano"]:
+            used_rows = sheet.UsedRange.Rows.Count
+            sheet.Cells(used_rows + 2, 1).Value = "Recibe: ______________"
+            sheet.Cells(used_rows + 3, 1).Value = "Firma: __________________________"
+            sheet.Range(sheet.Cells(used_rows + 2, 1), sheet.Cells(used_rows + 3, 1)).Font.Size = 10
+
+        # Configurar impresión
+        sheet.PageSetup.Orientation = 2  # Horizontal
+        sheet.PageSetup.Zoom = False
+        sheet.PageSetup.FitToPagesWide = 1
+        sheet.PageSetup.FitToPagesTall = False
+
+        # Pie de página con fecha
+        now = datetime.now().strftime("%d/%m/%Y %H:%M")
+        sheet.PageSetup.CenterFooter = f"&\"Arial,Bold\"&8 Impreso el: {now}"
+
+        # Imprimir
+        sheet.PrintOut()
+        wb.Close(SaveChanges=False)
+        excel.Quit()
+
+        log_evento(f"Archivo enviado a imprimir: {filepath.name}", "info")
+        messagebox.showinfo("Impresión exitosa", f"Archivo enviado a imprimir:\n{filepath}")
+
+        pythoncom.CoUninitialize()
 
     except Exception as e:
         logging.error(f"Error al imprimir {filepath}: {e}")
         messagebox.showerror("Error de impresión", f"Ocurrió un error:\n{e}")
 
 
-def _generar_pdf(filepath: Path, mode: str, config_columns: dict, df: pd.DataFrame) -> Path:
-    """
-    Crea un PDF con:
-      - Título centrado (Fin Día Urbano/Fin Día Fedex)
-      - Tabla cuadriculada con columnas especificadas
-      - Líneas de 'Recibe' y 'Firma'
-    """
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    # Título
-    if mode.lower() == "fedex":
-        title = "FIN DÍA FEDEX"
-    elif mode.lower() == "urbano":
-        title = "FIN DÍA URBANO"
-    else:
-        title = "LISTADO GENERAL"
-    pdf.cell(0, 10, title, ln=True, align="C")
-
-    # Columnas según configuración
-    cols = config_columns.get(mode, {}).get("columns", df.columns.tolist())
-    sub_df = df[cols]
-
-    # Tabla cuadriculada
-    col_w = (pdf.w - 2 * pdf.l_margin) / len(cols)
-    row_h = pdf.font_size * 1.8
-    for header in cols:
-        pdf.cell(col_w, row_h, header, border=1, align="C")
-    pdf.ln(row_h)
-    for _, row in sub_df.iterrows():
-        for item in row:
-            pdf.cell(col_w, row_h, str(item), border=1, align="C")
-        pdf.ln(row_h)
-
-    # Firma
-    pdf.ln(10)
-    pdf.cell(0, 8, "Recibe: ______________", ln=True)
-    pdf.cell(0, 8, "Firma: __________________________", ln=True)
-
-    out_path = filepath.with_suffix(f"_{mode}.pdf")
-    pdf.output(str(out_path))
-    logging.info(f"PDF generado en {out_path}")
-    return out_path
-
-
-def _print_windows(pdf_path: Path):
-    """
-    Imprime usando COM en Windows.
-    """
-    pythoncom.CoInitialize()
-    try:
-        word = Dispatch("Word.Application")
-        word.Visible = False
-        doc = word.Documents.Open(str(pdf_path.resolve()))
-        doc.PrintOut()
-        doc.Close(False)
-        word.Quit()
-    finally:
-        pythoncom.CoUninitialize()
-
-
-def _print_cups(pdf_path: Path):
-    """
-    Imprime usando CUPS en Linux/otros.
-    """
-    conn = cups.Connection()
-    printer_name = conn.getDefault()
-    if not printer_name:
-        raise RuntimeError("No hay impresora por defecto configurada en CUPS.")
-    conn.printFile(printer_name, str(pdf_path), pdf_path.name, {})
-
-
-# --------------------------------------
-# Función de logging genérico
-# --------------------------------------
-import inspect
-import os
-
-
 def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo que llamó.
-    """
     frame = inspect.stack()[1]
     caller = os.path.splitext(os.path.basename(frame.filename))[0]
     log_name = f"{caller}_log_{datetime.now().strftime('%Y%m%d')}"
@@ -149,19 +79,10 @@ def log_evento(mensaje: str, nivel: str = "info"):
 
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
-    if not any(
-        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
-        for h in logger.handlers
-    ):
+
+    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve()) for h in logger.handlers):
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         logger.addHandler(handler)
 
-    level_fn = {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical,
-    }.get(nivel.lower(), logger.info)
-    level_fn(mensaje)
+    getattr(logger, nivel.lower(), logger.info)(mensaje)

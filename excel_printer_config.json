@@ -61,18 +61,20 @@
     },
     "urbano": {
         "eliminar": [
-            "SERVICIO",
-            "DIAS",
-            "PESO",
-            "AGENCIA",
             "ESTADO",
+            "FECHA CHK",
             "SHIPPER",
-            "FECHA CHK"
+            "DIAS",
+            "SERVICIO",
+            "AGENCIA",
+            "PESO"
         ],
         "sumar": [
             "PIEZAS"
         ],
-        "mantener_formato": [],
+        "mantener_formato": [
+            "PIEZAS"
+        ],
         "start_row": 2,
         "nombre_archivo_digitos": [
             10
@@ -92,7 +94,5 @@
         "sumar": [],
         "mantener_formato": []
     },
-
     "postal_file": "C:/Users/Recepci\u00f3n 2/Desktop/workspace/exelcior_apolo/Codigos Postales SAM.xlsx"
-
 }
