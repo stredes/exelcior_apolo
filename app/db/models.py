@@ -33,9 +33,7 @@ class HistorialArchivo(Base):
     usuario_id = Column(Integer, nullable=True)
     nombre_archivo = Column(String(255), nullable=False)
     fecha_procesado = Column(DateTime, default=datetime.utcnow)
-    modo_utilizado = Column(
-        String(50), nullable=False
-    )  # Este campo es correcto si usas modo_utilizado en el insert
+    modo = Column(String(50), nullable=False)
 
 
 class RegistroImpresion(Base):

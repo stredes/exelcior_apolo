@@ -159,3 +159,9 @@ GitHub: [@stredes](https://github.com/stredes)
 
 Distribuido bajo la licencia Apache 2.0.  
 Consulta el archivo LICENSE para mÃ¡s detalles.
+
+## Cómo usar
+1. Ejecuta run_app.py
+2. Usa menú para imprimir etiquetas
+3. Configura tu impresora Zebra en Configuración
+

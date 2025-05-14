@@ -69,7 +69,7 @@ def exportar_xlsx(df):
         defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")]
     )
     if file_path:
-        df.to_excel(file_path, index=False)
+        save_pretty_excel(file_path, index=False)
         messagebox.showinfo("Exportar XLSX", f"Archivo exportado: {file_path}")
 
 
@@ -231,7 +231,7 @@ def enviar_email(df, parent):
             Path(tempfile.gettempdir())
             / f"datos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         )
-        df.to_excel(temp_path, index=False)
+        save_pretty_excel(temp_path, index=False)
 
         msg = EmailMessage()
         msg["Subject"] = "Datos Exportados"

@@ -33,6 +33,8 @@ from app.utils.logger_setup import log_evento, setup_logging
 from app.utils.logger_viewer import abrir_visor_logs
 from app.utils.platform_utils import is_linux, is_windows
 from app.utils.utils import load_config
+from app.config.excel_formatter import save_pretty_excel
+
 
 
 def global_exception_handler(exctype, value, tb):
@@ -172,6 +174,7 @@ class ExcelPrinterApp(tk.Tk):
         ttk.Label(
             self, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=5
         ).pack(side=tk.BOTTOM, fill=tk.X)
+        
 
     def _mostrar_acerca_de(self):
         acerca_win = tk.Toplevel(self)
@@ -446,32 +449,32 @@ class ExcelPrinterApp(tk.Tk):
                 f"Filas eliminadas en vista previa: {filas_indices}", "info"
             )
 
-        # Botones con íconos
-        ttk.Button(
-            botones_centrados, text="🖨️ Imprimir", command=self._threaded_print
-        ).pack(side=tk.LEFT, padx=10)
-        ttk.Button(
-            botones_centrados, text="❌ Cerrar", command=preview_win.destroy
-        ).pack(side=tk.LEFT, padx=10)
-        ttk.Button(
-            botones_centrados,
-            text="🗑️ Eliminar filas",
-            command=eliminar_filas_seleccionadas,
-        ).pack(side=tk.LEFT, padx=10)
+        ttk.Button(botones_centrados, text="🖨️ Imprimir", command=self._threaded_print).pack(side=tk.LEFT, padx=10)
+        ttk.Button(botones_centrados, text="❌ Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=10)
+        ttk.Button(botones_centrados, text="🗑️ Eliminar filas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=10)
 
-        # Etiqueta derecha
-        if self.mode == "fedex" and hasattr(self, "total_bultos"):
+        # Etiqueta de resumen de bultos/piezas con validación segura
+        total = 0
+        if "BULTOS" in self.transformed_df.columns:
+            total = self.transformed_df["BULTOS"].sum()
+        elif "PIEZAS" in self.transformed_df.columns:
+            total = self.transformed_df["PIEZAS"].sum()
+        else:
+            total = len(self.transformed_df)
+
+        if self.mode == "fedex":
             ttk.Label(
                 barra_botones,
-                text=f"📦 Total PIEZAS: {self.total_bultos}",
+                text=f"📦 Total PIEZAS: {total}",
                 font=("Segoe UI", 10, "bold"),
             ).pack(side=tk.RIGHT, padx=20)
-        elif self.mode == "urbano" and hasattr(self, "total_bultos"):
+        elif self.mode == "urbano":
             ttk.Label(
                 barra_botones,
-                text=f"📦 Total BULTOS: {self.total_bultos}",
+                text=f"📦 Total BULTOS: {total}",
                 font=("Segoe UI", 10, "bold"),
             ).pack(side=tk.RIGHT, padx=20)
+
 
     def _threaded_print(self):
         if self.processing:
@@ -493,7 +496,7 @@ class ExcelPrinterApp(tk.Tk):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
 
-            self.transformed_df.to_excel(output_file, index=False)
+            save_pretty_excel(self.transformed_df, output_file)
 
             capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
             log_evento(f"Archivo exportado correctamente: {output_file}", "info")
