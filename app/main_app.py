@@ -64,6 +64,8 @@ def _get_print_function():
     return print_document
 
 
+
+
 class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -172,7 +174,7 @@ class ExcelPrinterApp(tk.Tk):
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
         ttk.Label(
-            self, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=5
+            self, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=9
         ).pack(side=tk.BOTTOM, fill=tk.X)
         
 

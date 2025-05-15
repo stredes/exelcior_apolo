@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-from app.printer.printer import print_document
+from app.printer.print_router import print_document  # ✅ Correcto y multiplataforma
 from app.core.logger_bod1 import capturar_log_bod1
 
 
