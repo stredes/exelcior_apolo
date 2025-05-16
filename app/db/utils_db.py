@@ -1,23 +1,20 @@
 import json
 import logging
+import inspect
+import os
 from datetime import datetime
 from pathlib import Path
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from .models import Base, Configuracion, HistorialArchivo, RegistroImpresion, User
 
-from .models import (Base, Configuracion, HistorialArchivo, RegistroImpresion,
-                     User)
-
-# Rutas de configuración
+# Configuración de rutas y base de datos
 CONFIG_FILE = Path("excel_printer_config.json")
 LOG_FILE = Path("logs_app.log")
 
-# ----------------- Conexión a la BD -----------------
 DB_PATH = "sqlite:///excel_printer.db"
 engine = create_engine(DB_PATH)
 Session = sessionmaker(bind=engine)
-
 
 # ----------------- Configuración -----------------
 def load_config():
@@ -30,7 +27,6 @@ def load_config():
             return {}
     return {}
 
-
 def save_config(config_data):
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -38,7 +34,6 @@ def save_config(config_data):
         logging.info("Configuración guardada correctamente.")
     except Exception as e:
         logging.error(f"Error al guardar configuración: {e}")
-
 
 # ----------------- Usuarios -----------------
 def create_user(username, password):
@@ -54,7 +49,6 @@ def create_user(username, password):
     finally:
         session.close()
 
-
 def get_user(username):
     session = Session()
     try:
@@ -65,17 +59,16 @@ def get_user(username):
     finally:
         session.close()
 
-
 # ----------------- Historial Archivos -----------------
 def save_file_history(nombre_archivo, modo, usuario_id=None):
     session = Session()
     try:
         record = HistorialArchivo(
-            usuario_id=usuario_id,
-            nombre_archivo=str(nombre_archivo),
-            fecha_procesado=datetime.utcnow(),
-            modo_utilizado=modo,
-        )
+        usuario_id=usuario_id,
+        nombre_archivo=str(nombre_archivo),
+        fecha_procesado=datetime.utcnow(),
+        modo=modo
+    )
         session.add(record)
         session.commit()
         logging.info(
@@ -87,8 +80,7 @@ def save_file_history(nombre_archivo, modo, usuario_id=None):
     finally:
         session.close()
 
-
-# ----------------- Logging -----------------
+# ----------------- Logging general -----------------
 def setup_logging():
     logging.basicConfig(
         filename=LOG_FILE,
@@ -96,21 +88,7 @@ def setup_logging():
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
-
-import inspect
-import logging
-import os
-from datetime import datetime
-from pathlib import Path
-
-
 def log_evento(mensaje: str, nivel: str = "info"):
-    """
-    Guarda logs con nombre dinámico según el archivo donde se llama.
-    Ejemplo: logs/etiqueta_editor_log_20250411.log
-    """
-
-    # Detectar el nombre del archivo que llama a esta función
     frame = inspect.stack()[1]
     archivo_llamador = os.path.splitext(os.path.basename(frame.filename))[0]
     log_name = f"{archivo_llamador}_log_{datetime.now().strftime('%Y%m%d')}"
@@ -122,7 +100,6 @@ def log_evento(mensaje: str, nivel: str = "info"):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
-    # Evitar duplicar handlers
     if not any(
         isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
         for h in logger.handlers

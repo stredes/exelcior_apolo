@@ -455,25 +455,21 @@ class ExcelPrinterApp(tk.Tk):
         ttk.Button(botones_centrados, text="❌ Cerrar", command=preview_win.destroy).pack(side=tk.LEFT, padx=10)
         ttk.Button(botones_centrados, text="🗑️ Eliminar filas", command=eliminar_filas_seleccionadas).pack(side=tk.LEFT, padx=10)
 
-        # Etiqueta de resumen de bultos/piezas con validación segura
-        total = 0
-        if "BULTOS" in self.transformed_df.columns:
-            total = self.transformed_df["BULTOS"].sum()
-        elif "PIEZAS" in self.transformed_df.columns:
-            total = self.transformed_df["PIEZAS"].sum()
-        else:
-            total = len(self.transformed_df)
-
+        label_text = ""
         if self.mode == "fedex":
-            ttk.Label(
-                barra_botones,
-                text=f"📦 Total PIEZAS: {total}",
-                font=("Segoe UI", 10, "bold"),
-            ).pack(side=tk.RIGHT, padx=20)
+            total = self.transformed_df["BULTOS"].sum() if "BULTOS" in self.transformed_df.columns else len(self.transformed_df)
+            label_text = f"📦 Total PIEZAS: {total}"
         elif self.mode == "urbano":
+            total = self.transformed_df["BULTOS"].sum() if "BULTOS" in self.transformed_df.columns else len(self.transformed_df)
+            label_text = f"📦 Total BULTOS: {total}"
+        elif self.mode == "listados":
+            total = len(self.transformed_df)
+            label_text = f"📋 Documentos listados: {total}"
+
+        if label_text:
             ttk.Label(
                 barra_botones,
-                text=f"📦 Total BULTOS: {total}",
+                text=label_text,
                 font=("Segoe UI", 10, "bold"),
             ).pack(side=tk.RIGHT, padx=20)
 
