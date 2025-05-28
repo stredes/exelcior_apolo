@@ -5,10 +5,8 @@ import json
 import logging
 from datetime import datetime
 
-from .models import Base, User, Configuracion, HistorialArchivo, RegistroImpresion
-
 # Rutas de configuración
-CONFIG_FILE = Path("excel_printer_config.json")
+CONFIG_FILE = Path("app/config/excel_printer_config.json")
 LOG_FILE = Path("logs_app.log")
 
 # ----------------- Conexión a la BD -----------------
@@ -21,50 +19,58 @@ def load_config():
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                config = json.load(f)
+                return validate_config_structure(config)
         except Exception as e:
             logging.error(f"Error al cargar configuración: {e}")
             return {}
     return {}
 
 def save_config(config_data):
+    def convert_sets(obj):
+        if isinstance(obj, set):
+            return list(obj)
+        elif isinstance(obj, dict):
+            return {k: convert_sets(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_sets(i) for i in obj]
+        return obj
+
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=4)
+            json.dump(convert_sets(config_data), f, indent=4)
         logging.info("Configuración guardada correctamente.")
     except Exception as e:
         logging.error(f"Error al guardar configuración: {e}")
 
-# ----------------- Usuarios -----------------
-def create_user(username, password):
-    session = Session()
-    try:
-        user = User(username=username, password=password)
-        session.add(user)
-        session.commit()
-        logging.info(f"Usuario '{username}' creado.")
-    except Exception as e:
-        session.rollback()
-        logging.error(f"Error al crear usuario: {e}")
-    finally:
-        session.close()
+def validate_config_structure(config):
+    modos = ["fedex", "urbano", "listados"]
+    for modo in modos:
+        if modo not in config:
+            config[modo] = {}
+        config[modo].setdefault("eliminar", [])
+        config[modo].setdefault("sumar", [])
+        config[modo].setdefault("mantener_formato", [])
+        config[modo].setdefault("start_row", 0)
+        config[modo].setdefault("nombre_archivo_digitos", [])
+        config[modo].setdefault("vista_previa_fuente", 10)
+    return config
 
-def get_user(username):
-    session = Session()
+def guardar_ultimo_path(path_str: str, clave: str = "ultimo_archivo_excel"):
     try:
-        return session.query(User).filter_by(username=username).first()
+        config = load_config()
+        config[clave] = str(Path(path_str).resolve())
+        save_config(config)
+        logging.info(f"Ruta guardada en config ({clave}): {path_str}")
     except Exception as e:
-        logging.error(f"Error al obtener usuario: {e}")
-        return None
-    finally:
-        session.close()
+        logging.error(f"Error al guardar ruta en config: {e}")
 
 # ----------------- Historial Archivos -----------------
-def save_file_history(nombre_archivo, modo, usuario_id=None):
+def save_file_history(nombre_archivo, modo):
     session = Session()
     try:
+        from .models import HistorialArchivo
         record = HistorialArchivo(
-            usuario_id=usuario_id,
             nombre_archivo=str(nombre_archivo),
             fecha_procesado=datetime.utcnow(),
             modo_utilizado=modo

@@ -1,0 +1,99 @@
+{
+    "fedex": {
+        "eliminar": [
+            "width",
+            "recipientCompany",
+            "recipientPhoneExtension",
+            "recipientResidential",
+            "height",
+            "senderPostcode",
+            "returnTrackingId",
+            "length",
+            "recipientLine2",
+            "senderAccountNumber",
+            "senderEmail",
+            "packageWeight",
+            "shipmentType",
+            "recipientState",
+            "etdEnabled",
+            "returnRmaNumber",
+            "recipientPostcode",
+            "recipientContactNumber",
+            "returnReason",
+            "poNumber",
+            "departmentNumber",
+            "recipientLine1",
+            "senderContactName",
+            "senderCity",
+            "senderContactNumber",
+            "senderCountry",
+            "recipientEmail",
+            "pickupId",
+            "senderTin",
+            "paymentType",
+            "weightUnits",
+            "senderPhoneExtension",
+            "recipientTin",
+            "senderLine2",
+            "quoteId",
+            "creationDate",
+            "senderResidential",
+            "senderState",
+            "errors",
+            "totalShipmentWeight",
+            "senderLine3",
+            "invoiceNumber",
+            "recipientCountry",
+            "senderCompany",
+            "senderLine1",
+            "status",
+            "estimatedShippingCosts"
+        ],
+        "sumar": [
+            "numberOfPackages"
+        ],
+        "mantener_formato": [
+            "masterTrackingNumber"
+        ],
+        "start_row": 0,
+        "nombre_archivo_digitos": [],
+        "vista_previa_fuente": 10
+    },
+    "urbano": {
+        "eliminar": [
+            "AGENCIA",
+            "PESO",
+            "DIAS",
+            "SHIPPER",
+            "SERVICIO",
+            "ESTADO"
+        ],
+        "sumar": [
+            "PIEZAS"
+        ],
+        "mantener_formato": [
+            "PIEZAS"
+        ],
+        "start_row": 2,
+        "nombre_archivo_digitos": [
+            9,
+            10
+        ],
+        "vista_previa_fuente": 10
+    },
+    "listados": {
+        "eliminar": [
+            "Vendedor",
+            "Fecha doc.",
+            "N\u00ba",
+            "RUT",
+            "Moneda",
+            "Tipo cambio",
+            "Glosa"
+        ],
+        "sumar": [],
+        "mantener_formato": [],
+        "formato_texto": []
+    },
+    "archivo_codigos_postales": "C:\\Users\\Recepci\u00f3n 2\\Desktop\\SS.MM.GGG\\Codigos Postales SAM.xlsx"
+}

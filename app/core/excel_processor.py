@@ -5,9 +5,22 @@ from typing import Optional
 from tkinter import messagebox
 from win32com.client import Dispatch
 from datetime import datetime
+import json
 
 from app.core.logger_eventos import log_evento
 
+# Cargar configuración
+CONFIG_PATH = Path("app/config/excel_printer_config.json")
+
+def load_config() -> dict:
+    try:
+        with CONFIG_PATH.open(encoding='utf-8') as f:
+            config = json.load(f)
+        log_evento("Configuración cargada correctamente.", "info")
+        return config
+    except Exception as e:
+        log_evento(f"Error al cargar configuración: {e}", "error")
+        return {}
 
 def validate_file(file_path: str) -> bool:
     path = Path(file_path)
@@ -19,96 +32,51 @@ def validate_file(file_path: str) -> bool:
         messagebox.showerror("Error", "Formato de archivo no soportado.")
         log_evento(f"Formato de archivo no soportado: {file_path}", "warning")
         return False
-    log_evento(f"Archivo validado correctamente: {file_path}", "info")
     return True
 
+def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
+    path = Path(file_path)
+    file_ext = path.suffix.lower()
 
-def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
-    path_obj = Path(file_path).resolve()
-    file_extension = path_obj.suffix.lower()
-    file_path_str = path_obj.as_posix()
+    engine = {
+        ".xlsx": "openpyxl",
+        ".xls": "openpyxl",
+        ".csv": None
+    }.get(file_ext)
 
-    if not path_obj.exists():
-        msg = f"El archivo no existe en la ruta: {file_path_str}"
-        log_evento(msg, "error")
-        raise FileNotFoundError(msg)
-
-    if file_extension in [".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"]:
-        engine = "openpyxl"
-    elif file_extension == ".xlsb":
-        engine = "pyxlsb"
-    elif file_extension == ".ods":
-        engine = "odf"
-    elif file_extension in [".csv", ".txt"]:
-        engine = None
-    else:
-        msg = f"Formato de archivo no soportado: {file_extension}"
-        log_evento(msg, "warning")
-        raise ValueError(msg)
-
-    start_row = config_columns.get(mode, {}).get("start_row", 0)
-    skiprows = list(range(start_row)) if start_row > 0 else None
+    skiprows = list(range(config.get(mode, {}).get("start_row", 0)))
 
     try:
         if engine:
-            df = pd.read_excel(file_path_str, engine=engine, skiprows=skiprows, nrows=max_rows)
+            df = pd.read_excel(path, engine=engine, skiprows=skiprows, nrows=max_rows)
         else:
-            df = pd.read_csv(file_path_str, skiprows=skiprows, nrows=max_rows)
+            df = pd.read_csv(path, skiprows=skiprows, nrows=max_rows)
 
         df.columns = df.columns.str.strip().str.replace('\u200b', '', regex=True)
-        log_evento(f"Columnas leídas: {df.columns.tolist()}", "info")
-
+        return df
     except Exception as e:
-        log_evento(f"Error al cargar archivo: {e}", "error")
-        raise ValueError(f"Error al cargar archivo: {e}")
+        log_evento(f"Error al leer archivo: {e}", "error")
+        raise
 
-    if df.empty:
-        msg = "El archivo está vacío o no tiene datos válidos"
-        log_evento(msg, "warning")
-        raise ValueError(msg)
-
-    if 'reference' not in df.columns:
-        log_evento("La columna 'reference' no se encontró en el archivo.", "warning")
-
-    log_evento(f"Archivo cargado correctamente: {file_path_str}", "info")
-    return df
-
-
-def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str) -> pd.DataFrame:
+def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFrame:
     log_evento(f"Aplicando transformación para modo: {mode}", "info")
 
-    if mode == "fedex":
-        columns_to_keep = ['shipDate', 'masterTrackingNumber', 'recipientContactName',
-                           'recipientCity', 'numberOfPackages', 'reference']
+    modo_cfg = config.get(mode, {})
+    eliminar = modo_cfg.get("eliminar", [])
+    sumar = modo_cfg.get("sumar", [])
+    mantener = modo_cfg.get("mantener_formato", [])
 
-        missing = [col for col in columns_to_keep if col not in df.columns]
-        if missing:
-            log_evento(f"Faltan columnas requeridas: {missing}", "error")
-            raise KeyError(f"Faltan columnas requeridas: {missing}")
+    df = df.drop(columns=[col for col in eliminar if col in df.columns], errors='ignore')
 
-        df_transformed = df[columns_to_keep].copy()
+    if sumar:
+        suma = {col: df[col].sum() if col in df.columns else 0 for col in sumar}
+        df = pd.concat([df, pd.DataFrame([suma])], ignore_index=True)
 
-        rename_dict = {
-            'shipDate': 'Fecha',
-            'masterTrackingNumber': 'Tracking Number',
-            'recipientContactName': 'Cliente',
-            'recipientCity': 'Ciudad',
-            'numberOfPackages': 'BULTOS',
-            'reference': 'Referencia'
-        }
-        df_transformed.rename(columns=rename_dict, inplace=True)
-        df_transformed.drop_duplicates(subset=['Tracking Number', 'Cliente', 'Ciudad'], inplace=True)
-        df_transformed['BULTOS'] = df_transformed['BULTOS'].fillna(0).astype(int)
+    for col in mantener:
+        if col in df.columns:
+            df[col] = df[col].astype(str)
 
-        orden = ['Fecha', 'Tracking Number', 'Cliente', 'Ciudad', 'BULTOS', 'Referencia']
-        df_transformed = df_transformed[orden]
-
-        log_evento(f"Transformación para 'fedex' completada. Total filas: {len(df_transformed)}", "info")
-        return df_transformed
-
-    # Otros modos...
     return df
-
 
 def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
     try:
@@ -121,16 +89,13 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
         wb = excel.Workbooks.Open(str(filepath.resolve()))
         sheet = wb.Sheets(1)
 
-        # Ajustar columnas y preparar título
-        sheet.Cells.EntireColumn.AutoFit()
-
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
         titulo = {
             "fedex": f"FIN DE DÍA FEDEX - {fecha_actual}",
             "urbano": f"FIN DE DÍA URBANO - {fecha_actual}"
-        }.get(mode.lower(), f"LISTADO GENERAL - {fecha_actual}")
+        }.get(mode, f"LISTADO GENERAL - {fecha_actual}")
 
-        # Insertar título
+        # Insertar título y aplicar formato
         sheet.Rows("1:1").Insert()
         sheet.Cells(1, 1).Value = titulo
         sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
@@ -138,22 +103,16 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
         sheet.Cells(1, 1).Font.Size = 12
         sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
 
-        # Centrar contenido de tabla
-        sheet.Range(
-            sheet.Cells(2, 1),
-            sheet.Cells(df.shape[0] + 2, df.shape[1])
-        ).HorizontalAlignment = -4108  # xlCenter
-
-        # Cuadriculado con bordes
+        # Cuadriculado y centrado
         for row in range(2, df.shape[0] + 2):
             for col in range(1, df.shape[1] + 1):
                 cell = sheet.Cells(row, col)
-                cell.Borders.LineStyle = 1  # xlContinuous
+                cell.Borders.LineStyle = 1
+                cell.HorizontalAlignment = -4108
 
         wb.Save()
         wb.Close(SaveChanges=True)
-        log_evento(f"Impresión completada correctamente: {filepath}", "info")
-
+        log_evento(f"Impresión completada: {filepath}", "info")
     except Exception as e:
         log_evento(f"Error durante impresión: {e}", "error")
-        raise RuntimeError(f"Error durante impresión: {e}")
+        raise
