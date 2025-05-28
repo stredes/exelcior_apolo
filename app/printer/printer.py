@@ -1,9 +1,4 @@
-# app/printer/printer.py
-
 import os
-import platform
-import logging
-import inspect
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -16,10 +11,7 @@ except ImportError:
     pythoncom = None
     Dispatch = None
 
-try:
-    import cups  # type: ignore
-except ImportError:
-    cups = None
+from app.core.logger_eventos import log_evento  # ✅ uso centralizado
 
 
 def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataFrame):
@@ -45,7 +37,7 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
 
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-        # Cálculo seguro del total según modo
+        # Cálculo del total según modo
         total = 0
         label = "Items"
 
@@ -73,11 +65,11 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
                 total = len(df)
                 label = "Documentos"
 
-        # Pie de página dinámico con separador de miles
+        # Pie de página con total
         footer = f'&"Arial,Bold"&8 Impreso: {now}  |  {label}: {total:,.0f}'
         sheet.PageSetup.CenterFooter = footer
 
-        # Asegurar formato de texto para códigos de tracking
+        # Asegurar formato de texto en columna de tracking
         if mode == "fedex" and "Tracking Number" in df.columns:
             col_idx = list(df.columns).index("Tracking Number") + 1
             sheet.Columns(col_idx).NumberFormat = "@"
@@ -89,41 +81,16 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
                     except Exception:
                         pass
 
+        # Imprimir
         sheet.PrintOut()
         wb.Close(SaveChanges=False)
         excel.Quit()
 
-        logging.info(f"Impresión completada: {filepath}")
+        log_evento(f"Impresión completada: {filepath}", "info")
         messagebox.showinfo("Impresión exitosa", f"Archivo enviado a imprimir:\n{filepath}")
 
         pythoncom.CoUninitialize()
 
     except Exception as e:
-        logging.error(f"Error al imprimir {filepath}: {e}")
+        log_evento(f"Error al imprimir {filepath}: {e}", "error")
         messagebox.showerror("Error de impresión", f"Ocurrió un error:\n{e}")
-
-def log_evento(mensaje: str, nivel: str = "info"):
-    frame = inspect.stack()[1]
-    caller = os.path.splitext(os.path.basename(frame.filename))[0]
-    log_name = f"{caller}_log_{datetime.now().strftime('%Y%m%d')}"
-
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"{log_name}.log"
-
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file.resolve())
-               for h in logger.handlers):
-        handler = logging.FileHandler(log_file, encoding="utf-8")
-        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-        logger.addHandler(handler)
-
-    level_fn = {
-        "debug": logger.debug,
-        "info": logger.info,
-        "warning": logger.warning,
-        "error": logger.error,
-        "critical": logger.critical,
-    }.get(nivel.lower(), logger.info)
-    level_fn(mensaje)

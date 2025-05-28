@@ -18,11 +18,15 @@ from app.core.herramientas import abrir_herramientas
 from app.db.database import init_db
 from app.db.database import save_file_history
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
-from app.core.logger_bod1 import capturar_log_bod1
+from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import load_config
 from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
-from app.printer.printer_linux import print_document  # ✅ correctfrom app.printer.printer_linux import print_document  # ✅ con 'app.'
+from app.printer.printer_linux import print_document  
+from app.gui.sra_mary import SraMaryView
+from app.gui.inventario_view import InventarioView
+
+
 
 
 
@@ -69,6 +73,16 @@ class ExcelPrinterApp(tk.Tk):
         style.configure("TLabel", font=("Segoe UI", 11))
         style.configure("TCheckbutton", font=("Segoe UI", 11))
 
+    
+    def _abrir_buscador_codigos_postales(self):
+        from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
+        BuscadorCodigosPostales(self)
+
+    def _abrir_sra_mary(self):
+        SraMaryView(self)
+
+
+
     def _setup_sidebar(self):
         sidebar = tk.Frame(self, bg="#111827", width=200)
         sidebar.pack(side="left", fill="y")
@@ -83,7 +97,10 @@ class ExcelPrinterApp(tk.Tk):
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", self.view_logs),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
-            ("Etiquetas 🏷️", self._abrir_editor_etiquetas),  # 👈 Aquí está el nuevo botón
+            ("Etiquetas 🏷️", self._abrir_editor_etiquetas),
+            ("Buscar Códigos Postales 🧭", self._abrir_buscador_codigos_postales),
+            ("Sra Mary 👩‍💼", self._abrir_sra_mary),
+            ("Inventario 📦", lambda: InventarioView(self)),# 👈 Aquí está el nuevo botón
         ]
 
         for text, command in buttons:
@@ -114,6 +131,7 @@ class ExcelPrinterApp(tk.Tk):
         self.status_var = tk.StringVar()
         ttk.Label(self, textvariable=self.status_var,
                   relief=tk.SUNKEN, anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
+    
         
 
     def _mostrar_acerca_de(self):

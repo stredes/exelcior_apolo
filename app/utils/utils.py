@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from app.core.logger_bod1 import capturar_log_bod1
+from app.core.logger_eventos import capturar_log_bod1
 
 # Ruta del archivo de configuración
 CONFIG_FILE = Path("excel_printer_config.json")
@@ -20,6 +20,10 @@ def load_config():
         capturar_log_bod1("Archivo de configuración no encontrado. Se cargará configuración vacía", nivel="warning")
         return {}
 
+# Alias para carga directa
+def load_config_from_file():
+    return load_config()
+
 # ---------- Guardar Configuración ----------
 def save_config(config_data):
     def convert_sets(obj):
@@ -38,6 +42,16 @@ def save_config(config_data):
         capturar_log_bod1("Configuración guardada correctamente.", nivel="info")
     except Exception as e:
         capturar_log_bod1(f"Error al guardar configuración: {e}", nivel="error")
+
+# ---------- Guardar ruta de último archivo usado ----------
+def guardar_ultimo_path(path_str: str, clave: str = "ultimo_archivo_excel"):
+    try:
+        config = load_config()
+        config[clave] = str(Path(path_str).resolve())
+        save_config(config)
+        capturar_log_bod1(f"Ruta guardada en config ({clave}): {path_str}", nivel="info")
+    except Exception as e:
+        capturar_log_bod1(f"Error al guardar ruta en config: {e}", nivel="error")
 
 # ---------- (Opcional) Inicializar Logging Base (si aún lo usas en alguna parte) ----------
 def setup_logging():

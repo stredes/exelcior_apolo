@@ -5,10 +5,13 @@ from pathlib import Path
 from datetime import datetime
 from tkinter import messagebox
 
+from app.core.logger_eventos import log_evento  # ✅ logging unificado
+
 
 def print_document(filepath, mode, config_columns, df):
     try:
         if platform.system().lower() != "linux":
+            log_evento("Intento de impresión en SO no compatible (no Linux)", "warning")
             messagebox.showerror("Error", "Este método solo es compatible con Linux.")
             return
 
@@ -17,14 +20,13 @@ def print_document(filepath, mode, config_columns, df):
             if subprocess.call(["which", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
                 raise EnvironmentError(f"{cmd} no está disponible en el sistema.")
 
-        # Directorio para PDF exportado
         output_dir = Path("outputs/pdf").resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pdf_output = output_dir / f"{mode}_impreso_{timestamp}.pdf"
 
-        # Convertir Excel a PDF con libreoffice
+        # Convertir Excel a PDF
         convert_cmd = [
             "libreoffice", "--headless",
             "--convert-to", "pdf",
@@ -42,11 +44,13 @@ def print_document(filepath, mode, config_columns, df):
 
         generated_pdf.rename(pdf_output)
 
-        # Preparar comando de impresión
+        # Imprimir PDF
         print_cmd = ["lp", "-d", os.getenv("PRINTER", ""), str(pdf_output)]
         subprocess.run(print_cmd)
 
+        log_evento(f"PDF generado e impreso correctamente: {pdf_output}", "info")
         messagebox.showinfo("Impresión", f"Archivo PDF impreso:\n{pdf_output.name}")
 
     except Exception as e:
+        log_evento(f"Error impresión en Linux: {e}", "error")
         messagebox.showerror("Error", f"Error impresión en Linux:\n{e}")
