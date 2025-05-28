@@ -1,89 +1,100 @@
 {
     "fedex": {
         "eliminar": [
-            "errors",
-            "senderAccountNumber",
-            "poNumber",
-            "senderLine1",
-            "senderPostcode",
-            "totalShipmentWeight",
-            "weightUnits",
-            "recipientPostcode",
-            "creationDate",
-            "recipientPhoneExtension",
-            "senderContactNumber",
-            "senderCity",
-            "length",
-            "senderEmail",
-            "senderLine2",
-            "recipientState",
-            "packageWeight",
-            "returnRmaNumber",
-            "invoiceNumber",
-            "paymentType",
-            "senderContactName",
-            "recipientContactNumber",
-            "departmentNumber",
-            "senderState",
-            "status",
-            "recipientTin",
-            "estimatedShippingCosts",
-            "recipientEmail",
-            "senderCompany",
-            "recipientResidential",
-            "senderPhoneExtension",
-            "senderTin",
-            "height",
-            "returnReason",
             "width",
-            "etdEnabled",
-            "quoteId",
-            "recipientLine2",
-            "recipientCountry",
-            "senderResidential",
-            "recipientLine1",
-            "pickupId",
+            "recipientCompany",
+            "recipientPhoneExtension",
+            "recipientResidential",
+            "height",
+            "senderPostcode",
             "returnTrackingId",
-            "senderLine3",
+            "length",
+            "recipientLine2",
+            "senderAccountNumber",
+            "senderEmail",
+            "packageWeight",
             "shipmentType",
-            "senderCountry"
+            "recipientState",
+            "etdEnabled",
+            "returnRmaNumber",
+            "recipientPostcode",
+            "recipientContactNumber",
+            "returnReason",
+            "poNumber",
+            "departmentNumber",
+            "recipientLine1",
+            "senderContactName",
+            "senderCity",
+            "senderContactNumber",
+            "senderCountry",
+            "recipientEmail",
+            "pickupId",
+            "senderTin",
+            "paymentType",
+            "weightUnits",
+            "senderPhoneExtension",
+            "recipientTin",
+            "senderLine2",
+            "quoteId",
+            "creationDate",
+            "senderResidential",
+            "senderState",
+            "errors",
+            "totalShipmentWeight",
+            "senderLine3",
+            "invoiceNumber",
+            "recipientCountry",
+            "senderCompany",
+            "senderLine1",
+            "status",
+            "estimatedShippingCosts"
         ],
         "sumar": [
             "numberOfPackages"
         ],
         "mantener_formato": [
             "masterTrackingNumber"
-        ]
+        ],
+        "start_row": 0,
+        "nombre_archivo_digitos": [],
+        "vista_previa_fuente": 10
     },
     "urbano": {
         "eliminar": [
             "AGENCIA",
-            "SHIPPER",
-            "FECHA CHK",
+            "PESO",
             "DIAS",
-            "ESTADO",
+            "SHIPPER",
             "SERVICIO",
-            "PESO"
+            "ESTADO"
         ],
         "sumar": [
             "PIEZAS"
         ],
-        "mantener_formato": [],
-        "start_row": 2
+        "mantener_formato": [
+            "PIEZAS"
+        ],
+        "start_row": 2,
+        "nombre_archivo_digitos": [
+            9,
+            10
+        ],
+        "vista_previa_fuente": 10
     },
     "listados": {
         "eliminar": [
-            "Moneda",
-            "Fecha doc.",
+            "VENDEDOR",
+            "N\u00ba",
             "RUT",
-            "Vendedor",
-            "Glosa",
-            "Total",
-            "Tipo cambio"
+            "GLOSA",
+            "TIPO_CAMBIO",
+            "MONEDA"
         ],
         "sumar": [],
-        "mantener_formato": []
+        "mantener_formato": [],
+        "start_row": 0,
+        "nombre_archivo_digitos": [],
+        "vista_previa_fuente": 18
     },
-    "archivo_codigos_postales": "/home/stredes/Descargas/Codigos Postales SAM.xlsx",
-    "archivo_inventario": "/home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls"
+    "archivo_codigos_postales": "C:\\Users\\Recepci\u00f3n 2\\Desktop\\SS.MM.GGG\\Codigos Postales SAM.xlsx"
 }

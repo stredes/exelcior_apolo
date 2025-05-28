@@ -10,10 +10,13 @@ class BuscadorCodigosPostales(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Buscador de Códigos Postales")
-        self.geometry("800x540")
+        self.geometry("800x500")
         self.config(bg="#F9FAFB")
 
         self.df = self._cargar_datos_excel()
+        if self.df.empty:
+            self.destroy()
+            return
         self._crear_widgets()
 
     def _cargar_datos_excel(self) -> pd.DataFrame:
@@ -34,6 +37,8 @@ class BuscadorCodigosPostales(tk.Toplevel):
 
         try:
             df = pd.read_excel(ruta_config, header=1)
+            df.columns = df.columns.str.strip()  # Eliminar espacios en los encabezados
+
             df.rename(columns={
                 "Comuna/Localidad": "COMUNA",
                 "Provincia": "PROVINCIA",
@@ -74,12 +79,10 @@ class BuscadorCodigosPostales(tk.Toplevel):
             self.tree.column(col, anchor="center", width=200)
         self.tree.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Botón para copiar código postal
         self.btn_copiar = ttk.Button(self, text="Copiar Código Postal", command=self._copiar_codigo_postal)
         self.btn_copiar.pack(pady=(0, 10))
         self.btn_copiar["state"] = "disabled"
 
-        # Activar botón cuando se selecciona fila
         self.tree.bind("<<TreeviewSelect>>", self._habilitar_boton_copiar)
 
     def _buscar(self):
@@ -89,8 +92,8 @@ class BuscadorCodigosPostales(tk.Toplevel):
             return
 
         df_filtrado = self.df[
-            self.df["COMUNA"].str.lower().str.contains(termino) |
-            self.df["REGIÓN"].str.lower().str.contains(termino)
+            self.df["COMUNA"].astype(str).str.lower().str.contains(termino) |
+            self.df["REGIÓN"].astype(str).str.lower().str.contains(termino)
         ]
 
         self.tree.delete(*self.tree.get_children())
@@ -116,8 +119,8 @@ class BuscadorCodigosPostales(tk.Toplevel):
             return
 
         item = self.tree.item(seleccion[0])
-        codigo_postal = item["values"][2]  # Columna "CÓDIGO POSTAL"
+        codigo_postal = item["values"][2]
         self.clipboard_clear()
         self.clipboard_append(str(codigo_postal))
-        self.update()  # Requerido para asegurar que se copie
+        self.update()
         messagebox.showinfo("Copiado", f"Código Postal copiado: {codigo_postal}")

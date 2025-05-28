@@ -29,6 +29,7 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
         wb = excel.Workbooks.Open(str(filepath.resolve()))
         sheet = wb.Sheets(1)
 
+        # Estética general
         sheet.Cells.EntireColumn.AutoFit()
         sheet.PageSetup.Orientation = 2  # Horizontal
         sheet.PageSetup.Zoom = False
@@ -37,39 +38,38 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
 
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-        # Cálculo del total según modo
+        # ----------- TITULO DINÁMICO -----------------
+        titulo = {
+            "fedex": f"FIN DE DÍA FEDEX - {now}",
+            "urbano": f"FIN DE DÍA URBANO - {now}"
+        }.get(mode.lower(), f"LISTADO GENERAL - {now}")
+
+        # Insertar fila superior y escribir título centrado
+        sheet.Rows("1:1").Insert()
+        sheet.Cells(1, 1).Value = titulo
+        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
+        sheet.Cells(1, 1).Font.Bold = True
+        sheet.Cells(1, 1).Font.Size = 12
+        sheet.Cells(1, 1).HorizontalAlignment = -4108  # xlCenter
+
+        # ----------- PIE DE PÁGINA ------------------
         total = 0
         label = "Items"
 
-        if mode == "fedex":
-            if "BULTOS" in df.columns:
-                total = df["BULTOS"].sum()
-                label = "Piezas"
-            else:
-                total = len(df)
-                label = "Registros"
+        if mode in ["fedex", "urbano"] and "BULTOS" in df.columns:
+            total = df["BULTOS"].sum()
+            label = "Piezas"
+        elif "Total" in df.columns:
+            total = df["Total"].sum()
+            label = "Total $"
+        else:
+            total = len(df)
+            label = "Registros"
 
-        elif mode == "urbano":
-            if "BULTOS" in df.columns:
-                total = df["BULTOS"].sum()
-                label = "Piezas"
-            else:
-                total = len(df)
-                label = "Registros"
-
-        elif mode == "listados":
-            if "Total" in df.columns:
-                total = df["Total"].sum()
-                label = "Total $"
-            else:
-                total = len(df)
-                label = "Documentos"
-
-        # Pie de página con total
         footer = f'&"Arial,Bold"&8 Impreso: {now}  |  {label}: {total:,.0f}'
         sheet.PageSetup.CenterFooter = footer
 
-        # Asegurar formato de texto en columna de tracking
+        # ----------- FORMATO TRACKING COMO TEXTO --------
         if mode == "fedex" and "Tracking Number" in df.columns:
             col_idx = list(df.columns).index("Tracking Number") + 1
             sheet.Columns(col_idx).NumberFormat = "@"
@@ -81,14 +81,25 @@ def print_document(filepath: Path, mode: str, config_columns: dict, df: pd.DataF
                     except Exception:
                         pass
 
-        # Imprimir
+        # ----------- CENTRAR TODO EL CONTENIDO ------------
+        sheet.Range(
+            sheet.Cells(2, 1),
+            sheet.Cells(df.shape[0] + 2, df.shape[1])
+        ).HorizontalAlignment = -4108  # xlCenter
+
+        # ----------- APLICAR BORDES A TODA LA TABLA -------
+        for row in range(2, df.shape[0] + 2):
+            for col in range(1, df.shape[1] + 1):
+                cell = sheet.Cells(row, col)
+                cell.Borders.LineStyle = 1  # xlContinuous
+
+        # ----------- IMPRIMIR Y CERRAR --------------------
         sheet.PrintOut()
         wb.Close(SaveChanges=False)
         excel.Quit()
 
         log_evento(f"Impresión completada: {filepath}", "info")
         messagebox.showinfo("Impresión exitosa", f"Archivo enviado a imprimir:\n{filepath}")
-
         pythoncom.CoUninitialize()
 
     except Exception as e:

@@ -1,8 +1,12 @@
 import pandas as pd
+import pythoncom
 from pathlib import Path
 from typing import Optional
 from tkinter import messagebox
-from app.core.logger_eventos import log_evento  # ✅ Logger unificado
+from win32com.client import Dispatch
+from datetime import datetime
+
+from app.core.logger_eventos import log_evento
 
 
 def validate_file(file_path: str) -> bool:
@@ -29,10 +33,7 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
         log_evento(msg, "error")
         raise FileNotFoundError(msg)
 
-    # Engine según formato
-    if file_extension in [".xlsx", ".xlsm", ".xltx", ".xltm"]:
-        engine = "openpyxl"
-    elif file_extension == ".xls":
+    if file_extension in [".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"]:
         engine = "openpyxl"
     elif file_extension == ".xlsb":
         engine = "pyxlsb"
@@ -53,6 +54,10 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
             df = pd.read_excel(file_path_str, engine=engine, skiprows=skiprows, nrows=max_rows)
         else:
             df = pd.read_csv(file_path_str, skiprows=skiprows, nrows=max_rows)
+
+        df.columns = df.columns.str.strip().str.replace('\u200b', '', regex=True)
+        log_evento(f"Columnas leídas: {df.columns.tolist()}", "info")
+
     except Exception as e:
         log_evento(f"Error al cargar archivo: {e}", "error")
         raise ValueError(f"Error al cargar archivo: {e}")
@@ -61,6 +66,9 @@ def load_excel(file_path: str, config_columns: dict, mode: str, max_rows: Option
         msg = "El archivo está vacío o no tiene datos válidos"
         log_evento(msg, "warning")
         raise ValueError(msg)
+
+    if 'reference' not in df.columns:
+        log_evento("La columna 'reference' no se encontró en el archivo.", "warning")
 
     log_evento(f"Archivo cargado correctamente: {file_path_str}", "info")
     return df
@@ -71,58 +79,81 @@ def apply_transformation(df: pd.DataFrame, config_columns: dict, mode: str) -> p
 
     if mode == "fedex":
         columns_to_keep = ['shipDate', 'masterTrackingNumber', 'recipientContactName',
-                           'recipientCompany', 'recipientCity', 'numberOfPackages']
+                           'recipientCity', 'numberOfPackages', 'reference']
+
+        missing = [col for col in columns_to_keep if col not in df.columns]
+        if missing:
+            log_evento(f"Faltan columnas requeridas: {missing}", "error")
+            raise KeyError(f"Faltan columnas requeridas: {missing}")
+
         df_transformed = df[columns_to_keep].copy()
 
         rename_dict = {
+            'shipDate': 'Fecha',
             'masterTrackingNumber': 'Tracking Number',
             'recipientContactName': 'Cliente',
             'recipientCity': 'Ciudad',
-            'numberOfPackages': 'BULTOS'
+            'numberOfPackages': 'BULTOS',
+            'reference': 'Referencia'
         }
         df_transformed.rename(columns=rename_dict, inplace=True)
         df_transformed.drop_duplicates(subset=['Tracking Number', 'Cliente', 'Ciudad'], inplace=True)
         df_transformed['BULTOS'] = df_transformed['BULTOS'].fillna(0).astype(int)
 
-        total_bultos = df_transformed['BULTOS'].sum()
+        orden = ['Fecha', 'Tracking Number', 'Cliente', 'Ciudad', 'BULTOS', 'Referencia']
+        df_transformed = df_transformed[orden]
 
-        total_row = pd.DataFrame({
-            'Tracking Number': [''],
-            'Cliente': [''],
-            'Ciudad': ['TOTAL BULTOS ='],
-            'BULTOS': [total_bultos]
-        })
-
-        df_transformed = pd.concat([df_transformed, total_row], ignore_index=True)
-        log_evento(f"Transformación para 'fedex' completada. Total bultos: {total_bultos}", "info")
+        log_evento(f"Transformación para 'fedex' completada. Total filas: {len(df_transformed)}", "info")
         return df_transformed
 
-    # --- Genérico para otros modos ---
-    config = config_columns.get(mode, {})
-    cols_to_drop = config.get("eliminar", [])
-    cols_to_sum = config.get("sumar", [])
-    cols_format = config.get("mantener_formato", [])
+    # Otros modos...
+    return df
 
-    df_transformed = df.drop(columns=list(cols_to_drop), errors="ignore").copy()
 
-    # Formato
-    for col in cols_format:
-        if col in df_transformed.columns:
-            df_transformed[col] = df_transformed[col].astype(str)
+def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
+    try:
+        if not filepath.exists():
+            raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
 
-    # Sumas
-    resumen = {}
-    for col in cols_to_sum:
-        if col in df_transformed.columns:
-            df_transformed[col] = pd.to_numeric(df_transformed[col], errors='coerce')
-            resumen[col] = df_transformed[col].sum()
+        pythoncom.CoInitialize()
+        excel = Dispatch("Excel.Application")
+        excel.Visible = False
+        wb = excel.Workbooks.Open(str(filepath.resolve()))
+        sheet = wb.Sheets(1)
 
-    if resumen:
-        total_row_data = {col: '' for col in df_transformed.columns}
-        for col, total in resumen.items():
-            total_row_data[col] = total
-        total_row = pd.DataFrame([total_row_data])
-        df_transformed = pd.concat([df_transformed, total_row], ignore_index=True)
-        log_evento(f"Transformación para '{mode}' completada con resumen: {resumen}", "info")
+        # Ajustar columnas y preparar título
+        sheet.Cells.EntireColumn.AutoFit()
 
-    return df_transformed
+        fecha_actual = datetime.now().strftime("%d/%m/%Y")
+        titulo = {
+            "fedex": f"FIN DE DÍA FEDEX - {fecha_actual}",
+            "urbano": f"FIN DE DÍA URBANO - {fecha_actual}"
+        }.get(mode.lower(), f"LISTADO GENERAL - {fecha_actual}")
+
+        # Insertar título
+        sheet.Rows("1:1").Insert()
+        sheet.Cells(1, 1).Value = titulo
+        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
+        sheet.Cells(1, 1).Font.Bold = True
+        sheet.Cells(1, 1).Font.Size = 12
+        sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
+
+        # Centrar contenido de tabla
+        sheet.Range(
+            sheet.Cells(2, 1),
+            sheet.Cells(df.shape[0] + 2, df.shape[1])
+        ).HorizontalAlignment = -4108  # xlCenter
+
+        # Cuadriculado con bordes
+        for row in range(2, df.shape[0] + 2):
+            for col in range(1, df.shape[1] + 1):
+                cell = sheet.Cells(row, col)
+                cell.Borders.LineStyle = 1  # xlContinuous
+
+        wb.Save()
+        wb.Close(SaveChanges=True)
+        log_evento(f"Impresión completada correctamente: {filepath}", "info")
+
+    except Exception as e:
+        log_evento(f"Error durante impresión: {e}", "error")
+        raise RuntimeError(f"Error durante impresión: {e}")
