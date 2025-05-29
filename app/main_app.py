@@ -22,7 +22,14 @@ from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import load_config
 from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
-from app.printer.printer_linux import print_document  
+from app.printer import (
+    printer_fedex,
+    printer_urbano,
+    printer_listados,
+    printer_etiquetas,
+    printer_inventario_codigo,
+    printer_inventario_ubicacion,
+)
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
 
@@ -334,28 +341,23 @@ class ExcelPrinterApp(tk.Tk):
             return
         threading.Thread(target=self._print_document, daemon=True).start()
 
-    def _print_document(self):
+    def _print_document(self):   
         try:
-            if self.transformed_df is None or self.transformed_df.empty:
-                messagebox.showerror("Error", "No hay datos para imprimir.")
-                return
+            ...
+            printer_map = {
+                "fedex": printer_fedex.print_fedex,
+                "urbano": printer_urbano.print_urbano,
+                "listados": printer_listados.print_listados,
+                "etiquetas": printer_etiquetas.print_etiquetas,
+                "inventario_codigo": printer_inventario_codigo.print_inventario_codigo,
+                "inventario_ubicacion": printer_inventario_ubicacion.print_inventario_ubicacion,
+            }
 
-            output_dir = Path("exportados/excel")
-            output_dir.mkdir(parents=True, exist_ok=True)
+            print_func = printer_map.get(self.mode)
+            if not print_func:
+                raise ValueError(f"No se encontró printer para el modo: {self.mode}")
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = output_dir / f"{self.mode}_editado_{timestamp}.xlsx"
-
-            # Guardar solamente los datos procesados
-            self.transformed_df.to_excel(output_file, index=False)
-
-            capturar_log_bod1(f"Archivo exportado correctamente: {output_file}", "info")
-
-            # Enviar a impresión
-            self.print_document(output_file, self.mode, self.config_columns, self.transformed_df)
-
-            messagebox.showinfo("Impresión", f"El documento se ha exportado e impreso correctamente:\n{output_file}")
-            capturar_log_bod1(f"Archivo enviado a imprimir: {output_file.name}", "info")
+            print_func(output_file, self.config_columns, self.transformed_df)
 
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
