@@ -1,0 +1,81 @@
+2025-05-28 00:27:43,762 - INFO - Configuración cargada correctamente
+2025-05-28 00:31:55,652 - INFO - Configuración cargada correctamente
+2025-05-28 00:33:49,611 - INFO - Configuración cargada correctamente
+2025-05-28 00:33:57,859 - INFO - Base de datos actualizada exitosamente.
+2025-05-28 00:33:57,859 - INFO - Cliente eliminado: araval
+2025-05-28 00:41:43,531 - INFO - Configuración cargada correctamente
+2025-05-28 00:42:08,077 - INFO - Configuración cargada correctamente
+2025-05-28 00:42:39,234 - INFO - Configuración cargada correctamente
+2025-05-28 00:45:27,926 - INFO - Configuración cargada correctamente
+2025-05-28 00:46:59,089 - INFO - Configuración cargada correctamente
+2025-05-28 00:56:43,795 - INFO - Configuración cargada correctamente
+2025-05-28 00:56:45,542 - INFO - Configuración cargada correctamente
+2025-05-28 00:56:56,637 - INFO - Configuración cargada correctamente
+2025-05-28 00:56:56,638 - INFO - Configuración guardada correctamente.
+2025-05-28 00:56:56,638 - INFO - Ruta guardada en config (archivo_inventario): /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 00:56:56,638 - INFO - Ruta de inventario guardada: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 00:57:10,502 - ERROR - Error al cargar inventario: Pandas requires version '2.0.1' or newer of 'xlrd' (version '1.2.0' currently installed).
+2025-05-28 00:58:06,548 - INFO - Configuración cargada correctamente
+2025-05-28 00:58:08,413 - INFO - Configuración cargada correctamente
+2025-05-28 00:58:08,443 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 01:05:51,679 - INFO - Configuración cargada correctamente
+2025-05-28 01:05:55,301 - INFO - Configuración cargada correctamente
+2025-05-28 01:05:55,327 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 01:06:11,312 - INFO - Configuración cargada correctamente
+2025-05-28 01:06:12,428 - INFO - Configuración cargada correctamente
+2025-05-28 01:06:12,455 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 01:07:06,536 - INFO - Configuración cargada correctamente
+2025-05-28 01:07:08,490 - INFO - Configuración cargada correctamente
+2025-05-28 01:07:08,516 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 01:13:59,904 - INFO - Configuración cargada correctamente
+2025-05-28 01:13:59,924 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-28 01:14:29,615 - INFO - Base de datos actualizada exitosamente.
+2025-05-28 01:14:29,616 - INFO - Cliente agregado: araval
+2025-05-28 01:14:41,016 - INFO - Base de datos actualizada exitosamente.
+2025-05-28 01:14:41,016 - INFO - Cliente agregado: kk
+2025-05-29 23:37:15,301 - INFO - Configuración cargada correctamente
+2025-05-29 23:41:15,437 - INFO - Configuración cargada correctamente
+2025-05-29 23:47:25,282 - INFO - Configuración cargada correctamente
+2025-05-29 23:47:30,904 - INFO - Configuración cargada correctamente
+2025-05-29 23:48:13,109 - INFO - Configuración cargada correctamente
+2025-05-29 23:48:13,110 - INFO - Configuración guardada correctamente.
+2025-05-29 23:48:13,110 - INFO - Ruta guardada en config (archivo_inventario): /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-29 23:48:13,110 - INFO - Ruta de inventario guardada: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-29 23:48:13,110 - INFO - Configuración cargada correctamente
+2025-05-29 23:48:13,142 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-29 23:50:54,879 - INFO - Configuración cargada correctamente
+2025-05-29 23:50:59,593 - INFO - Configuración cargada correctamente
+2025-05-29 23:50:59,620 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-29 23:53:44,983 - INFO - Configuración cargada correctamente
+2025-05-29 23:53:51,405 - INFO - Configuración cargada correctamente
+2025-05-29 23:54:01,978 - INFO - Configuración cargada correctamente
+2025-05-29 23:54:01,978 - INFO - Configuración guardada correctamente.
+2025-05-29 23:54:01,978 - INFO - Ruta guardada en config (archivo_codigos_postales): /home/stredes/Descargas/Codigos Postales SAM.xlsx
+2025-05-29 23:54:01,978 - INFO - Ruta de códigos postales guardada: /home/stredes/Descargas/Codigos Postales SAM.xlsx
+2025-05-29 23:54:02,080 - INFO - Archivo de códigos postales cargado: /home/stredes/Descargas/Codigos Postales SAM.xlsx
+2025-05-29 23:54:10,935 - INFO - Búsqueda exitosa: 'aric', resultados: 4
+2025-05-29 23:54:14,467 - INFO - Búsqueda exitosa: 'arica', resultados: 4
+2025-05-29 23:54:23,219 - INFO - Búsqueda exitosa: 'pari', resultados: 4
+2025-05-29 23:54:32,461 - INFO - Búsqueda exitosa: 'santi', resultados: 52
+2025-05-29 23:54:57,288 - INFO - Búsqueda exitosa: 'huel', resultados: 1
+2025-05-29 23:55:05,236 - INFO - Búsqueda exitosa: 'puda', resultados: 1
+2025-05-29 23:55:12,537 - INFO - Búsqueda exitosa: 'con', resultados: 8
+2025-05-29 23:55:17,544 - INFO - Búsqueda exitosa: 'conce', resultados: 1
+2025-05-29 23:55:30,751 - INFO - Configuración cargada correctamente
+2025-05-29 23:55:30,773 - INFO - Archivo de inventario cargado: /home/stredes/Descargas/Informe_stock_fisico_20250528_003557.xls
+2025-05-29 23:58:06,791 - INFO - Iniciando procesamiento: /home/stredes/Descargas/lista_doc_venta_20250326_164354.xlsx
+2025-05-29 23:58:06,801 - INFO - Aplicando transformación para modo: listados
+2025-05-29 23:58:20,269 - INFO - Aplicando transformación para modo: listados
+2025-05-29 23:58:28,427 - INFO - Iniciando procesamiento: /home/stredes/Descargas/lista_doc_venta_20250326_164354.xlsx
+2025-05-29 23:58:28,433 - INFO - Aplicando transformación para modo: listados
+2025-05-29 23:58:35,183 - INFO - Iniciando procesamiento: /home/stredes/Descargas/Shipment_Report_2025-03-26.xlsx
+2025-05-29 23:58:35,197 - INFO - Aplicando transformación para modo: fedex
+2025-05-29 23:58:49,979 - INFO - Aplicando transformación para modo: fedex
+2025-05-29 23:58:57,883 - INFO - Iniciando procesamiento: /home/stredes/Descargas/Shipment_Report_2025-03-26.xlsx
+2025-05-29 23:58:57,896 - INFO - Aplicando transformación para modo: fedex
+2025-05-29 23:59:26,741 - INFO - Aplicando transformación para modo: fedex
+2025-05-29 23:59:31,147 - INFO - Iniciando procesamiento: /home/stredes/Descargas/Shipment_Report_2025-03-26.xlsx
+2025-05-29 23:59:31,161 - INFO - Aplicando transformación para modo: fedex
+2025-05-29 23:59:38,800 - INFO - Aplicando transformación para modo: urbano
+2025-05-29 23:59:45,623 - INFO - Iniciando procesamiento: /home/stredes/Descargas/211823030.xlsx
+2025-05-29 23:59:45,630 - INFO - Aplicando transformación para modo: urbano

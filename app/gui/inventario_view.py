@@ -5,12 +5,13 @@ from pathlib import Path
 
 from app.utils.utils import guardar_ultimo_path, load_config_from_file
 from app.core.logger_eventos import capturar_log_bod1
-from app.printer.inventario_printer import imprimir_inventario_excel
+from app.printer import printer_inventario_codigo, printer_inventario_ubicacion
 
 VISIBLE_COLUMNS = [
     "Código", "Producto", "Bodega", "Ubicación",
     "N° Serie", "Lote", "Fecha Vencimiento", "Saldo stock"
 ]
+
 
 class InventarioView(tk.Toplevel):
     def __init__(self, parent):
@@ -109,6 +110,14 @@ class InventarioView(tk.Toplevel):
             return
         try:
             df_to_print = pd.DataFrame(df_filtrado, columns=VISIBLE_COLUMNS)
-            imprimir_inventario_excel(df_to_print)
+            termino = self.entry_busqueda.get().strip().lower()
+            if any(termino in str(c).lower() for c in df_to_print["Código"]):
+                printer_inventario_codigo.print_inventario_codigo(
+                    Path("inventario_codigo.xlsx"), {}, df_to_print
+                )
+            else:
+                printer_inventario_ubicacion.print_inventario_ubicacion(
+                    Path("inventario_ubicacion.xlsx"), {}, df_to_print
+                )
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo imprimir el archivo:\n{e}")

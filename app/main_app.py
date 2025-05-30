@@ -1,3 +1,4 @@
+# main_app.py
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
@@ -5,68 +6,40 @@ import pandas as pd
 import logging
 from pathlib import Path
 from datetime import datetime
-import tempfile
-import platform
-import tkinter as tk
 
-
-# ✅ IMPORTS AJUSTADOS A LA NUEVA ESTRUCTURA
 from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
 from app.core.herramientas import abrir_herramientas
-from app.db.database import init_db
-from app.db.database import save_file_history
+from app.db.database import init_db, save_file_history
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import load_config
-from app.utils.platform_utils import is_windows, is_linux
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
+from app.gui.sra_mary import SraMaryView
+from app.gui.inventario_view import InventarioView
 from app.printer import (
     printer_fedex,
     printer_urbano,
     printer_listados,
-    printer_etiquetas,
-    printer_inventario_codigo,
-    printer_inventario_ubicacion,
+    printer_etiquetas
 )
-from app.gui.sra_mary import SraMaryView
-from app.gui.inventario_view import InventarioView
-
-
-
-
-
-def _get_print_function():
-    if platform.system() == "Windows":
-        from app.printer.printer import print_document
-    elif platform.system() == "Linux":
-        from app.printer.printer_linux import print_document
-    else:
-        raise OSError("Sistema operativo no soportado")
-    return print_document
 
 
 class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("750x700") 
-
-
-     
-
+        self.geometry("750x700")
         self.configure(bg="#F9FAFB")
 
         init_db()
-
         self.df = None
         self.transformed_df = None
         self.mode = "listados"
         self.processing = False
-        self.print_document = _get_print_function()
-        self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
         self.config_columns = load_config()
+        self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
         self._setup_styles()
         self._setup_sidebar()
@@ -80,43 +53,30 @@ class ExcelPrinterApp(tk.Tk):
         style.configure("TLabel", font=("Segoe UI", 11))
         style.configure("TCheckbutton", font=("Segoe UI", 11))
 
-    
-    def _abrir_buscador_codigos_postales(self):
-        from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
-        BuscadorCodigosPostales(self)
-
-    def _abrir_sra_mary(self):
-        SraMaryView(self)
-
-
-
     def _setup_sidebar(self):
         sidebar = tk.Frame(self, bg="#111827", width=200)
         sidebar.pack(side="left", fill="y")
 
         tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
-                font=("Segoe UI", 14, "bold")).pack(pady=20)
+                 font=("Segoe UI", 14, "bold")).pack(pady=20)
 
         buttons = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
             ("Carga Automática 🚀", self._threaded_auto_load),
             ("Configuración ⚙️", self._open_config_menu),
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
-            ("Ver Logs 📋", self.view_logs),
+            ("Ver Logs 📋", self._view_logs),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),
             ("Buscar Códigos Postales 🧭", self._abrir_buscador_codigos_postales),
             ("Sra Mary 👩‍💼", self._abrir_sra_mary),
-            ("Inventario 📦", lambda: InventarioView(self)),# 👈 Aquí está el nuevo botón
+            ("Inventario 📦", lambda: InventarioView(self)),
         ]
 
         for text, command in buttons:
             ttk.Button(sidebar, text=text, command=command).pack(pady=10, fill="x", padx=10)
 
-        # Botón "Acerca de"
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
-
-        # Botón salir al final
         ttk.Button(sidebar, text="Salir ❌", command=self.quit).pack(side="bottom", pady=20, fill="x", padx=10)
 
     def _setup_main_area(self):
@@ -138,97 +98,29 @@ class ExcelPrinterApp(tk.Tk):
         self.status_var = tk.StringVar()
         ttk.Label(self, textvariable=self.status_var,
                   relief=tk.SUNKEN, anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
-    
-        
 
-    def _mostrar_acerca_de(self):
-        acerca_win = tk.Toplevel(self)
-        acerca_win.title("Acerca de Exelcior Apolo")
-        acerca_win.geometry("900x900")
-        acerca_win.configure(bg="#F9FAFB")  
-
-        contenido = (
-            "🧬 Sistema Exelcior Apolo\n\n"
-            "📄 Descripción:\n"
-            "Aplicación para facilitar la gestión, edición e impresión de archivos Excel\n"
-            "clínicos y logísticos, con herramientas pensadas para el trabajo real en terreno.\n\n"
-            "👤 Desarrollador principal:\n"
-            "Gian Lucas San Martín\n"
-            "• Analista Programador\n"
-            "• Técnico de Laboratorio Clínico\n"
-            "• Socio fundador de GCNJ\n\n"
-            "🤝 Colaboradores:\n"
-            "• Mis socios de GCNJ, siempre presentes en el desarrollo de este proyecto\n\n"
-            "🔖 Versión: 1.0.0\n"
-            "📅 Última actualización: 2025-03-31\n\n"
-            "💼 Propiedad:\n"
-            "Este software fue creado con fines prácticos y profesionales por el equipo de GCNJ.\n"
-            "El código y el diseño pertenecen a sus autores.\n\n"
-            "© 2025 Gian Lucas San Martín – GCNJ. Todos los derechos reservados.\n\n"
-            "───────────────────────────────────────────────\n\n"
-            "📜 LICENCIA DE USO\n\n"
-            "Copyright © 2025 Gian Lucas San Martín – GCNJ\n"
-            "Todos los derechos reservados.\n\n"
-            "Este software, Exelcior Apolo, incluyendo su código fuente, diseño, lógica y documentación,\n"
-            "ha sido desarrollado por Gian Lucas San Martín – Analista Programador y Técnico de Laboratorio Clínico –\n"
-            "junto con sus socios de GCNJ.\n\n"
-            "🔒 PROHIBIDO:\n"
-            "• Copiar, reproducir o modificar total o parcialmente este software sin autorización expresa por escrito.\n"
-            "• Distribuir, vender o publicar este software o cualquier derivado sin el consentimiento de los propietarios.\n"
-            "• Usar con fines comerciales sin licencia específica de GCNJ.\n\n"
-            "✅ PERMITIDO:\n"
-            "• Uso interno por parte de licenciados autorizados por GCNJ.\n"
-            "• Revisión técnica bajo convenio de confidencialidad.\n"
-            "• Personalización solo por el equipo desarrollador original.\n\n"
-            "🛡️ Cualquier uso no autorizado constituirá una infracción a los derechos de propiedad intelectual\n"
-            "bajo las leyes de Chile y tratados internacionales vigentes.\n\n"
-            "📧 Contacto para licencias o uso institucional:\n"
-            "    gianlucassanmartin@gmail.com\n\n"
-            "™ Exelcior Apolo es una marca en uso por el equipo GCNJ.\n"
-        )
-
-        # Frame con scrollbar
-        frame = tk.Frame(acerca_win, bg="#F9FAFB")
-        frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        scrollbar = tk.Scrollbar(frame)
-        scrollbar.pack(side="right", fill="y")
-
-        text_widget = tk.Text(
-            frame,
-            wrap="word",
-            yscrollcommand=scrollbar.set,
-            font=("Segoe UI", 10),
-            bg="#F9FAFB",
-            relief="flat",
-            borderwidth=0
-        )
-        text_widget.insert("1.0", contenido)
-        text_widget.config(state="disabled")
-        text_widget.pack(side="left", fill="both", expand=True)
-
-        scrollbar.config(command=text_widget.yview)
-
-        ttk.Button(acerca_win, text="Cerrar", command=acerca_win.destroy).pack(pady=10)
-
-
-
-    def _update_status(self, message):
+    def _update_status(self, message: str):
         self.status_var.set(message)
-        self.update_idletasks()
 
     def _update_mode(self, selected_mode: str):
         for mode in self.mode_vars:
             self.mode_vars[mode].set(mode == selected_mode)
         self.mode = selected_mode
 
+    def _abrir_buscador_codigos_postales(self):
+        from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
+        BuscadorCodigosPostales(self)
+
+    def _abrir_sra_mary(self):
+        SraMaryView(self)
+
+    def _mostrar_acerca_de(self):
+        messagebox.showinfo("Acerca de", "Exelcior Apolo\n\nSistema integral de impresión, logística y trazabilidad para operaciones clínicas, desarrollado por Gian Lucas y GCNJ.\n\nVersión 2025 — Funciona en Windows y Linux.")
+
     def _threaded_select_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
-
         if file_path and validate_file(file_path):
-            # Calibrar la carpeta automáticamente
             set_carpeta_descarga_personalizada(Path(file_path).parent, self.mode)
-
             self.processing = True
             threading.Thread(target=self._process_file, args=(file_path,), daemon=True).start()
 
@@ -241,7 +133,6 @@ class ExcelPrinterApp(tk.Tk):
         self._update_status("Buscando archivo más reciente...")
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
-
             if estado == "ok" and archivo and validate_file(str(archivo)):
                 self._update_status(f"✅ Cargado: {archivo.name}")
                 self._process_file(str(archivo))
@@ -253,33 +144,27 @@ class ExcelPrinterApp(tk.Tk):
                 messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
             else:
                 self._update_status("❌ Error en la autocarga.")
-                messagebox.showerror("Error", "Ocurrió un error inesperado.")
         except Exception as e:
-            self._update_status("❌ Fallo crítico")
             logging.error(f"Error en carga automática: {e}")
-            messagebox.showerror("Error", f"No se pudo cargar automáticamente:\n{e}")
+            messagebox.showerror("Error", str(e))
         finally:
             self.processing = False
 
-
     def _process_file(self, file_path: str):
-        self._update_status("Procesando archivo...")
-        capturar_log_bod1(f"Iniciando procesamiento del archivo: {file_path}", "info")
+        self.after(0, lambda: self._update_status("Procesando archivo..."))
+        capturar_log_bod1(f"Iniciando procesamiento: {file_path}", "info")
         try:
             df = load_excel(file_path, self.config_columns, self.mode)
             self.df = df
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
             save_file_history(file_path, self.mode)
-            capturar_log_bod1(f"Archivo procesado correctamente: {file_path}", "info")
             self.after(0, self._show_preview)
-        except Exception as exc:
-            capturar_log_bod1(f"Error al procesar archivo: {file_path} - {exc}", "error")
-            messagebox.showerror("Error", f"Error al leer el archivo:\n{exc}")
-            logging.error(f"Error: {exc}")
+        except Exception as e:
+            logging.error(f"Error procesando archivo: {e}")
+            self.after(0, lambda: messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{e}"))
         finally:
             self.processing = False
-            self._update_status("Listo")
-
+            self.after(0, lambda: self._update_status("Listo"))
 
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
@@ -313,27 +198,6 @@ class ExcelPrinterApp(tk.Tk):
             tree.insert("", "end", values=row)
 
         ttk.Button(preview_win, text="Imprimir", command=self._threaded_print).pack(pady=5)
-        ttk.Button(preview_win, text="Cerrar", command=preview_win.destroy).pack(pady=5)
-
-
-        def eliminar_filas_seleccionadas():
-            seleccion = tree.selection()
-            if not seleccion:
-                messagebox.showinfo("Sin selección", "Debes seleccionar al menos una fila para eliminar.")
-                return
-
-            filas_indices = [tree.index(i) for i in seleccion]
-            for item in seleccion:
-                tree.delete(item)
-
-            # Eliminar del DataFrame original
-            self.transformed_df.drop(index=self.transformed_df.index[filas_indices], inplace=True)
-            self.transformed_df.reset_index(drop=True, inplace=True)
-            capturar_log_bod1(f"Filas eliminadas en vista previa: {filas_indices}", "info")
-
-        ttk.Button(preview_win, text="Eliminar filas seleccionadas", command=eliminar_filas_seleccionadas).pack(pady=5)
-
-        
 
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
@@ -341,37 +205,35 @@ class ExcelPrinterApp(tk.Tk):
             return
         threading.Thread(target=self._print_document, daemon=True).start()
 
-    def _print_document(self):   
+    def _print_document(self):
         try:
-            ...
             printer_map = {
                 "fedex": printer_fedex.print_fedex,
                 "urbano": printer_urbano.print_urbano,
                 "listados": printer_listados.print_listados,
                 "etiquetas": printer_etiquetas.print_etiquetas,
-                "inventario_codigo": printer_inventario_codigo.print_inventario_codigo,
-                "inventario_ubicacion": printer_inventario_ubicacion.print_inventario_ubicacion,
             }
 
             print_func = printer_map.get(self.mode)
             if not print_func:
                 raise ValueError(f"No se encontró printer para el modo: {self.mode}")
 
-            print_func(output_file, self.config_columns, self.transformed_df)
-
+            print_func(None, self.config_columns, self.transformed_df)
         except Exception as e:
             messagebox.showerror("Error", f"Error al imprimir:\n{e}")
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error durante impresión: {e}", "error")
-
-
 
     def _open_config_menu(self):
         if self.df is None:
             messagebox.showerror("Error", "Primero cargue un archivo Excel.")
             return
         self.open_config_dialog(self.mode)
-        print("CONFIGURACIÓN CARGADA:", self.config_columns)
+
+    def open_config_dialog(self, mode: str):
+        dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
+        self.wait_window(dialog)
+        self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
 
     def _abrir_editor_etiquetas(self):
         try:
@@ -386,36 +248,62 @@ class ExcelPrinterApp(tk.Tk):
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
 
-
-    def open_config_dialog(self, mode: str):
-        dialog = ConfigDialog(self, mode, list(self.df.columns), self.config_columns)
-        self.wait_window(dialog)
-        self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
-
-    def view_logs(self):
-        log_dir = Path("logs")
+    def _view_logs(self):
+        log_dir = Path(__file__).resolve().parent.parent / "logs"
         if not log_dir.exists():
             messagebox.showinfo("Logs", "No hay logs para mostrar.")
             return
 
-        log_files = sorted(log_dir.glob("bod1_log_*.log"), reverse=True)
+        log_files = sorted(log_dir.glob("*.log"), reverse=True)
         if not log_files:
             messagebox.showinfo("Logs", "No hay logs para mostrar.")
             return
 
         latest_log = log_files[0]
+
         log_win = tk.Toplevel(self)
-        log_win.title(f"Logs: {latest_log.name}")
-        log_win.geometry("600x400")
-        txt = tk.Text(log_win)
-        txt.pack(fill=tk.BOTH, expand=True)
-        with latest_log.open("r", encoding="utf-8", errors="replace") as f:
-            txt.insert(tk.END, f.read())
+        log_win.title(f"Visor de Logs - {latest_log.name}")
+        log_win.geometry("1000x600")
+        log_win.configure(bg="#F9FAFB")
+
+        frame = ttk.Frame(log_win, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        txt = tk.Text(frame, wrap="word", font=("Consolas", 10), bg="white")
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(frame, command=txt.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        txt.config(yscrollcommand=scrollbar.set)
+
+        txt.tag_configure("ERROR", foreground="red")
+        txt.tag_configure("WARNING", foreground="orange")
+        txt.tag_configure("DEBUG", foreground="gray")
+        txt.tag_configure("INFO", foreground="black")
+
+        def cargar_log():
+            txt.config(state="normal")
+            txt.delete("1.0", tk.END)
+            with latest_log.open("r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if "ERROR" in line:
+                        txt.insert(tk.END, line, "ERROR")
+                    elif "WARNING" in line:
+                        txt.insert(tk.END, line, "WARNING")
+                    elif "DEBUG" in line:
+                        txt.insert(tk.END, line, "DEBUG")
+                    else:
+                        txt.insert(tk.END, line, "INFO")
+            txt.config(state="disabled")
+
+        ttk.Button(log_win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
+        cargar_log()
 
 
 def main():
     app = ExcelPrinterApp()
     app.mainloop()
+
 
 if __name__ == "__main__":
     main()

@@ -4,15 +4,31 @@ from pathlib import Path
 import json
 import logging
 from datetime import datetime
+from app.db.models import HistorialArchivo
 
-# Rutas de configuración
+# Configuración inicial de paths
 CONFIG_FILE = Path("app/config/excel_printer_config.json")
-LOG_FILE = Path("logs_app.log")
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOG_DIR / "logs_app.log"
+
+# ----------------- Setup Logging -----------------
+def setup_logging():
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+setup_logging()
 
 # ----------------- Conexión a la BD -----------------
-DB_PATH = "sqlite:///excel_printer.db"
-engine = create_engine(DB_PATH)
+DB_PATH = Path("data/excel_printer.db")
+DB_PATH.parent.mkdir(exist_ok=True)
+DATABASE_URL = f"sqlite:///{DB_PATH}"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 Session = sessionmaker(bind=engine)
+
 
 # ----------------- Configuración -----------------
 def load_config():
@@ -37,6 +53,7 @@ def save_config(config_data):
         return obj
 
     try:
+        CONFIG_FILE.parent.mkdir(exist_ok=True, parents=True)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(convert_sets(config_data), f, indent=4)
         logging.info("Configuración guardada correctamente.")
@@ -65,12 +82,13 @@ def guardar_ultimo_path(path_str: str, clave: str = "ultimo_archivo_excel"):
     except Exception as e:
         logging.error(f"Error al guardar ruta en config: {e}")
 
+
 # ----------------- Historial Archivos -----------------
-def save_file_history(nombre_archivo, modo):
+def save_file_history(nombre_archivo, modo, usuario_id=None):
     session = Session()
     try:
-        from .models import HistorialArchivo
         record = HistorialArchivo(
+            usuario_id=usuario_id,
             nombre_archivo=str(nombre_archivo),
             fecha_procesado=datetime.utcnow(),
             modo_utilizado=modo
@@ -83,11 +101,3 @@ def save_file_history(nombre_archivo, modo):
         logging.error(f"Error al guardar historial: {e}")
     finally:
         session.close()
-
-# ----------------- Logging -----------------
-def setup_logging():
-    logging.basicConfig(
-        filename=LOG_FILE,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )

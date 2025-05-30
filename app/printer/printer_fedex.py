@@ -4,8 +4,8 @@
 # Módulo: printer_fedex.py
 # Descripción: Lógica de impresión para listados FedEx
 
-import pythoncom
-from win32com.client import Dispatch
+
+
 from pathlib import Path
 from datetime import datetime
 from app.core.logger_eventos import log_evento
@@ -16,8 +16,8 @@ def imprimir_fedex(filepath: Path, df):
         if not filepath.exists():
             raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
 
-        pythoncom.CoInitialize()
-        excel = Dispatch("Excel.Application")
+        
+        excel = None  # Eliminado para compatibilidad Linux
         excel.Visible = False
         wb = excel.Workbooks.Open(str(filepath.resolve()))
         sheet = wb.Sheets(1)
@@ -51,3 +51,5 @@ def imprimir_fedex(filepath: Path, df):
     except Exception as e:
         log_evento(f"Error en impresión FedEx: {e}", "error")
         raise
+
+# Linux compatible version: Use openpyxl or external print handling

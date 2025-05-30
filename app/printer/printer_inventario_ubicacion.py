@@ -4,10 +4,10 @@
 # Módulo: printer_inventario_ubicacion.py
 # Descripción: Lógica de impresión de resultados de consulta por ubicación en el módulo de Inventario
 
-import pythoncom
+
 from pathlib import Path
 from datetime import datetime
-from win32com.client import Dispatch
+
 from app.core.logger_eventos import log_evento
 
 def imprimir_inventario_por_ubicacion(filepath: Path, df):
@@ -19,8 +19,8 @@ def imprimir_inventario_por_ubicacion(filepath: Path, df):
         if not filepath.exists():
             raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
 
-        pythoncom.CoInitialize()
-        excel = Dispatch("Excel.Application")
+        
+        excel = None  # Eliminado para compatibilidad Linux
         excel.Visible = False
         wb = excel.Workbooks.Open(str(filepath.resolve()))
         sheet = wb.Sheets(1)
@@ -48,3 +48,5 @@ def imprimir_inventario_por_ubicacion(filepath: Path, df):
     except Exception as e:
         log_evento(f"Error en impresión por ubicación: {e}", "error")
         raise RuntimeError(f"Error en impresión por ubicación: {e}")
+
+# Linux compatible version: Use openpyxl or external print handling

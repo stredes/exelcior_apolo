@@ -1,15 +1,18 @@
 import pandas as pd
-import pythoncom
 from pathlib import Path
 from typing import Optional
 from tkinter import messagebox
-from win32com.client import Dispatch
 from datetime import datetime
+import platform
 import json
 
 from app.core.logger_eventos import log_evento
 
-# Cargar configuración
+# Solo importar estas librerías si estás en Windows
+if platform.system() == "Windows":
+    import pythoncom
+    from win32com.client import Dispatch
+
 CONFIG_PATH = Path("app/config/excel_printer_config.json")
 
 def load_config() -> dict:
@@ -40,7 +43,7 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
 
     engine = {
         ".xlsx": "openpyxl",
-        ".xls": "openpyxl",
+        ".xls": "openpyxl",  # Puedes cambiarlo a xlrd si usas .xls
         ".csv": None
     }.get(file_ext)
 
@@ -79,6 +82,10 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
     return df
 
 def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
+    if platform.system() != "Windows":
+        log_evento("Impresión de Excel solo soportada en Windows.", "warning")
+        raise NotImplementedError("La impresión desde Excel solo está disponible en Windows.")
+
     try:
         if not filepath.exists():
             raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
@@ -95,7 +102,6 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
             "urbano": f"FIN DE DÍA URBANO - {fecha_actual}"
         }.get(mode, f"LISTADO GENERAL - {fecha_actual}")
 
-        # Insertar título y aplicar formato
         sheet.Rows("1:1").Insert()
         sheet.Cells(1, 1).Value = titulo
         sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
@@ -103,7 +109,6 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
         sheet.Cells(1, 1).Font.Size = 12
         sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
 
-        # Cuadriculado y centrado
         for row in range(2, df.shape[0] + 2):
             for col in range(1, df.shape[1] + 1):
                 cell = sheet.Cells(row, col)

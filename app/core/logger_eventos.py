@@ -2,18 +2,27 @@ import logging
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 
-# Este setup solo se ejecuta si no ha sido ya configurado desde logger_setup
 def _setup_eventos_logger():
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    eventos_log = logs_dir / "eventos.log"
+    # Ruta consistente desde cualquier ubicación de ejecución
+    base_dir = Path(__file__).resolve().parent.parent
+    logs_dir = base_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
+    eventos_log = logs_dir / "eventos.log"
     logger = logging.getLogger("eventos_logger")
     logger.setLevel(logging.INFO)
 
+    # Evita añadir múltiples handlers
     if not logger.handlers:
-        handler = TimedRotatingFileHandler(eventos_log, when="midnight", backupCount=30, encoding="utf-8")
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        handler = TimedRotatingFileHandler(
+            eventos_log,
+            when="midnight",
+            backupCount=30,
+            encoding="utf-8"
+        )
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s"
+        )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
@@ -23,7 +32,7 @@ _eventos_logger = _setup_eventos_logger()
 
 def log_evento(mensaje: str, nivel: str = "info"):
     """
-    Loguea un evento funcional de negocio en 'logs/eventos.log'
+    Loguea un evento funcional en 'logs/eventos.log' con el nivel dado.
     """
     nivel = nivel.lower()
     log_func = {
@@ -36,5 +45,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
 
     log_func(mensaje)
 
-# 🔁 Alias retrocompatible para funciones existentes
+# Alias para compatibilidad
 capturar_log_bod1 = log_evento
