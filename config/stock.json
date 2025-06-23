@@ -1,0 +1,10 @@
+{
+    "critical_threshold": 5,
+    "low_threshold": 20,
+    "high_threshold": 50,
+    "expiration_alert_days": 90,
+    "special_fields": [
+        "N° Serie",
+        "Lote"
+    ]
+}
