@@ -1,0 +1,6 @@
+{
+    "name": "exelcior.db",
+    "backup_name": "exelcior_backup.db",
+    "connection_pool_size": 5,
+    "echo_sql": false
+}
