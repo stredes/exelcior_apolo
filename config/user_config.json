@@ -1,0 +1,60 @@
+{
+    "fedex": {
+        "eliminar": [
+            "errors",
+            "senderAccountNumber",
+            "poNumber",
+            "senderLine1",
+            "senderPostcode",
+            "totalShipmentWeight",
+            "weightUnits",
+            "recipientPostcode",
+            "creationDate",
+            "recipientPhoneExtension"
+        ],
+        "sumar": [
+            "numberOfPackages"
+        ],
+        "mantener_formato": [
+            "masterTrackingNumber"
+        ],
+        "start_row": 0,
+        "vista_previa_fuente": 10
+    },
+    "urbano": {
+        "eliminar": [
+            "AGENCIA",
+            "SHIPPER",
+            "FECHA CHK",
+            "DIAS",
+            "ESTADO",
+            "SERVICIO",
+            "PESO"
+        ],
+        "sumar": [
+            "PIEZAS"
+        ],
+        "mantener_formato": [],
+        "start_row": 3,
+        "vista_previa_fuente": 10,
+        "nombre_archivo_digitos": [
+            9,
+            10
+        ]
+    },
+    "listados": {
+        "eliminar": [
+            "Moneda",
+            "Fecha doc.",
+            "RUT",
+            "Vendedor",
+            "Glosa",
+            "Total",
+            "Tipo cambio"
+        ],
+        "sumar": [],
+        "mantener_formato": [],
+        "start_row": 0,
+        "vista_previa_fuente": 10
+    }
+}

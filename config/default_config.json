@@ -1,0 +1,29 @@
+{
+  "database": {
+    "name": "exelcior.db",
+    "backup_name": "exelcior_backup.db",
+    "connection_pool_size": 5,
+    "echo_sql": false
+  },
+  "network": {
+    "zebra_ip": "192.168.0.100",
+    "zebra_port": 9100,
+    "connection_timeout": 5,
+    "retry_attempts": 3
+  },
+  "stock": {
+    "critical_threshold": 5,
+    "low_threshold": 20,
+    "high_threshold": 50,
+    "expiration_alert_days": 90,
+    "special_fields": ["N° Serie", "Lote"]
+  },
+  "user": {
+    "default_mode": "listados",
+    "default_printer": "URBANO",
+    "auto_load_enabled": true,
+    "custom_download_paths": {},
+    "recent_files": []
+  }
+}
+

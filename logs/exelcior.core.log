@@ -1,0 +1,17 @@
+2025-06-23 13:48:42 - exelcior.core.integrated_processor - INFO - Archivo cargado: 1 filas, 12 columnas
+2025-06-23 13:48:42 - exelcior.core.integrated_processor - INFO - Aplicando transformación para modo: listados
+2025-06-23 13:48:42 - exelcior.core.integrated_processor - INFO - Listados procesado: 1 registros
+2025-06-23 13:49:00 - exelcior.core.integrated_processor - INFO - Archivo cargado: 5 filas, 55 columnas
+2025-06-23 13:49:00 - exelcior.core.integrated_processor - INFO - Aplicando transformación para modo: fedex
+2025-06-23 13:49:00 - exelcior.core.integrated_processor - INFO - FedEx procesado: 4 envíos, 5 bultos
+2025-06-23 13:49:00 - exelcior.core.integrated_processor - WARNING - Columna Reference no encontrada para eliminar duplicados
+2025-06-23 13:49:11 - exelcior.core.urbano_system - INFO - 🏢 Iniciando procesamiento urbano: C:/Users/Recepción 2/Downloads/192403809.xlsx
+2025-06-23 13:49:12 - exelcior.core.urbano_system - INFO - Archivo urbano cargado: 29 filas, 12 columnas
+2025-06-23 13:49:12 - exelcior.core.urbano_system - WARNING - ❌ Columnas faltantes: ['FECHA', 'CIUDAD']
+2025-06-23 13:49:12 - exelcior.core.urbano_system - INFO - Detección urbana: {'is_urbano': False, 'confidence': 0.6, 'filename_match': True, 'structure_valid': False, 'missing_columns': ['FECHA', 'CIUDAD'], 'detected_pattern': 9}
+2025-06-23 13:49:12 - exelcior.core.urbano_system - ERROR - ❌ Error en procesamiento urbano: Archivo no es urbano válido: {'is_urbano': False, 'confidence': 0.6, 'filename_match': True, 'structure_valid': False, 'missing_columns': ['FECHA', 'CIUDAD'], 'detected_pattern': 9}
+2025-06-23 13:50:42 - exelcior.core.urbano_system - INFO - 🏢 Iniciando procesamiento urbano: C:/Users/Recepción 2/Downloads/192403809.xlsx
+2025-06-23 13:50:42 - exelcior.core.urbano_system - INFO - Archivo urbano cargado: 29 filas, 12 columnas
+2025-06-23 13:50:42 - exelcior.core.urbano_system - WARNING - ❌ Columnas faltantes: ['FECHA', 'CIUDAD']
+2025-06-23 13:50:42 - exelcior.core.urbano_system - INFO - Detección urbana: {'is_urbano': False, 'confidence': 0.6, 'filename_match': True, 'structure_valid': False, 'missing_columns': ['FECHA', 'CIUDAD'], 'detected_pattern': 9}
+2025-06-23 13:50:42 - exelcior.core.urbano_system - ERROR - ❌ Error en procesamiento urbano: Archivo no es urbano válido: {'is_urbano': False, 'confidence': 0.6, 'filename_match': True, 'structure_valid': False, 'missing_columns': ['FECHA', 'CIUDAD'], 'detected_pattern': 9}

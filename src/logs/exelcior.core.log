@@ -1,0 +1,33 @@
+2025-06-23 11:27:05 - exelcior.core.integrated_processor - INFO - Configuraciones cargadas para todos los modos
+2025-06-23 11:27:21 - exelcior.core.integrated_processor - INFO - Configuraciones cargadas para todos los modos
+2025-06-23 11:27:30 - exelcior.core.integrated_processor - INFO - Configuraciones cargadas para todos los modos
+2025-06-23 12:03:48 - exelcior.core.urbano_system - INFO - ✅ Estructura urbana válida detectada
+2025-06-23 12:03:48 - exelcior.core.urbano_system - WARNING - ❌ Columnas faltantes: ['CLIENTE', 'CIUDAD']
+2025-06-23 12:04:03 - exelcior.core.integrated_processor - INFO - 🏢 Archivo urbano detectado automáticamente: 192403809
+2025-06-23 12:04:03 - exelcior.core.integrated_processor - INFO - 📦 Archivo FedEx detectado: fedex_report
+2025-06-23 12:04:03 - exelcior.core.integrated_processor - INFO - 📋 Archivo de listados detectado: lista_venta_20250623
+2025-06-23 12:04:04 - exelcior.core.integrated_processor - INFO - 📋 Modo por defecto asignado: listados
+2025-06-23 12:04:04 - exelcior.core.integrated_processor - INFO - Archivo cargado: 3 filas, 6 columnas
+2025-06-23 12:04:04 - exelcior.core.integrated_processor - INFO - Aplicando transformación para modo: listados
+2025-06-23 12:04:04 - exelcior.core.integrated_processor - INFO - Listados procesado: 3 registros
+2025-06-23 12:04:54 - exelcior.core.urbano_system - INFO - ✅ Estructura urbana válida detectada
+2025-06-23 12:04:54 - exelcior.core.urbano_system - WARNING - ❌ Columnas faltantes: ['CLIENTE', 'CIUDAD', 'PIEZAS']
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 🏢 Archivo urbano detectado automáticamente: 192403809
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 🏢 Archivo urbano detectado automáticamente: 1924038091
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 📦 Archivo FedEx detectado: fedex_report
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 📦 Archivo FedEx detectado: shipment_data
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 📋 Archivo de listados detectado: lista_venta_20250623
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 📋 Archivo de listados detectado: listado_productos
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - 📋 Modo por defecto asignado: listados
+2025-06-23 12:04:54 - exelcior.core.urbano_system - INFO - 🏢 Iniciando procesamiento urbano: /tmp/tmp1xdfppzp_urbano_test.xlsx
+2025-06-23 12:04:54 - exelcior.core.urbano_system - INFO - Archivo urbano cargado: 1 filas, 6 columnas
+2025-06-23 12:04:54 - exelcior.core.urbano_system - WARNING - ❌ Columnas faltantes: ['FECHA', 'CLIENTE', 'CIUDAD', 'PIEZAS']
+2025-06-23 12:04:54 - exelcior.core.urbano_system - INFO - Detección urbana: {'is_urbano': False, 'confidence': 0.0, 'filename_match': False, 'structure_valid': False, 'missing_columns': ['FECHA', 'CLIENTE', 'CIUDAD', 'PIEZAS'], 'detected_pattern': None}
+2025-06-23 12:04:54 - exelcior.core.urbano_system - ERROR - ❌ Error en procesamiento urbano: Archivo no es urbano válido: {'is_urbano': False, 'confidence': 0.0, 'filename_match': False, 'structure_valid': False, 'missing_columns': ['FECHA', 'CLIENTE', 'CIUDAD', 'PIEZAS'], 'detected_pattern': None}
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - Archivo cargado: 3 filas, 6 columnas
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - Aplicando transformación para modo: fedex
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - INFO - FedEx procesado: 2 envíos, 3 bultos
+2025-06-23 12:04:54 - exelcior.core.integrated_processor - WARNING - Columna Reference no encontrada para eliminar duplicados
+2025-06-23 12:04:55 - exelcior.core.integrated_processor - INFO - Archivo cargado: 2 filas, 5 columnas
+2025-06-23 12:04:55 - exelcior.core.integrated_processor - INFO - Aplicando transformación para modo: listados
+2025-06-23 12:04:55 - exelcior.core.integrated_processor - INFO - Listados procesado: 2 registros

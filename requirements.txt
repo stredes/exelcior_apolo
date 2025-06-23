@@ -1,0 +1,37 @@
+# Exelcior Apolo v2.0.0 - Dependencias
+
+# Core data processing
+pandas>=1.5.0
+numpy>=1.21.0
+openpyxl>=3.0.9
+xlrd>=2.0.1
+
+# Database
+sqlalchemy>=1.4.0
+
+# PDF generation
+fpdf2>=2.5.0
+reportlab>=3.6.0
+
+# Image processing
+pillow>=9.0.0
+
+# GUI enhancements
+tkcalendar>=1.6.1
+
+# Networking (optional for Zebra printers)
+requests>=2.28.0
+
+# Date/time handling
+python-dateutil>=2.8.0
+pytz>=2022.1
+
+# Type checking (development)
+typing-extensions>=4.0.0
+
+# Character encoding detection
+chardet>=5.0.0
+
+# Additional utilities
+six>=1.16.0
+
