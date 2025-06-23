@@ -224,6 +224,11 @@ class IntegratedExcelProcessor:
         # Procesar fechas
         if "FECHA" in df_clean.columns:
             df_clean["FECHA"] = pd.to_datetime(df_clean["FECHA"], errors="coerce")
+
+        # Incluir COD RASTREO como campo de referencia si está presente
+        if "COD_RASTREO" in df_clean.columns:
+            df_clean["COD_RASTREO"] = df_clean["COD_RASTREO"].astype(str).str.strip().str.upper()
+            self.logger.info("🔗 Campo COD RASTREO incluido como referencia (normalizado)")
         
         # Ordenar datos
         if "FECHA" in df_clean.columns and "CLIENTE" in df_clean.columns:
@@ -233,6 +238,7 @@ class IntegratedExcelProcessor:
         
         self.logger.info(f"🏢 Urbano procesado con sistema perfecto: {len(df_clean)} registros, {total_piezas} piezas")
         return df_clean, total_piezas
+
     
     def process_listados_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
         """Procesar datos de listados"""
