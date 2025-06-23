@@ -76,11 +76,12 @@ class AutoLoader:
                 priority=10
             ),
             FilePattern(
-                "Urban Pattern",
-                r"ciudad|local|metropolitano",
+                "Urbano ID File",
+                r"^\d{9}\.xlsx$",
                 "urbano",
-                priority=7
+                priority=15  # Alta prioridad, porque es un patrón exclusivo
             ),
+
             
             # Patrones para Listados
             FilePattern(
@@ -228,6 +229,11 @@ class AutoLoader:
             Modo detectado o None si no se puede determinar
         """
         filename = file_path.name
+
+        # Añadir caso especial: archivo de 9 dígitos terminado en .xlsx
+        if re.match(r"^\d{9}\.xlsx$", filename):
+            logger.info(f"Archivo {filename} detectado como modo urbano (formato numérico de 9 dígitos)")
+            return "urbano"
         
         # Buscar patrones que coincidan
         matching_patterns = []
@@ -236,15 +242,17 @@ class AutoLoader:
                 matching_patterns.append(pattern)
         
         if not matching_patterns:
+            logger.warning(f"No se pudo detectar modo para archivo: {filename}")
             return None
         
         # Seleccionar patrón con mayor prioridad
         best_pattern = max(matching_patterns, key=lambda p: p.priority)
-        
-        logger.debug(f"Archivo {filename} detectado como modo {best_pattern.mode} "
+
+        logger.info(f"Archivo {filename} detectado como modo {best_pattern.mode} "
                     f"(patrón: {best_pattern.name})")
         
         return best_pattern.mode
+
 
     def get_recent_files(self, mode: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
         """

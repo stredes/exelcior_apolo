@@ -166,7 +166,7 @@ class UrbanoCodeDetector:
             return {
                 "is_urbano": True,  # Mantener como Urbano por el nombre del archivo
                 "header_row": 0,
-                "data_start_row": 1,
+                "data_start_row": 3,
                 "expected_columns": [],
                 "numeric_columns": [],
                 "total_rows": len(df) if df is not None else 0,
