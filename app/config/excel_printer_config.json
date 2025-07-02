@@ -83,18 +83,16 @@
     },
     "listados": {
         "eliminar": [
-            "VENDEDOR",
-            "N\u00ba",
+            "Tipo doc",
+            "Glosa",
+            "Cliente",
             "RUT",
-            "GLOSA",
-            "TIPO_CAMBIO",
-            "MONEDA"
+            "Moneda",
+            "N\u00ba"
         ],
         "sumar": [],
         "mantener_formato": [],
-        "start_row": 0,
-        "nombre_archivo_digitos": [],
-        "vista_previa_fuente": 18
+        "formato_texto": []
     },
     "archivo_codigos_postales": "C:\\Users\\Recepci\u00f3n 2\\Desktop\\SS.MM.GGG\\Codigos Postales SAM.xlsx",
     "archivo_inventario": "C:\\Users\\Recepci\u00f3n 2\\Downloads\\Informe_stock_fisico_20250512_111252.xls"

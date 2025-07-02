@@ -9,6 +9,7 @@ class LogViewer(tk.Toplevel):
         self.title("Visor de Logs")
         self.geometry("1000x600")
         self.configure(bg="#F9FAFB")
+        self.resizable(True, True)
 
         self.log_dir = Path("logs")
         self.logs = []
@@ -17,6 +18,12 @@ class LogViewer(tk.Toplevel):
         self._load_logs()
 
     def _setup_ui(self):
+        top_frame = tk.Frame(self, bg="#F9FAFB")
+        top_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(top_frame, text="🔄 Recargar Logs", command=self._recargar_logs).pack(side=tk.LEFT, padx=5)
+        ttk.Button(top_frame, text="❌ Cerrar", command=self.destroy).pack(side=tk.RIGHT, padx=5)
+
         container = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -49,9 +56,15 @@ class LogViewer(tk.Toplevel):
         self.text_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         self.text_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
 
+        # Estilo de resaltado
+        self.text.tag_configure("error", foreground="red")
+        self.text.tag_configure("info", foreground="black")
+
         container.add(self.text_frame, weight=3)
 
     def _load_logs(self):
+        self.tree.delete(*self.tree.get_children())
+
         if not self.log_dir.exists():
             messagebox.showinfo("Logs", "No hay logs para mostrar.")
             return
@@ -60,6 +73,10 @@ class LogViewer(tk.Toplevel):
         for log in self.logs:
             size_kb = log.stat().st_size // 1024
             self.tree.insert("", "end", values=(log.name, f"{size_kb} KB"))
+
+    def _recargar_logs(self):
+        self._load_logs()
+        self.text.delete("1.0", tk.END)
 
     def _mostrar_contenido_log(self, event):
         selected = self.tree.selection()
@@ -72,8 +89,12 @@ class LogViewer(tk.Toplevel):
 
         try:
             with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                contenido = f.read()
-            self.text.delete("1.0", tk.END)
-            self.text.insert(tk.END, contenido)
+                self.text.delete("1.0", tk.END)
+                for line in f:
+                    if any(err in line.upper() for err in ["ERROR", "CRÍTICO", "FATAL"]):
+                        self.text.insert(tk.END, line, "error")
+                    else:
+                        self.text.insert(tk.END, line, "info")
+                self.text.see(tk.END)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo leer el archivo:\n{e}")

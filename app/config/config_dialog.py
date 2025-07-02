@@ -1,10 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
-import json
-from pathlib import Path
 from typing import List, Set, Dict
-from app.db.utils_db import CONFIG_FILE, save_config
-
+from app.utils.utils import save_config  # ← Importa desde el nuevo módulo correcto
 
 class ConfigDialog(tk.Toplevel):
     def __init__(self, parent: tk.Tk, mode: str, available_columns: List[str], config_columns: Dict[str, Dict[str, Set[str]]]) -> None:
@@ -36,7 +33,7 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_eliminar.insert(tk.END, col)
 
-        # Columnas para sumar
+        # Columnas para sumar (solo en ciertos modos)
         if self.mode in ("urbano", "fedex", "listados"):
             frame_sumar = ttk.LabelFrame(container, text="Columnas para sumatorias", padding=10)
             frame_sumar.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
@@ -49,7 +46,7 @@ class ConfigDialog(tk.Toplevel):
         else:
             self.listbox_sumar = None
 
-        # Columnas a preservar formato original
+        # Columnas a preservar formato
         frame_preservar = ttk.LabelFrame(container, text="Preservar formato original", padding=10)
         frame_preservar.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         self.listbox_preservar = tk.Listbox(frame_preservar, selectmode="extended", font=("Helvetica", 10), exportselection=False)
@@ -57,7 +54,7 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_preservar.insert(tk.END, col)
 
-        # Columnas a formatear como texto en impresión
+        # Columnas como texto en impresión
         frame_texto = ttk.LabelFrame(container, text="Formato texto en impresión", padding=10)
         frame_texto.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
         self.listbox_formato_texto = tk.Listbox(frame_texto, selectmode="extended", font=("Helvetica", 10), exportselection=False)
@@ -65,13 +62,13 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_formato_texto.insert(tk.END, col)
 
-        # Layout
+        # Layout flexible
         container.columnconfigure(0, weight=1)
         container.columnconfigure(1, weight=1)
         container.rowconfigure(0, weight=1)
         container.rowconfigure(1, weight=1)
 
-        # Botones
+        # Botones de acción
         btn_frame = ttk.Frame(self)
         btn_frame.pack(pady=10)
         ttk.Button(btn_frame, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=5)

@@ -1,52 +1,60 @@
-# M�dulo: printer_inventario_codigo.py
-# Descripci�n: L�gica de impresi�n correspondiente.
-
-# Módulo: printer_inventario_codigo.py
-# Descripción: Lógica de impresión de resultados de consulta por código en el módulo de Inventario
-
-
 from pathlib import Path
 from datetime import datetime
+import pandas as pd
+import tempfile
+import os
+import platform
+import subprocess
 
 from app.core.logger_eventos import log_evento
 
-def imprimir_inventario_por_codigo(filepath: Path, df):
+def print_inventario_codigo(df: pd.DataFrame):
     """
-    Imprime desde Excel una consulta filtrada por código de producto.
-    El DataFrame debe tener las columnas ya transformadas.
+    Imprime una consulta filtrada por código desde un DataFrame.
+    Genera un archivo temporal Excel con formato y lo envía a la impresora por sistema operativo.
     """
     try:
-        if not filepath.exists():
-            raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
-
-        
-        excel = None  # Eliminado para compatibilidad Linux
-        excel.Visible = False
-        wb = excel.Workbooks.Open(str(filepath.resolve()))
-        sheet = wb.Sheets(1)
-
-        sheet.Cells.EntireColumn.AutoFit()
+        # Crear archivo temporal Excel
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            temp_path = Path(tmp.name)
 
         fecha = datetime.now().strftime("%d/%m/%Y")
-        sheet.Rows("1:1").Insert()
-        sheet.Cells(1, 1).Value = f"INVENTARIO POR CÓDIGO - {fecha}"
-        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
-        sheet.Cells(1, 1).Font.Bold = True
-        sheet.Cells(1, 1).Font.Size = 12
-        sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
+        titulo = f"INVENTARIO POR CÓDIGO - {fecha}"
 
-        # Bordes
-        for row in range(2, df.shape[0] + 2):
-            for col in range(1, df.shape[1] + 1):
-                cell = sheet.Cells(row, col)
-                cell.Borders.LineStyle = 1
+        # Insertar título y exportar
+        df_to_export = pd.DataFrame(columns=df.columns)
+        df_to_export.loc[0] = [""] * len(df.columns)  # Fila vacía para título
+        df_to_export = pd.concat([df_to_export, df], ignore_index=True)
+        with pd.ExcelWriter(temp_path, engine="openpyxl") as writer:
+            df_to_export.to_excel(writer, index=False, sheet_name="Inventario")
+            sheet = writer.book["Inventario"]
+            sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(df.columns))
+            cell = sheet.cell(row=1, column=1)
+            cell.value = titulo
+            cell.font = cell.font.copy(bold=True, size=12)
+            cell.alignment = cell.alignment.copy(horizontal="center")
 
-        wb.Save()
-        wb.Close(SaveChanges=True)
-        log_evento(f"Impresión por código completada correctamente: {filepath}", "info")
+        log_evento(f"Archivo temporal generado para impresión por código: {temp_path}", "info")
+
+        # Enviar a impresión por sistema operativo
+        _print_excel(temp_path)
+
+        log_evento("Impresión por código completada correctamente.", "info")
 
     except Exception as e:
         log_evento(f"Error en impresión por código: {e}", "error")
-        raise RuntimeError(f"Error en impresión por código: {e}")
+        raise RuntimeError(f"Error al imprimir inventario por código: {e}")
 
-# Linux compatible version: Use openpyxl or external print handling
+def _print_excel(file_path: Path):
+    """
+    Imprime un archivo Excel en función del sistema operativo.
+    """
+    system = platform.system()
+    if system == "Windows":
+        os.startfile(str(file_path), "print")
+    elif system == "Linux":
+        subprocess.run(["libreoffice", "--headless", "--pt", "Default", str(file_path)], check=False)
+    elif system == "Darwin":  # macOS
+        subprocess.run(["lp", str(file_path)], check=False)
+    else:
+        raise OSError("Sistema operativo no compatible para impresión automática.")

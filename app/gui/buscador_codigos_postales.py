@@ -1,25 +1,35 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import threading
 import pandas as pd
 from pathlib import Path
 
 from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import guardar_ultimo_path, load_config_from_file
 
+
 class BuscadorCodigosPostales(tk.Toplevel):
+    """
+    Ventana de búsqueda de códigos postales por comuna o región.
+    Carga un archivo Excel, muestra resultados en un Treeview, y permite copiar el código postal al portapapeles.
+    """
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Buscador de Códigos Postales")
         self.geometry("800x500")
         self.config(bg="#F9FAFB")
 
-        self.df = self._cargar_datos_excel()
-        if self.df.empty:
-            self.destroy()
-            return
-        self._crear_widgets()
+        self.df = pd.DataFrame()
+        self.entrada_busqueda = None
+        self.tree = None
+        self.btn_copiar = None
 
-    def _cargar_datos_excel(self) -> pd.DataFrame:
+        self.label_estado = tk.Label(self, text="Cargando datos...", bg="#F9FAFB", font=("Segoe UI", 11, "italic"))
+        self.label_estado.pack(pady=20)
+
+        threading.Thread(target=self._cargar_datos_excel, daemon=True).start()
+
+    def _cargar_datos_excel(self):
         config = load_config_from_file()
         ruta_config = config.get("archivo_codigos_postales")
 
@@ -29,37 +39,49 @@ class BuscadorCodigosPostales(tk.Toplevel):
                 filetypes=[("Archivos Excel", "*.xlsx *.xls")]
             )
             if not ruta_config:
-                messagebox.showerror("Error", "Archivo no seleccionado.")
-                self.destroy()
-                return pd.DataFrame()
+                self.after(0, lambda: self._mostrar_error("Archivo no seleccionado."))
+                return
             guardar_ultimo_path(ruta_config, clave="archivo_codigos_postales")
             capturar_log_bod1(f"Ruta de códigos postales guardada: {ruta_config}", "info")
 
         try:
-            df = pd.read_excel(ruta_config, header=1)
-            df.columns = df.columns.str.strip()  # Eliminar espacios en los encabezados
+            # Carga el archivo Excel sin encabezado si no los tiene
+            df = pd.read_excel(ruta_config, header=None)
 
-            df.rename(columns={
-                "Comuna/Localidad": "COMUNA",
-                "Provincia": "PROVINCIA",
-                "Region": "REGIÓN",
-                "Codigo Postal": "CÓDIGO POSTAL"
-            }, inplace=True)
+            # Asignar encabezados esperados manualmente si detectamos que no existen
+            if not {"Region", "Comuna/Localidad", "Codigo Postal"}.intersection(set(df.iloc[0].astype(str))):
+                # Asumimos que no tiene encabezado, entonces asignamos manualmente
+                df.columns = ["COMUNA", "PROVINCIA", "REGIÓN", "CÓDIGO POSTAL"]
+            else:
+                df = pd.read_excel(ruta_config, header=1)
+                df.columns = df.columns.str.strip()
+                df.rename(columns={
+                    "Comuna/Localidad": "COMUNA",
+                    "Provincia": "PROVINCIA",
+                    "Region": "REGIÓN",
+                    "Codigo Postal": "CÓDIGO POSTAL"
+                }, inplace=True)
 
             columnas_esperadas = {"REGIÓN", "COMUNA", "CÓDIGO POSTAL"}
             if not columnas_esperadas.issubset(set(df.columns)):
                 raise ValueError(f"Faltan columnas requeridas: {columnas_esperadas - set(df.columns)}")
 
+            self.df = df
             capturar_log_bod1(f"Archivo de códigos postales cargado: {ruta_config}", "info")
-            return df
+            self.after(0, self._crear_widgets)
 
         except Exception as e:
             capturar_log_bod1(f"Error al cargar archivo de códigos postales: {e}", "error")
-            messagebox.showerror("Error", str(e))
-            self.destroy()
-            return pd.DataFrame()
+            self.after(0, lambda: self._mostrar_error(f"No se pudo cargar el archivo:\n{e}"))
+
+    def _mostrar_error(self, mensaje):
+        messagebox.showerror("Error", mensaje)
+        self.destroy()
 
     def _crear_widgets(self):
+        if hasattr(self, "label_estado"):
+            self.label_estado.destroy()
+
         frame_busqueda = tk.Frame(self, bg="#F9FAFB")
         frame_busqueda.pack(pady=10)
 
@@ -103,14 +125,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
         else:
             for _, row in df_filtrado.iterrows():
                 self.tree.insert("", "end", values=(row["REGIÓN"], row["COMUNA"], row["CÓDIGO POSTAL"]))
-            capturar_log_bod1(f"Búsqueda exitosa: '{termino}', resultados: {len(df_filtrado)}", "info")
+            capturar_log_bod1(f"Búsqueda: '{termino}', resultados: {len(df_filtrado)}", "info")
 
     def _habilitar_boton_copiar(self, event=None):
         seleccion = self.tree.selection()
-        if seleccion:
-            self.btn_copiar["state"] = "normal"
-        else:
-            self.btn_copiar["state"] = "disabled"
+        self.btn_copiar["state"] = "normal" if seleccion else "disabled"
 
     def _copiar_codigo_postal(self):
         seleccion = self.tree.selection()

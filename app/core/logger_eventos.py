@@ -2,21 +2,22 @@ import logging
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 
+# --- Configuración del logger de eventos funcionales ---
 def _setup_eventos_logger():
-    # Ruta consistente desde cualquier ubicación de ejecución
+    # Calcula la ruta base del proyecto
     base_dir = Path(__file__).resolve().parent.parent
     logs_dir = base_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    eventos_log = logs_dir / "eventos.log"
+    log_file = logs_dir / "eventos.log"
     logger = logging.getLogger("eventos_logger")
     logger.setLevel(logging.INFO)
 
-    # Evita añadir múltiples handlers
     if not logger.handlers:
         handler = TimedRotatingFileHandler(
-            eventos_log,
+            log_file,
             when="midnight",
+            interval=1,
             backupCount=30,
             encoding="utf-8"
         )
@@ -28,11 +29,18 @@ def _setup_eventos_logger():
 
     return logger
 
+
+# Logger global de eventos funcionales
 _eventos_logger = _setup_eventos_logger()
 
+# --- Función para registrar eventos funcionales ---
 def log_evento(mensaje: str, nivel: str = "info"):
     """
-    Loguea un evento funcional en 'logs/eventos.log' con el nivel dado.
+    Registra un evento funcional de la aplicación en 'logs/eventos.log'.
+
+    Args:
+        mensaje (str): Descripción del evento.
+        nivel (str): Nivel del evento: info, warning, error, etc.
     """
     nivel = nivel.lower()
     log_func = {
@@ -45,5 +53,5 @@ def log_evento(mensaje: str, nivel: str = "info"):
 
     log_func(mensaje)
 
-# Alias para compatibilidad
+# ⚠️ Alias legado (se eliminará próximamente)
 capturar_log_bod1 = log_evento
