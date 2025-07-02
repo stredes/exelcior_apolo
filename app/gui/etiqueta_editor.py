@@ -1,10 +1,12 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
+from pathlib import Path
+import pandas as pd
+from datetime import datetime
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
+import tkinter as tk
+from tkinter import ttk, messagebox
+import win32api
+import win32print
 
 # Cargar datos de clientes desde Excel
 def cargar_clientes(path_excel):
@@ -50,6 +52,22 @@ def generar_etiqueta_pdf(data, output_path):
 
     c.save()
 
+# Imprimir PDF directamente en la impresora URBANO
+def imprimir_pdf(path):
+    printer_name = "URBANO"
+    try:
+        win32print.SetDefaultPrinter(printer_name)
+        win32api.ShellExecute(
+            0,
+            "print",
+            str(path),
+            None,
+            ".",
+            0
+        )
+    except Exception as e:
+        messagebox.showerror("Error al imprimir", f"No se pudo imprimir:\n{e}")
+
 # Interfaz Tkinter
 def crear_editor_etiqueta(df_clientes):
     root = tk.Tk()
@@ -94,14 +112,14 @@ def crear_editor_etiqueta(df_clientes):
 
     entradas["rut"].bind("<Return>", cargar_datos_cliente)
 
-    def generar_pdf():
+    def generar_y_imprimir():
         data = {k: v.get() for k, v in entradas.items()}
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = Path.cwd() / f"etiqueta_{data['rut']}_{timestamp}.pdf"
         generar_etiqueta_pdf(data, output_path)
-        messagebox.showinfo("Etiqueta generada", f"Etiqueta guardada en:\n{output_path}")
+        imprimir_pdf(output_path)
 
-    ttk.Button(frame, text="Generar Etiqueta PDF", command=generar_pdf).grid(row=len(campos), column=0, columnspan=2, pady=15)
+    ttk.Button(frame, text="Imprimir Etiqueta", command=generar_y_imprimir).grid(row=len(campos), column=0, columnspan=2, pady=15)
 
     root.mainloop()
 
@@ -110,3 +128,4 @@ if __name__ == "__main__":
     excel_path = "etiqueta pedido.xlsx"  # Asegúrate de que esté en el mismo directorio
     df_clientes = cargar_clientes(excel_path)
     crear_editor_etiqueta(df_clientes)
+

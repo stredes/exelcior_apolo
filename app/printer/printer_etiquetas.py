@@ -1,29 +1,56 @@
-# M�dulo: printer_etiquetas.py
-# Descripci�n: L�gica de impresi�n correspondiente.
-
-# Módulo: printer_etiquetas.py
-# Descripción: Lógica de impresión de etiquetas (Zebra o similares)
-
-import os
+import pandas as pd
 from pathlib import Path
-from datetime import datetime
-from tkinter import messagebox
-from app.core.logger_eventos import log_evento
+import openpyxl
+import pythoncom
+from win32com.client import Dispatch
+import logging
 
-def imprimir_etiquetas_zebra(etiquetas: list[str], puerto: str = "LPT1"):
+def generar_archivo_etiquetas(df: pd.DataFrame, output_path: Path):
     """
-    Envía líneas de código ZPL directamente a una impresora Zebra conectada al puerto especificado.
+    Genera un archivo Excel con formato tipo etiqueta (una etiqueta por página).
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Etiqueta"
+
+    columnas = df.columns.tolist()
+    for row in df.itertuples(index=False):
+        for col, val in zip(columnas, row):
+            ws.append([f"{col}: {val}"])
+        ws.append(["Guía: " + str(row[0])])  # Guía al final si deseas
+        ws.append([""])  # Espacio entre etiquetas
+
+    wb.save(output_path)
+
+def imprimir_archivo_excel(ruta_archivo: Path, impresora: str = "URBANO"):
+    """
+    Imprime el archivo Excel en la impresora especificada de forma silenciosa.
     """
     try:
-        if not etiquetas:
-            raise ValueError("La lista de etiquetas está vacía.")
+        pythoncom.CoInitialize()
+        excel = Dispatch("Excel.Application")
+        excel.Visible = False
 
-        with open(puerto, "w", encoding="utf-8") as printer:
-            for zpl in etiquetas:
-                printer.write(zpl + "\n")
+        wb = excel.Workbooks.Open(str(ruta_archivo.resolve()))
+        hoja = wb.Sheets(1)
+        hoja.Columns.AutoFit()
 
-        log_evento(f"{len(etiquetas)} etiquetas enviadas a {puerto}", "info")
+        excel.ActivePrinter = impresora
+        hoja.PrintOut()
 
+        wb.Close(SaveChanges=False)
+        excel.Quit()
     except Exception as e:
-        log_evento(f"Error al imprimir etiquetas: {e}", "error")
-        messagebox.showerror("Error", f"No se pudo imprimir etiquetas: {e}")
+        logging.error(f"Error al imprimir etiquetas: {e}")
+        raise
+
+def print_etiquetas(_, config_columns: dict, df: pd.DataFrame):
+    """
+    Punto de entrada para impresión de etiquetas desde el sistema.
+    """
+    try:
+        temp_path = Path("temp_etiquetas.xlsx")
+        generar_archivo_etiquetas(df, temp_path)
+        imprimir_archivo_excel(temp_path, impresora="URBANO")
+    except Exception as e:
+        logging.error(f"No se pudo imprimir etiquetas: {e}")
