@@ -1,1 +1,0 @@
-from .validate_config_structure import validate_config_structure

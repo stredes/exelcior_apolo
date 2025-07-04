@@ -10,8 +10,7 @@ from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
-from app.db.database import init_db, save_file_history
-from app.db.database import save_print_history 
+from app.db.database import init_db, save_file_history, save_print_history
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import load_config
@@ -219,7 +218,6 @@ class ExcelPrinterApp(tk.Tk):
 
             imprimir(None, self.config_columns, self.transformed_df)
 
-            # Registro de la impresión en la base de datos
             save_print_history(
                 archivo=f"{self.mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 observacion=f"Impresión realizada en modo '{self.mode}'"
@@ -300,7 +298,6 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
-
 
 def main():
     app = ExcelPrinterApp()

@@ -1,83 +1,74 @@
+# app/utils/utils.py
+
 import json
 from pathlib import Path
-from app.core.logger_eventos import capturar_log_bod1
-from app.utils.paths import CONFIG_PATH  # ← Se importa la ruta centralizada
+from app.core.logger_eventos import log_evento
+from app.utils.validate_config_structure import validate_config_structure
 
-# ---------- Cargar Configuración ----------
+from app.utils.paths import CONFIG_PATH
+
+# === CONFIGURACIÓN ===
+# Archivo de configuración principal del sistema (excel_printer_config.json)
+# Se espera que este archivo esté ubicado junto al ejecutable o en la raíz del proyecto
+# Claves comunes:
+# - "fedex", "urbano", "listados" → config de transformación
+# - "ultimo_archivo_excel", "archivo_inventario", "archivo_codigos_postales" → últimas rutas usadas
+
+# --- Cargar configuración JSON ---
 def load_config() -> dict:
     """
-    Carga la configuración desde el archivo JSON principal.
-    Retorna un diccionario con la configuración o uno vacío en caso de error.
+    Carga el archivo de configuración desde la ruta definida en CONFIG_PATH.
+    Si el archivo no existe o está corrupto, retorna un diccionario vacío.
+    Valida y completa estructura si hay campos faltantes.
     """
-    if CONFIG_PATH.exists():
-        try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    try:
+        config_file = Path(CONFIG_PATH)
+        if config_file.exists():
+            with config_file.open("r", encoding="utf-8") as f:
                 config = json.load(f)
                 config = validate_config_structure(config)
-                capturar_log_bod1("Configuración cargada correctamente", nivel="info")
+                log_evento("✅ Configuración cargada correctamente.")
                 return config
-        except Exception as e:
-            capturar_log_bod1(f"Error al cargar configuración: {e}", nivel="error")
+        else:
+            log_evento("⚠️ Archivo de configuración no encontrado. Se usará configuración vacía.", "warning")
             return {}
-    else:
-        capturar_log_bod1("Archivo de configuración no encontrado. Se cargará configuración vacía", nivel="warning")
+    except Exception as e:
+        log_evento(f"❌ Error al cargar configuración: {e}", "error")
         return {}
 
-# Alias directo por si se desea importar con otro nombre
-def load_config_from_file() -> dict:
-    return load_config()
-
-# ---------- Guardar Configuración ----------
+# --- Guardar configuración JSON ---
 def save_config(config_data: dict):
     """
-    Guarda la configuración como JSON en el archivo de configuración principal.
-    Convierte automáticamente los sets a listas para compatibilidad con JSON.
+    Guarda el diccionario de configuración en formato JSON.
+    Convierte automáticamente sets a listas (porque JSON no admite sets).
     """
-    def convert_sets(obj):
-        if isinstance(obj, set):
-            return list(obj)
-        elif isinstance(obj, dict):
-            return {k: convert_sets(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_sets(i) for i in obj]
-        return obj
-
     try:
-        serializable_data = convert_sets(config_data)
-        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(serializable_data, f, indent=4)
-        capturar_log_bod1("Configuración guardada correctamente.", nivel="info")
+        def convert_sets(obj):
+            if isinstance(obj, set):
+                return list(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_sets(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_sets(i) for i in obj]
+            return obj
+
+        cleaned_config = convert_sets(config_data)
+        with Path(CONFIG_PATH).open("w", encoding="utf-8") as f:
+            json.dump(cleaned_config, f, indent=4, ensure_ascii=False)
+        log_evento("💾 Configuración guardada correctamente.")
     except Exception as e:
-        capturar_log_bod1(f"Error al guardar configuración: {e}", nivel="error")
+        log_evento(f"❌ Error al guardar configuración: {e}", "error")
 
-# ---------- Validación de estructura de configuración ----------
-def validate_config_structure(config: dict) -> dict:
-    """
-    Asegura que la configuración tenga todas las claves necesarias por modo.
-    Si falta alguna sección, la inicializa con valores por defecto.
-    """
-    modos = ["fedex", "urbano", "listados"]
-    for modo in modos:
-        if modo not in config:
-            config[modo] = {}
-        config[modo].setdefault("eliminar", [])
-        config[modo].setdefault("sumar", [])
-        config[modo].setdefault("mantener_formato", [])
-        config[modo].setdefault("start_row", 0)
-        config[modo].setdefault("nombre_archivo_digitos", [])
-        config[modo].setdefault("vista_previa_fuente", 10)
-    return config
-
-# ---------- Guardar ruta de último archivo usado ----------
+# --- Guardar ruta de último archivo procesado ---
 def guardar_ultimo_path(path_str: str, clave: str = "ultimo_archivo_excel"):
     """
-    Guarda la ruta del último archivo Excel procesado, para reabrirlo más adelante.
+    Guarda la ruta del último archivo usado en la configuración JSON bajo una clave determinada.
+
+    Args:
+        path_str (str): Ruta absoluta del archivo.
+        clave (str): Clave donde guardar la ruta. Ej: 'archivo_inventario', 'archivo_codigos_postales'.
     """
-    try:
-        config = load_config()
-        config[clave] = str(Path(path_str).resolve())
-        save_config(config)
-        capturar_log_bod1(f"Ruta guardada en config ({clave}): {path_str}", nivel="info")
-    except Exception as e:
-        capturar_log_bod1(f"Error al guardar ruta en config: {e}", nivel="error")
+    config = load_config()
+    config[clave] = str(path_str)
+    save_config(config)
+    log_evento(f"📍 Ruta actualizada en configuración: {clave} = {path_str}")

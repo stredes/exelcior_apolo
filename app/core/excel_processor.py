@@ -3,29 +3,13 @@ from pathlib import Path
 from typing import Optional, Tuple
 from datetime import datetime
 import platform
-import json
-import logging
 
 from app.core.logger_eventos import log_evento
-from app.utils import validate_config_structure
+from app.config.config_manager import load_config, save_config  # ✅ Config centralizada
 
 if platform.system() == "Windows":
     import pythoncom
     from win32com.client import Dispatch
-
-CONFIG_PATH = Path("app/config/excel_printer_config.json")
-
-
-def load_config() -> dict:
-    try:
-        with CONFIG_PATH.open(encoding='utf-8') as f:
-            config = json.load(f)
-        validate_config_structure(config)
-        log_evento("Configuración cargada correctamente.", "info")
-        return config
-    except Exception as e:
-        log_evento(f"Error al cargar configuración: {e}", "error")
-        return {}
 
 
 def validate_file(file_path: str) -> Tuple[bool, str]:
