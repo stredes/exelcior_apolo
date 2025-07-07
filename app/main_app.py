@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+# Módulos internos
 from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
@@ -32,13 +33,17 @@ class ExcelPrinterApp(tk.Tk):
         self.transformed_df = None
         self.mode = "listados"
         self.processing = False
-        self.config_columns = load_config() if isinstance(load_config(), dict) else {}
+
+        config = load_config()
+        self.config_columns = config if isinstance(config, dict) else {}
         self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
         self._setup_styles()
         self._setup_sidebar()
         self._setup_main_area()
         self._setup_status_bar()
+
+    # ------------------- Setup Estilos y UI -------------------
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -92,6 +97,8 @@ class ExcelPrinterApp(tk.Tk):
         ttk.Label(self, textvariable=self.status_var, relief=tk.SUNKEN,
                   anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
 
+    # ------------------- Funciones UI y navegación -------------------
+
     def _update_status(self, mensaje: str):
         self.status_var.set(mensaje)
 
@@ -115,6 +122,8 @@ class ExcelPrinterApp(tk.Tk):
         )
         messagebox.showinfo("Acerca de", mensaje)
 
+    # ------------------- Carga de Archivos -------------------
+
     def _threaded_select_file(self):
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
         if path and validate_file(path):
@@ -135,18 +144,15 @@ class ExcelPrinterApp(tk.Tk):
                 self._process_file(str(archivo))
             elif estado == "no_match":
                 self._update_status("⚠️ No se encontraron archivos compatibles.")
-                self.after(0, lambda: messagebox.showwarning("Sin coincidencias",
-                                                             f"No hay archivos válidos para el modo '{self.mode}'"))
+                self.after(0, lambda: messagebox.showwarning("Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'"))
             elif estado == "empty_folder":
                 self._update_status("📂 Carpeta vacía o inexistente.")
-                self.after(0, lambda: messagebox.showerror("Carpeta vacía",
-                                                           "La carpeta de descargas está vacía o no existe."))
+                self.after(0, lambda: messagebox.showerror("Carpeta vacía", "La carpeta de descargas está vacía o no existe."))
             else:
                 self._update_status("❌ Error en la autocarga.")
         except Exception as e:
-            error_message = str(e)
-            logging.error(f"Error en carga automática: {error_message}")
-            self.after(0, lambda: messagebox.showerror("Error", error_message))
+            logging.error(f"Error en carga automática: {e}")
+            self.after(0, lambda: messagebox.showerror("Error", str(e)))
         finally:
             self.processing = False
 
@@ -154,20 +160,18 @@ class ExcelPrinterApp(tk.Tk):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento: {path}", "info")
         try:
-            if not isinstance(self.config_columns, dict):
-                raise ValueError("La configuración cargada no es válida. Se esperaba un diccionario.")
-
             self.df = load_excel(path, self.config_columns, self.mode)
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
             save_file_history(path, self.mode)
             self.after(0, self._show_preview)
         except Exception as e:
-            error_message = str(e)
-            logging.error(f"Error procesando archivo: {error_message}")
-            self.after(0, lambda: messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{error_message}"))
+            logging.error(f"Error procesando archivo: {e}")
+            self.after(0, lambda: messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{e}"))
         finally:
             self.processing = False
             self._update_status("Listo")
+
+    # ------------------- Vista previa e impresión -------------------
 
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
@@ -232,6 +236,8 @@ class ExcelPrinterApp(tk.Tk):
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
             self.after(0, lambda: messagebox.showerror("Error", f"Error al imprimir:\n{e}"))
+
+    # ------------------- Configuración y herramientas -------------------
 
     def _open_config_menu(self):
         if self.df is None:

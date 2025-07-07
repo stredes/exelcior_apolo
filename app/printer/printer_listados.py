@@ -1,59 +1,34 @@
-# M�dulo: printer_listados.py
-# Descripci�n: L�gica de impresi�n correspondiente.
-
 # Módulo: printer_listados.py
-# Descripción: Lógica de impresión para Listados Generales
+# Descripción: Impresión de Listados Generales con formato unificado multiplataforma.
 
-
-
-from pathlib import Path
 from datetime import datetime
+import pandas as pd
+from pathlib import Path
+
 from app.core.logger_eventos import log_evento
+from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
 
 
-def imprimir_listado_general(filepath: Path, df):
+def imprimir_listado_general(df: pd.DataFrame):
+    """
+    Imprime un listado general aplicando título, bordes, centrado y formato en Excel.
+    El archivo generado se envía directamente a la impresora predeterminada.
+    """
     try:
-        if not filepath.exists():
-            raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
+        if df.empty:
+            raise ValueError("El DataFrame del listado general está vacío.")
 
-        
-        excel = None  # Eliminado para compatibilidad Linux
-        excel.Visible = False
-        wb = excel.Workbooks.Open(str(filepath.resolve()))
-        sheet = wb.Sheets(1)
+        fecha = datetime.now().strftime("%d/%m/%Y")
+        titulo = f"LISTADO GENERAL - {fecha}"
 
-        # Autoajuste de columnas
-        sheet.Cells.EntireColumn.AutoFit()
+        archivo_temporal: Path = generar_excel_temporal(df, titulo, sheet_name="Listado")
 
-        # Título genérico con fecha
-        fecha_actual = datetime.now().strftime("%d/%m/%Y")
-        titulo = f"LISTADO GENERAL - {fecha_actual}"
+        log_evento(f"📄 Archivo temporal generado para Listado General: {archivo_temporal}", "info")
 
-        sheet.Rows("1:1").Insert()
-        sheet.Cells(1, 1).Value = titulo
-        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
-        sheet.Cells(1, 1).Font.Bold = True
-        sheet.Cells(1, 1).Font.Size = 12
-        sheet.Cells(1, 1).HorizontalAlignment = -4108
+        enviar_a_impresora(archivo_temporal)
 
-        # Centrar contenido
-        sheet.Range(
-            sheet.Cells(2, 1),
-            sheet.Cells(df.shape[0] + 2, df.shape[1])
-        ).HorizontalAlignment = -4108
+        log_evento("✅ Impresión de Listado General completada correctamente.", "info")
 
-        # Cuadriculado
-        for row in range(2, df.shape[0] + 2):
-            for col in range(1, df.shape[1] + 1):
-                cell = sheet.Cells(row, col)
-                cell.Borders.LineStyle = 1
-
-        wb.Save()
-        wb.Close(SaveChanges=True)
-        log_evento(f"Impresión Listado General completada: {filepath}", "info")
-
-    except Exception as e:
-        log_evento(f"Error en impresión Listado General: {e}", "error")
-        raise
-
-# Linux compatible version: Use openpyxl or external print handling
+    except Exception as error:
+        log_evento(f"❌ Error al imprimir Listado General: {error}", "error")
+        raise RuntimeError(f"Error en impresión Listado General: {error}")
