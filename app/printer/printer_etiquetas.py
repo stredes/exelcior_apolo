@@ -1,56 +1,60 @@
-import pandas as pd
-from pathlib import Path
+import shutil
 import openpyxl
 import pythoncom
 from win32com.client import Dispatch
-import logging
+from pathlib import Path
 
-def generar_archivo_etiquetas(df: pd.DataFrame, output_path: Path):
+# Rutas
+PLANTILLA_PATH = Path("data/etiqueta pedido.xlsx")
+OUTPUT_PATH = Path("temp/etiqueta_impresion.xlsx")  # temporal
+
+# Mapeo de datos a celdas
+CELDAS_MAP = {
+    "rut": "B2",
+    "razsoc": "B3",
+    "dir": "B4",
+    "comuna": "B5",
+    "ciudad": "B6",
+    "guia": "B7",
+    "bultos": "B8",
+    "transporte": "B9"
+}
+
+DEFAULT_PRINTER = "URBANO"  # puedes cambiarlo por otro
+
+def generar_etiqueta_excel(data: dict, output_path: Path):
     """
-    Genera un archivo Excel con formato tipo etiqueta (una etiqueta por página).
+    Llena la plantilla Excel con los datos de la etiqueta.
     """
-    wb = openpyxl.Workbook()
+    shutil.copy(PLANTILLA_PATH, output_path)
+    wb = openpyxl.load_workbook(output_path)
     ws = wb.active
-    ws.title = "Etiqueta"
 
-    columnas = df.columns.tolist()
-    for row in df.itertuples(index=False):
-        for col, val in zip(columnas, row):
-            ws.append([f"{col}: {val}"])
-        ws.append(["Guía: " + str(row[0])])  # Guía al final si deseas
-        ws.append([""])  # Espacio entre etiquetas
+    for campo, celda in CELDAS_MAP.items():
+        ws[celda] = data.get(campo, "")
 
     wb.save(output_path)
 
-def imprimir_archivo_excel(ruta_archivo: Path, impresora: str = "URBANO"):
+def imprimir_excel(path: Path, impresora: str = DEFAULT_PRINTER):
     """
-    Imprime el archivo Excel en la impresora especificada de forma silenciosa.
+    Imprime el archivo Excel usando COM (solo Windows).
     """
-    try:
-        pythoncom.CoInitialize()
-        excel = Dispatch("Excel.Application")
-        excel.Visible = False
+    pythoncom.CoInitialize()
+    excel = Dispatch("Excel.Application")
+    excel.Visible = False
+    libro = excel.Workbooks.Open(str(path.resolve()))
+    hoja = libro.Sheets(1)
+    hoja.PageSetup.Zoom = False
+    hoja.PageSetup.FitToPagesWide = 1
+    hoja.PageSetup.FitToPagesTall = 1
+    excel.ActivePrinter = impresora
+    hoja.PrintOut()
+    libro.Close(False)
+    excel.Quit()
 
-        wb = excel.Workbooks.Open(str(ruta_archivo.resolve()))
-        hoja = wb.Sheets(1)
-        hoja.Columns.AutoFit()
-
-        excel.ActivePrinter = impresora
-        hoja.PrintOut()
-
-        wb.Close(SaveChanges=False)
-        excel.Quit()
-    except Exception as e:
-        logging.error(f"Error al imprimir etiquetas: {e}")
-        raise
-
-def print_etiquetas(_, config_columns: dict, df: pd.DataFrame):
+def imprimir_etiqueta_desde_formulario(data: dict, impresora: str = DEFAULT_PRINTER):
     """
-    Punto de entrada para impresión de etiquetas desde el sistema.
+    Flujo completo: generar archivo y enviarlo a impresión.
     """
-    try:
-        temp_path = Path("temp_etiquetas.xlsx")
-        generar_archivo_etiquetas(df, temp_path)
-        imprimir_archivo_excel(temp_path, impresora="URBANO")
-    except Exception as e:
-        logging.error(f"No se pudo imprimir etiquetas: {e}")
+    generar_etiqueta_excel(data, OUTPUT_PATH)
+    imprimir_excel(OUTPUT_PATH, impresora)

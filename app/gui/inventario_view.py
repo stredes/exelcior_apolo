@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import pandas as pd
 from pathlib import Path
 
-from app.utils.utils import guardar_ultimo_path, load_config_from_file
+from app.utils.utils import guardar_ultimo_path, load_config
 from app.core.logger_eventos import capturar_log_bod1
 from app.printer import printer_inventario_codigo, printer_inventario_ubicacion
 
@@ -46,7 +46,7 @@ class InventarioView(tk.Toplevel):
         self.tree.pack(padx=10, pady=10, fill="both", expand=True)
 
     def _cargar_o_pedir_archivo(self):
-        config = load_config_from_file()
+        config = load_config()
         ruta = config.get("archivo_inventario")
         if ruta and Path(ruta).exists():
             self._leer_excel(Path(ruta))

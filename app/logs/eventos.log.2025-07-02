@@ -1,0 +1,162 @@
+2025-07-02 08:33:20,634 - WARNING - Archivo de configuración no encontrado. Se cargará configuración vacía
+2025-07-02 08:33:30,939 - WARNING - Archivo de configuración no encontrado. Se cargará configuración vacía
+2025-07-02 08:33:38,015 - WARNING - Archivo de configuración no encontrado. Se cargará configuración vacía
+2025-07-02 08:33:38,015 - INFO - Configuración guardada correctamente.
+2025-07-02 08:33:38,015 - INFO - Ruta guardada en config (archivo_inventario): C:/Users/Recepción 2/Desktop/SS.MM.GGG/Informe_stock_fisico_20250618_114935.xls
+2025-07-02 08:33:38,015 - INFO - Ruta de inventario guardada: C:/Users/Recepción 2/Desktop/SS.MM.GGG/Informe_stock_fisico_20250618_114935.xls
+2025-07-02 08:33:38,390 - INFO - Archivo de inventario cargado: C:/Users/Recepción 2/Desktop/SS.MM.GGG/Informe_stock_fisico_20250618_114935.xls
+2025-07-02 09:11:01,589 - INFO - Configuración cargada correctamente
+2025-07-02 09:11:10,202 - INFO - Configuración cargada correctamente
+2025-07-02 09:11:17,424 - INFO - Configuración cargada correctamente
+2025-07-02 09:11:17,429 - INFO - Configuración guardada correctamente.
+2025-07-02 09:11:17,429 - INFO - Ruta guardada en config (archivo_codigos_postales): C:/Users/Recepción 2/Desktop/SS.MM.GGG/Codigos Postales SAM.xlsx
+2025-07-02 09:11:17,430 - INFO - Ruta de códigos postales guardada: C:/Users/Recepción 2/Desktop/SS.MM.GGG/Codigos Postales SAM.xlsx
+2025-07-02 09:11:17,729 - ERROR - Error al cargar archivo de códigos postales: Faltan columnas requeridas: {'COMUNA', 'REGIÓN', 'CÓDIGO POSTAL'}
+2025-07-02 09:11:23,817 - INFO - Configuración cargada correctamente
+2025-07-02 09:11:24,267 - ERROR - Error al cargar archivo de códigos postales: Faltan columnas requeridas: {'COMUNA', 'REGIÓN', 'CÓDIGO POSTAL'}
+2025-07-02 09:11:32,380 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 09:11:32,592 - INFO - Aplicando transformación para modo: urbano
+2025-07-02 09:11:35,893 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 09:11:36,380 - INFO - Aplicando transformación para modo: fedex
+2025-07-02 09:11:40,387 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:11:40,432 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:15:56,592 - INFO - Aplicando transformación para modo: urbano
+2025-07-02 09:15:59,947 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 09:16:00,102 - INFO - Aplicando transformación para modo: urbano
+2025-07-02 09:16:06,152 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 09:16:06,442 - INFO - Aplicando transformación para modo: fedex
+2025-07-02 09:16:19,040 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:16:19,208 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:18:58,835 - INFO - Configuración cargada correctamente
+2025-07-02 09:19:07,935 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:19:08,279 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:34:25,383 - INFO - Configuración cargada correctamente
+2025-07-02 09:34:41,678 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:34:41,865 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:34:57,614 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:36:20,328 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:36:21,546 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:36:21,702 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:36:35,506 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_081357.xlsx
+2025-07-02 09:36:35,615 - INFO - Aplicando transformación para modo: listados
+2025-07-02 09:36:38,291 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 09:36:38,611 - INFO - Aplicando transformación para modo: fedex
+2025-07-02 09:37:03,739 - INFO - Aplicando transformación para modo: urbano
+2025-07-02 09:37:04,900 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 09:37:05,087 - INFO - Aplicando transformación para modo: urbano
+2025-07-02 09:37:24,409 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 09:37:24,644 - INFO - Aplicando transformación para modo: fedex
+2025-07-02 09:41:29,936 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_093918.xlsx
+2025-07-02 09:41:30,061 - INFO - Aplicando transformación para modo: listados
+2025-07-02 10:07:17,578 - INFO - Configuración cargada correctamente
+2025-07-02 10:07:42,381 - INFO - Configuración cargada correctamente
+2025-07-02 10:07:43,282 - ERROR - Error al cargar archivo de códigos postales: Faltan columnas requeridas: {'COMUNA', 'REGIÓN', 'CÓDIGO POSTAL'}
+2025-07-02 13:50:07,576 - INFO - Configuración cargada correctamente
+2025-07-02 13:50:47,358 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_112829.xlsx
+2025-07-02 13:50:47,889 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250702_112829.xlsx
+2025-07-02 13:50:47,889 - INFO - Transformando datos para modo: listados
+2025-07-02 13:50:47,921 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 13:50:47,921 - INFO - Columnas convertidas a texto: []
+2025-07-02 13:51:19,214 - INFO - Iniciando procesamiento: C:/Users/Recepción 2/Desktop/SS.MM.GGG/lista_doc_venta_20250619_165518.xlsx
+2025-07-02 13:51:19,276 - INFO - Archivo cargado: C:/Users/Recepción 2/Desktop/SS.MM.GGG/lista_doc_venta_20250619_165518.xlsx
+2025-07-02 13:51:19,276 - INFO - Transformando datos para modo: listados
+2025-07-02 13:51:19,292 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 13:51:19,292 - INFO - Columnas convertidas a texto: []
+2025-07-02 13:51:42,770 - INFO - Iniciando procesamiento: C:/Users/Recepción 2/Downloads/Shipment_Report_2025-06-30.xlsx
+2025-07-02 13:51:42,950 - INFO - Archivo cargado: C:/Users/Recepción 2/Downloads/Shipment_Report_2025-06-30.xlsx
+2025-07-02 13:51:42,951 - INFO - Transformando datos para modo: fedex
+2025-07-02 13:51:42,959 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 13:51:42,972 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 13:51:42,975 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 13:51:56,279 - INFO - Iniciando procesamiento: C:/Users/Recepción 2/Downloads/561869281.xlsx
+2025-07-02 13:51:56,404 - INFO - Archivo cargado: C:/Users/Recepción 2/Downloads/561869281.xlsx
+2025-07-02 13:51:56,404 - INFO - Transformando datos para modo: urbano
+2025-07-02 13:51:56,404 - INFO - Columnas eliminadas: ['AGENCIA', 'PESO', 'DIAS', 'SHIPPER', 'SERVICIO', 'ESTADO']
+2025-07-02 13:51:56,404 - INFO - Columnas sumadas: ['PIEZAS']
+2025-07-02 13:51:56,420 - INFO - Columnas convertidas a texto: ['PIEZAS']
+2025-07-02 13:52:02,482 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 13:52:02,591 - INFO - Archivo cargado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 13:52:02,607 - INFO - Transformando datos para modo: listados
+2025-07-02 13:52:02,607 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 13:52:02,607 - INFO - Columnas convertidas a texto: []
+2025-07-02 13:52:05,920 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 13:52:06,195 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 13:52:06,207 - INFO - Transformando datos para modo: fedex
+2025-07-02 13:52:06,222 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 13:52:06,244 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 13:52:06,250 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 13:52:09,441 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 13:52:09,598 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 13:52:09,598 - INFO - Transformando datos para modo: urbano
+2025-07-02 13:52:09,598 - INFO - Columnas eliminadas: ['AGENCIA', 'PESO', 'DIAS', 'SHIPPER', 'SERVICIO', 'ESTADO']
+2025-07-02 13:52:09,613 - INFO - Columnas sumadas: ['PIEZAS']
+2025-07-02 13:52:09,629 - INFO - Columnas convertidas a texto: ['PIEZAS']
+2025-07-02 13:52:16,695 - INFO - Transformando datos para modo: urbano
+2025-07-02 13:52:16,710 - INFO - Columnas eliminadas: ['AGENCIA', 'PESO', 'DIAS', 'SHIPPER', 'SERVICIO', 'ESTADO']
+2025-07-02 13:52:16,757 - INFO - Columnas sumadas: ['PIEZAS']
+2025-07-02 13:52:16,763 - INFO - Columnas convertidas a texto: ['PIEZAS']
+2025-07-02 14:00:28,302 - INFO - Configuración cargada correctamente
+2025-07-02 14:00:37,025 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:00:37,135 - INFO - Archivo cargado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:00:37,135 - INFO - Transformando datos para modo: listados
+2025-07-02 14:00:37,135 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 14:00:37,135 - INFO - Columnas convertidas a texto: []
+2025-07-02 14:00:41,048 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:00:41,316 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:00:41,318 - INFO - Transformando datos para modo: fedex
+2025-07-02 14:00:41,329 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 14:00:41,348 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 14:00:41,353 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 14:00:44,134 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 14:00:44,181 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 14:00:44,181 - INFO - Transformando datos para modo: urbano
+2025-07-02 14:00:44,181 - INFO - Columnas eliminadas: ['AGENCIA', 'PESO', 'DIAS', 'SHIPPER', 'SERVICIO', 'ESTADO']
+2025-07-02 14:00:44,181 - INFO - Columnas sumadas: ['PIEZAS']
+2025-07-02 14:00:44,181 - INFO - Columnas convertidas a texto: ['PIEZAS']
+2025-07-02 14:20:48,863 - INFO - Inicializando base de datos...
+2025-07-02 14:20:48,880 - INFO - Tablas creadas o verificadas correctamente.
+2025-07-02 14:20:48,923 - INFO - Configuración cargada correctamente
+2025-07-02 14:21:04,682 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:05,007 - INFO - Archivo cargado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:05,008 - INFO - Transformando datos para modo: listados
+2025-07-02 14:21:05,018 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 14:21:05,019 - INFO - Columnas convertidas a texto: []
+2025-07-02 14:21:05,081 - INFO - Historial guardado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:08,137 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:08,325 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:08,326 - INFO - Transformando datos para modo: fedex
+2025-07-02 14:21:08,331 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 14:21:08,340 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 14:21:08,344 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 14:21:08,358 - INFO - Historial guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:12,472 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 14:21:12,674 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 14:21:12,676 - INFO - Transformando datos para modo: urbano
+2025-07-02 14:21:12,682 - INFO - Columnas eliminadas: ['AGENCIA', 'PESO', 'DIAS', 'SHIPPER', 'SERVICIO', 'ESTADO']
+2025-07-02 14:21:12,693 - INFO - Columnas sumadas: ['PIEZAS']
+2025-07-02 14:21:12,696 - INFO - Columnas convertidas a texto: ['PIEZAS']
+2025-07-02 14:21:12,719 - INFO - Historial guardado: C:\Users\Recepción 2\Downloads\561869281.xlsx
+2025-07-02 14:21:19,887 - INFO - Transformando datos para modo: fedex
+2025-07-02 14:21:19,897 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 14:21:19,922 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 14:21:19,924 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 14:21:22,240 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:22,434 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:22,436 - INFO - Transformando datos para modo: fedex
+2025-07-02 14:21:22,442 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 14:21:22,455 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 14:21:22,460 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 14:21:22,502 - INFO - Historial guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-06-30.xlsx
+2025-07-02 14:21:40,869 - INFO - Transformando datos para modo: fedex
+2025-07-02 14:21:40,873 - INFO - Columnas eliminadas: ['width', 'recipientCompany', 'recipientPhoneExtension', 'recipientResidential', 'height', 'senderPostcode', 'returnTrackingId', 'length', 'recipientLine2', 'senderAccountNumber', 'senderEmail', 'packageWeight', 'shipmentType', 'recipientState', 'etdEnabled', 'returnRmaNumber', 'recipientPostcode', 'recipientContactNumber', 'returnReason', 'poNumber', 'departmentNumber', 'recipientLine1', 'senderContactName', 'senderCity', 'senderContactNumber', 'senderCountry', 'recipientEmail', 'pickupId', 'senderTin', 'paymentType', 'weightUnits', 'senderPhoneExtension', 'recipientTin', 'senderLine2', 'quoteId', 'creationDate', 'senderResidential', 'senderState', 'errors', 'totalShipmentWeight', 'senderLine3', 'invoiceNumber', 'recipientCountry', 'senderCompany', 'senderLine1', 'status', 'estimatedShippingCosts']
+2025-07-02 14:21:40,879 - INFO - Columnas sumadas: ['numberOfPackages']
+2025-07-02 14:21:40,882 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-07-02 14:21:46,134 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:46,173 - INFO - Archivo cargado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:46,174 - INFO - Transformando datos para modo: listados
+2025-07-02 14:21:46,177 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 14:21:46,178 - INFO - Columnas convertidas a texto: []
+2025-07-02 14:21:46,191 - INFO - Historial guardado: C:\Users\Recepción 2\Desktop\SS.MM.GGG\lista_doc_venta_20250619_165518.xlsx
+2025-07-02 14:21:50,955 - INFO - Transformando datos para modo: listados
+2025-07-02 14:21:50,957 - INFO - Columnas eliminadas: ['VENDEDOR', 'Nº', 'RUT', 'GLOSA', 'TIPO_CAMBIO', 'MONEDA']
+2025-07-02 14:21:50,958 - INFO - Columnas convertidas a texto: []

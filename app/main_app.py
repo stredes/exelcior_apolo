@@ -32,7 +32,7 @@ class ExcelPrinterApp(tk.Tk):
         self.transformed_df = None
         self.mode = "listados"
         self.processing = False
-        self.config_columns = load_config()
+        self.config_columns = load_config() if isinstance(load_config(), dict) else {}
         self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
         self._setup_styles()
@@ -144,8 +144,9 @@ class ExcelPrinterApp(tk.Tk):
             else:
                 self._update_status("❌ Error en la autocarga.")
         except Exception as e:
-            logging.error(f"Error en carga automática: {e}")
-            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+            error_message = str(e)
+            logging.error(f"Error en carga automática: {error_message}")
+            self.after(0, lambda: messagebox.showerror("Error", error_message))
         finally:
             self.processing = False
 
@@ -153,13 +154,17 @@ class ExcelPrinterApp(tk.Tk):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento: {path}", "info")
         try:
+            if not isinstance(self.config_columns, dict):
+                raise ValueError("La configuración cargada no es válida. Se esperaba un diccionario.")
+
             self.df = load_excel(path, self.config_columns, self.mode)
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
             save_file_history(path, self.mode)
             self.after(0, self._show_preview)
         except Exception as e:
-            logging.error(f"Error procesando archivo: {e}")
-            self.after(0, lambda: messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{e}"))
+            error_message = str(e)
+            logging.error(f"Error procesando archivo: {error_message}")
+            self.after(0, lambda: messagebox.showerror("Error", f"No se pudo procesar el archivo:\n{error_message}"))
         finally:
             self.processing = False
             self._update_status("Listo")
@@ -298,6 +303,7 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
+
 
 def main():
     app = ExcelPrinterApp()
