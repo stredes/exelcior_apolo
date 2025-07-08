@@ -26,6 +26,13 @@ class InventarioView(tk.Toplevel):
         self._crear_widgets()
         self._cargar_o_pedir_archivo()
 
+    def safe_messagebox(self, tipo, titulo, mensaje):
+        self.after(0, lambda: {
+            "info": messagebox.showinfo,
+            "error": messagebox.showerror,
+            "warning": messagebox.showwarning
+        }[tipo](titulo, mensaje))
+
     def _crear_widgets(self):
         top_frame = tk.Frame(self, bg="#F9FAFB")
         top_frame.pack(pady=10)
@@ -74,16 +81,16 @@ class InventarioView(tk.Toplevel):
             self.df_filtrado = pd.DataFrame()
             self._actualizar_tree(self.df)
             capturar_log_bod1(f"Archivo de inventario cargado: {path}", "info")
-            messagebox.showinfo("Inventario", f"Archivo cargado correctamente: {path.name}")
+            self.safe_messagebox("info", "Inventario", f"Archivo cargado correctamente: {path.name}")
         except Exception as e:
             capturar_log_bod1(f"Error al cargar inventario: {e}", "error")
-            messagebox.showerror("Error", f"No se pudo cargar el archivo:\n{e}")
+            self.safe_messagebox("error", "Error", f"No se pudo cargar el archivo:\n{e}")
             self.df = pd.DataFrame()
 
     def _filtrar(self):
         termino = self.entry_busqueda.get().strip().lower()
         if not termino:
-            messagebox.showinfo("Buscar", "Ingrese un término de búsqueda.")
+            self.safe_messagebox("info", "Buscar", "Ingrese un término de búsqueda.")
             return
 
         df_codigo = self.df[self.df["Código"].astype(str).str.lower().str.contains(termino)]
@@ -110,7 +117,7 @@ class InventarioView(tk.Toplevel):
 
     def _imprimir_resultado(self):
         if self.df_filtrado.empty:
-            messagebox.showwarning("Sin datos", "No hay resultados filtrados para imprimir.")
+            self.safe_messagebox("warning", "Sin datos", "No hay resultados filtrados para imprimir.")
             return
 
         try:
@@ -122,8 +129,8 @@ class InventarioView(tk.Toplevel):
             elif self.tipo_busqueda == "ubicacion":
                 printer_inventario_ubicacion.print_inventario_ubicacion(df=df_to_print)
             else:
-                messagebox.showwarning("Tipo de búsqueda", "Debe realizar una búsqueda válida antes de imprimir.")
+                self.safe_messagebox("warning", "Tipo de búsqueda", "Debe realizar una búsqueda válida antes de imprimir.")
 
         except Exception as e:
             capturar_log_bod1(f"Error al imprimir inventario: {e}", "error")
-            messagebox.showerror("Error", f"No se pudo imprimir:\n{e}")
+            self.safe_messagebox("error", "Error", f"No se pudo imprimir:\n{e}")
