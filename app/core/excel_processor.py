@@ -7,29 +7,40 @@ import platform
 from app.core.logger_eventos import log_evento
 from app.config.config_manager import load_config, save_config  # ✅ Config centralizada
 
+# Solo importar COM en Windows
 if platform.system() == "Windows":
     import pythoncom
     from win32com.client import Dispatch
 
 
 def validate_file(file_path: str) -> Tuple[bool, str]:
+    """
+    Valida que el archivo exista y sea de un tipo soportado.
+    Retorna (True, "") si es válido, o (False, mensaje de error) si no lo es.
+    """
     path = Path(file_path)
+
     if not path.exists():
         log_evento(f"Archivo no encontrado: {file_path}", "error")
         return False, "El archivo no existe."
+
     if path.suffix.lower() not in ('.xlsx', '.xls', '.csv'):
         log_evento(f"Formato de archivo no soportado: {file_path}", "warning")
-        return False, "Formato de archivo no soportado."
+        return False, "Formato de archivo no soportado (.xlsx, .xls, .csv)"
+
     return True, ""
 
 
 def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
+    """
+    Carga un archivo Excel o CSV en un DataFrame, aplicando las filas de inicio desde la configuración.
+    """
     path = Path(file_path)
     ext = path.suffix.lower()
 
     engine = {
         ".xlsx": "openpyxl",
-        ".xls": "openpyxl",  # Cambiar a 'xlrd' si es necesario
+        ".xls": "openpyxl",  # Puedes cambiar a 'xlrd' si lo necesitas para .xls antiguos
         ".csv": None
     }.get(ext)
 
@@ -41,15 +52,20 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
         else:
             df = pd.read_excel(path, engine=engine, skiprows=skiprows, nrows=max_rows)
 
+        # Limpieza de nombres de columnas
         df.columns = df.columns.str.strip().str.replace('\u200b', '', regex=True)
         log_evento(f"Archivo cargado: {file_path}", "info")
         return df
+
     except Exception as e:
         log_evento(f"Error al leer archivo: {e}", "error")
         raise
 
 
 def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFrame:
+    """
+    Aplica las transformaciones configuradas: eliminación de columnas, sumatoria, y formato.
+    """
     log_evento(f"Transformando datos para modo: {mode}", "info")
 
     modo_cfg = config.get(mode, {})
@@ -57,14 +73,17 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
     sumar = modo_cfg.get("sumar", [])
     mantener = modo_cfg.get("mantener_formato", [])
 
+    # Eliminar columnas
     df.drop(columns=[col for col in eliminar if col in df.columns], errors='ignore', inplace=True)
     log_evento(f"Columnas eliminadas: {eliminar}", "info")
 
+    # Agregar fila de sumatorias si aplica
     if sumar:
         suma = {col: df[col].sum() if col in df.columns else 0 for col in sumar}
         df = pd.concat([df, pd.DataFrame([suma])], ignore_index=True)
         log_evento(f"Columnas sumadas: {sumar}", "info")
 
+    # Mantener formato como texto
     for col in mantener:
         if col in df.columns:
             df[col] = df[col].astype(str)
@@ -74,6 +93,9 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
 
 
 def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
+    """
+    Imprime el DataFrame usando Excel COM en Windows. Inserta título y formatea celdas.
+    """
     if platform.system() != "Windows":
         log_evento("Impresión Excel solo disponible en Windows.", "warning")
         raise NotImplementedError("La impresión desde Excel solo está disponible en Windows.")
@@ -91,14 +113,14 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
         wb = excel.Workbooks.Open(str(temp_xlsx.resolve()))
         sheet = wb.Sheets(1)
 
-        # Título según el modo
+        # Título dinámico por modo
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
         titulo = {
             "fedex": f"FIN DE DÍA FEDEX - {fecha_actual}",
             "urbano": f"FIN DE DÍA URBANO - {fecha_actual}"
         }.get(mode.lower(), f"LISTADO GENERAL - {fecha_actual}")
 
-        # Insertar fila con título
+        # Insertar título en la primera fila
         sheet.Rows("1:1").Insert()
         sheet.Cells(1, 1).Value = titulo
         sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
