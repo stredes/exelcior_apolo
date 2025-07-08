@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-# Módulos internos
 from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
@@ -72,7 +71,7 @@ class ExcelPrinterApp(tk.Tk):
             ("Ver Logs 📋", self._view_logs),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
             ("Etiquetas 🏷️", self._abrir_editor_etiquetas),
-            ("Buscar Códigos Postales 🧭", self._abrir_buscador_codigos_postales),
+            ("Buscar Códigos Postales 🧽", self._abrir_buscador_codigos_postales),
             ("Sra Mary 👩‍💼", self._abrir_sra_mary),
             ("Inventario 📦", lambda: InventarioView(self)),
         ]
@@ -232,6 +231,10 @@ class ExcelPrinterApp(tk.Tk):
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
 
+            # Liberar memoria
+            self.df = None
+            self.transformed_df = None
+
         except Exception as e:
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
@@ -307,7 +310,6 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
-
 
 def main():
     app = ExcelPrinterApp()
