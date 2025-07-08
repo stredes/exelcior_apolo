@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.core.logger_eventos import log_evento
 from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
-
+from app.printer.printer_tools import agregar_nombre_y_firma
 
 def imprimir_fedex(df: pd.DataFrame):
     """
@@ -18,18 +18,14 @@ def imprimir_fedex(df: pd.DataFrame):
         if df.empty:
             raise ValueError("El DataFrame de FedEx está vacío y no se puede imprimir.")
 
-        # Generar título dinámico con la fecha actual
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
         titulo = f"FIN DE DÍA FEDEX - {fecha_actual}"
 
-        # Generar archivo Excel temporal con formato
+        df = agregar_nombre_y_firma(df)
         archivo_temporal: Path = generar_excel_temporal(df, titulo, sheet_name="FedEx")
-
         log_evento(f"📄 Archivo temporal generado para impresión FedEx: {archivo_temporal}", "info")
 
-        # Enviar archivo generado a la impresora
         enviar_a_impresora(archivo_temporal)
-
         log_evento("✅ Impresión de listado FedEx completada correctamente.", "info")
 
     except Exception as error:
