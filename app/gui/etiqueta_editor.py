@@ -8,9 +8,20 @@ import pandas as pd
 import tempfile
 import os
 import platform
+import json
 
-# Configuración
-DEFAULT_PRINTER_NAME = "URBANO"  # Puedes cargar esto desde un archivo de config
+# Ruta al archivo de configuración
+CONFIG_PATH = Path("app/config/excel_printer_config.json")
+
+def cargar_config():
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def guardar_config(config):
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
 
 def cargar_clientes(path_excel):
     df_clientes = pd.read_excel(path_excel, sheet_name="Clientes")
@@ -53,22 +64,25 @@ def generar_etiqueta_pdf(data, output_path: Path):
 
     c.save()
 
-def imprimir_pdf(path_pdf: Path, printer_name: str = DEFAULT_PRINTER_NAME):
+def imprimir_pdf(path_pdf: Path, printer_name: str):
     try:
         system = platform.system()
         if system == "Windows":
             os.startfile(str(path_pdf), "print")
         elif system == "Linux":
-            os.system(f"lp '{path_pdf}'")
+            os.system(f"lp -d '{printer_name}' '{path_pdf}'")
         else:
             raise NotImplementedError(f"Plataforma no compatible: {system}")
     except Exception as e:
         messagebox.showerror("Error al imprimir", f"No se pudo imprimir el PDF:\n{e}")
 
 def crear_editor_etiqueta(df_clientes, parent=None):
+    config = cargar_config()
+    printer_name_default = config.get("printer_name", "URBANO")
+
     ventana = tk.Toplevel(parent)
     ventana.title("Editor de Etiquetas 10x10 cm")
-    ventana.geometry("400x500")
+    ventana.geometry("400x550")
 
     frame = ttk.Frame(ventana, padding=20)
     frame.pack(fill="both", expand=True)
@@ -92,18 +106,18 @@ def crear_editor_etiqueta(df_clientes, parent=None):
         entry.grid(row=idx, column=1, pady=4)
         entradas[key] = entry
 
+    ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=4)
+    entrada_impresora = ttk.Entry(frame, width=35)
+    entrada_impresora.insert(0, printer_name_default)
+    entrada_impresora.grid(row=len(campos), column=1, pady=4)
+
     def cargar_datos_cliente(event=None):
         rut = entradas["rut"].get()
         cliente = buscar_cliente_por_rut(df_clientes, rut)
         if cliente:
-            entradas["razsoc"].delete(0, tk.END)
-            entradas["razsoc"].insert(0, cliente["razsoc"])
-            entradas["dir"].delete(0, tk.END)
-            entradas["dir"].insert(0, cliente["dir"])
-            entradas["comuna"].delete(0, tk.END)
-            entradas["comuna"].insert(0, cliente["comuna"])
-            entradas["ciudad"].delete(0, tk.END)
-            entradas["ciudad"].insert(0, cliente["ciudad"])
+            for campo in ["razsoc", "dir", "comuna", "ciudad"]:
+                entradas[campo].delete(0, tk.END)
+                entradas[campo].insert(0, cliente[campo])
         else:
             messagebox.showerror("RUT no encontrado", "No se encontró el cliente para el RUT ingresado.")
 
@@ -112,14 +126,19 @@ def crear_editor_etiqueta(df_clientes, parent=None):
     def generar_y_imprimir():
         try:
             data = {k: v.get() for k, v in entradas.items()}
+            printer_name = entrada_impresora.get().strip()
+            config["printer_name"] = printer_name
+            guardar_config(config)
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
                 output_path = Path(temp_pdf.name)
+
             generar_etiqueta_pdf(data, output_path)
-            imprimir_pdf(output_path)
+            imprimir_pdf(output_path, printer_name)
             output_path.unlink(missing_ok=True)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar o imprimir la etiqueta:\n{e}")
 
     ttk.Button(frame, text="Imprimir Etiqueta", command=generar_y_imprimir).grid(
-        row=len(campos), column=0, columnspan=2, pady=15
+        row=len(campos) + 1, column=0, columnspan=2, pady=15
     )
