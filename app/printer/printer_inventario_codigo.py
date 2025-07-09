@@ -90,4 +90,4 @@ def _enviar_a_impresora(file_path: Path):
             raise OSError("Sistema operativo no compatible para impresión automática.")
     except Exception as e:
         log_evento(f"❌ Error al imprimir archivo Excel: {e}", "error")
-        raise
+        raise 
