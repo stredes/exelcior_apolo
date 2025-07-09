@@ -9,6 +9,7 @@ import tempfile
 import os
 import platform
 import json
+import subprocess
 
 # Ruta al archivo de configuración
 CONFIG_PATH = Path("app/config/excel_printer_config.json")
@@ -24,8 +25,7 @@ def guardar_config(config):
         json.dump(config, f, indent=4)
 
 def cargar_clientes(path_excel):
-    df_clientes = pd.read_excel(path_excel, sheet_name="Clientes")
-    return df_clientes
+    return pd.read_excel(path_excel, sheet_name="Clientes")
 
 def buscar_cliente_por_rut(df_clientes, rut):
     fila = df_clientes[df_clientes['rut'].astype(str).str.strip() == rut.strip()]
@@ -76,13 +76,30 @@ def imprimir_pdf(path_pdf: Path, printer_name: str):
     except Exception as e:
         messagebox.showerror("Error al imprimir", f"No se pudo imprimir el PDF:\n{e}")
 
+def obtener_impresoras_disponibles():
+    system = platform.system()
+    impresoras = []
+    if system == "Windows":
+        try:
+            import win32print
+            impresoras = [printer[2] for printer in win32print.EnumPrinters(2)]
+        except ImportError:
+            impresoras = []
+    elif system == "Linux":
+        try:
+            output = subprocess.check_output(["lpstat", "-a"]).decode()
+            impresoras = [line.split()[0] for line in output.strip().split("\n") if line]
+        except Exception:
+            impresoras = []
+    return impresoras
+
 def crear_editor_etiqueta(df_clientes, parent=None):
     config = cargar_config()
-    printer_name_default = config.get("printer_name", "URBANO")
+    printer_name_default = config.get("printer_name", "")
 
     ventana = tk.Toplevel(parent)
     ventana.title("Editor de Etiquetas 10x10 cm")
-    ventana.geometry("400x550")
+    ventana.geometry("420x580")
 
     frame = ttk.Frame(ventana, padding=20)
     frame.pack(fill="both", expand=True)
@@ -106,11 +123,14 @@ def crear_editor_etiqueta(df_clientes, parent=None):
         entry.grid(row=idx, column=1, pady=4)
         entradas[key] = entry
 
+    # Impresoras disponibles
     ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=4)
-    entrada_impresora = ttk.Entry(frame, width=35)
-    entrada_impresora.insert(0, printer_name_default)
-    entrada_impresora.grid(row=len(campos), column=1, pady=4)
+    impresoras = obtener_impresoras_disponibles()
+    combo_impresoras = ttk.Combobox(frame, values=impresoras, width=33)
+    combo_impresoras.set(printer_name_default)
+    combo_impresoras.grid(row=len(campos), column=1, pady=4)
 
+    # Función para autocompletar datos del cliente
     def cargar_datos_cliente(event=None):
         rut = entradas["rut"].get()
         cliente = buscar_cliente_por_rut(df_clientes, rut)
@@ -123,10 +143,27 @@ def crear_editor_etiqueta(df_clientes, parent=None):
 
     entradas["rut"].bind("<Return>", cargar_datos_cliente)
 
+    # Validación de campos
+    def validar_campos(data):
+        campos_requeridos = ["rut", "razsoc", "dir", "guia", "bultos"]
+        faltantes = [campo for campo in campos_requeridos if not data.get(campo)]
+        if faltantes:
+            messagebox.showerror("Campos faltantes", f"Los siguientes campos son obligatorios:\n- " + "\n- ".join(faltantes))
+            return False
+        return True
+
+    def limpiar_formulario():
+        for entry in entradas.values():
+            entry.delete(0, tk.END)
+
     def generar_y_imprimir():
         try:
             data = {k: v.get() for k, v in entradas.items()}
-            printer_name = entrada_impresora.get().strip()
+            printer_name = combo_impresoras.get().strip()
+
+            if not validar_campos(data):
+                return
+
             config["printer_name"] = printer_name
             guardar_config(config)
 
@@ -139,6 +176,11 @@ def crear_editor_etiqueta(df_clientes, parent=None):
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar o imprimir la etiqueta:\n{e}")
 
+    # Botones
     ttk.Button(frame, text="Imprimir Etiqueta", command=generar_y_imprimir).grid(
-        row=len(campos) + 1, column=0, columnspan=2, pady=15
+        row=len(campos) + 1, column=0, columnspan=2, pady=10
+    )
+
+    ttk.Button(frame, text="Limpiar Formulario", command=limpiar_formulario).grid(
+        row=len(campos) + 2, column=0, columnspan=2, pady=5
     )
