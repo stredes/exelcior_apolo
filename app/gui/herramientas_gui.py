@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 from pathlib import Path
+import os
+import pandas as pd
 
 from app.core import herramientas as core
-import pandas as pd
 
 
 def abrir_herramientas(parent, df: pd.DataFrame):
@@ -17,35 +18,48 @@ def abrir_herramientas(parent, df: pd.DataFrame):
     style = ttk.Style()
     style.configure("TButton", font=("Segoe UI", 11), padding=8)
 
-    # --- FUNCIONES GUI auxiliares ---
+    # ========== FUNCIONES AUXILIARES DE GUI ==========
+
     def gui_mostrar_estadisticas():
-        est = core.obtener_estadisticas(df)
-        texto = (
-            f"📊 Total de filas: {est['filas']}\n"
-            f"📊 Total de columnas: {est['columnas']}\n"
-            f"📦 BULTOS: {est['bultos']}\n"
-            f"👥 Clientes únicos: {est['clientes_unicos']}\n"
-            f"📅 Fechas de envío: {est['fechas_envio']}"
-        )
-        messagebox.showinfo("Estadísticas del Excel", texto)
+        try:
+            est = core.obtener_estadisticas(df)
+            texto = (
+                f"📊 Total de filas: {est['filas']}\n"
+                f"📊 Total de columnas: {est['columnas']}\n"
+                f"📦 BULTOS: {est['bultos']}\n"
+                f"👥 Clientes únicos: {est['clientes_unicos']}\n"
+                f"📅 Fechas de envío: {est['fechas_envio']}"
+            )
+            messagebox.showinfo("Estadísticas del Excel", texto)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
     def gui_exportar_csv():
         path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
         if path:
-            core.exportar_csv_a_path(df, Path(path))
-            messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            try:
+                core.exportar_csv_a_path(df, Path(path))
+                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            except Exception as e:
+                messagebox.showerror("Error al exportar", str(e))
 
     def gui_exportar_xlsx():
         path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
         if path:
-            core.exportar_xlsx_a_path(df, Path(path))
-            messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            try:
+                core.exportar_xlsx_a_path(df, Path(path))
+                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            except Exception as e:
+                messagebox.showerror("Error al exportar", str(e))
 
     def gui_exportar_pdf():
         path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF", "*.pdf")])
         if path:
-            core.exportar_pdf_a_path(df, Path(path))
-            messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            try:
+                core.exportar_pdf_a_path(df, Path(path))
+                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+            except Exception as e:
+                messagebox.showerror("Error al exportar", str(e))
 
     def gui_editor_columnas():
         editor = tk.Toplevel(tools_win)
@@ -67,10 +81,10 @@ def abrir_herramientas(parent, df: pd.DataFrame):
 
         for col in columnas:
             chk = tk.Checkbutton(frame, text=col, variable=seleccionadas[col])
-            chk.pack(anchor="w")
+            chk.pack(anchor="w", padx=5)
             entry = tk.Entry(frame)
             entry.insert(0, col)
-            entry.pack(fill="x", padx=10)
+            entry.pack(fill="x", padx=10, pady=2)
             nuevos_nombres[col] = entry
 
         def aplicar():
@@ -90,14 +104,17 @@ def abrir_herramientas(parent, df: pd.DataFrame):
     def gui_buscar_datos():
         buscar_win = tk.Toplevel(tools_win)
         buscar_win.title("Buscar en Excel")
-        buscar_win.geometry("300x150")
+        buscar_win.geometry("300x160")
+
         tk.Label(buscar_win, text="Columna:").pack(pady=5)
         combo = ttk.Combobox(buscar_win, values=list(df.columns))
         combo.pack(pady=5)
         combo.current(0)
+
         tk.Label(buscar_win, text="Buscar:").pack(pady=5)
         entry = tk.Entry(buscar_win)
         entry.pack(pady=5)
+        entry.focus()
 
         def buscar():
             try:
@@ -120,33 +137,28 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         tk.Button(buscar_win, text="Buscar", command=buscar).pack(pady=10)
 
     def gui_enviar_email():
-        config = core.cargar_config_usuario()
-        remitente = config.get("email", "")
-        smtp_server = config.get("smtp", "smtp.tudominio.com")
-        smtp_port = config.get("port", 587)
+        try:
+            smtp_server = os.getenv("SMTP_SERVER", "smtp.tudominio.com")
+            smtp_port = int(os.getenv("SMTP_PORT", 587))
 
-        if not remitente:
             remitente = simpledialog.askstring("Email", "Correo remitente:")
             if not remitente:
                 return
-            config["email"] = remitente
 
-        password = simpledialog.askstring("Contraseña", f"Contraseña de {remitente}:", show='*')
-        if not password:
-            return
+            password = simpledialog.askstring("Contraseña", f"Contraseña de {remitente}:", show='*')
+            if not password:
+                return
 
-        destinatario = simpledialog.askstring("Destinatario", "Correo destino:")
-        if not destinatario:
-            return
+            destinatario = simpledialog.askstring("Destinatario", "Correo destino:")
+            if not destinatario:
+                return
 
-        try:
-            core.guardar_config_usuario(config)
             core.enviar_dataframe_por_email(df, remitente, password, destinatario, smtp_server, smtp_port)
             messagebox.showinfo("Email", "Correo enviado correctamente.")
         except Exception as e:
             messagebox.showerror("Error al enviar", str(e))
 
-    # --- Botones GUI ---
+    # ========== BOTONES DE FUNCIONALIDADES ==========
     ttk.Button(tools_win, text="📊 Ver Estadísticas", command=gui_mostrar_estadisticas).pack(pady=10, fill="x", padx=20)
     ttk.Button(tools_win, text="📁 Exportar CSV", command=gui_exportar_csv).pack(pady=10, fill="x", padx=20)
     ttk.Button(tools_win, text="📁 Exportar XLSX", command=gui_exportar_xlsx).pack(pady=10, fill="x", padx=20)
@@ -154,3 +166,6 @@ def abrir_herramientas(parent, df: pd.DataFrame):
     ttk.Button(tools_win, text="🎨 Editor Columnas", command=gui_editor_columnas).pack(pady=10, fill="x", padx=20)
     ttk.Button(tools_win, text="🔍 Buscar Datos", command=gui_buscar_datos).pack(pady=10, fill="x", padx=20)
     ttk.Button(tools_win, text="📧 Enviar Email", command=gui_enviar_email).pack(pady=10, fill="x", padx=20)
+
+    # ========== ACCESIBILIDAD ==========
+    tools_win.bind("<Escape>", lambda e: tools_win.destroy())
