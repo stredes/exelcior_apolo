@@ -11,7 +11,7 @@ import platform
 import json
 import subprocess
 
-# Ruta al archivo de configuración
+# Ruta de configuración
 CONFIG_PATH = Path("app/config/excel_printer_config.json")
 
 def cargar_config():
@@ -100,6 +100,7 @@ def crear_editor_etiqueta(df_clientes, parent=None):
     ventana = tk.Toplevel(parent)
     ventana.title("Editor de Etiquetas 10x10 cm")
     ventana.geometry("420x580")
+    ventana.resizable(False, False)
 
     frame = ttk.Frame(ventana, padding=20)
     frame.pack(fill="both", expand=True)
@@ -117,20 +118,21 @@ def crear_editor_etiqueta(df_clientes, parent=None):
 
     entradas = {}
 
+    # Crear campos de entrada
     for idx, (key, label) in enumerate(campos.items()):
         ttk.Label(frame, text=label + ":").grid(row=idx, column=0, sticky="e", pady=4)
         entry = ttk.Entry(frame, width=35)
         entry.grid(row=idx, column=1, pady=4)
         entradas[key] = entry
 
-    # Impresoras disponibles
+    # Combobox de impresoras
     ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=4)
     impresoras = obtener_impresoras_disponibles()
     combo_impresoras = ttk.Combobox(frame, values=impresoras, width=33)
     combo_impresoras.set(printer_name_default)
     combo_impresoras.grid(row=len(campos), column=1, pady=4)
 
-    # Función para autocompletar datos del cliente
+    # Autocompletar cliente al presionar Enter en campo RUT
     def cargar_datos_cliente(event=None):
         rut = entradas["rut"].get()
         cliente = buscar_cliente_por_rut(df_clientes, rut)
@@ -143,12 +145,12 @@ def crear_editor_etiqueta(df_clientes, parent=None):
 
     entradas["rut"].bind("<Return>", cargar_datos_cliente)
 
-    # Validación de campos
+    # Validación de campos obligatorios
     def validar_campos(data):
-        campos_requeridos = ["rut", "razsoc", "dir", "guia", "bultos"]
-        faltantes = [campo for campo in campos_requeridos if not data.get(campo)]
+        obligatorios = ["rut", "razsoc", "dir", "guia", "bultos"]
+        faltantes = [campo for campo in obligatorios if not data.get(campo)]
         if faltantes:
-            messagebox.showerror("Campos faltantes", f"Los siguientes campos son obligatorios:\n- " + "\n- ".join(faltantes))
+            messagebox.showerror("Campos faltantes", "Completa los siguientes campos:\n- " + "\n- ".join(faltantes))
             return False
         return True
 
@@ -156,6 +158,7 @@ def crear_editor_etiqueta(df_clientes, parent=None):
         for entry in entradas.values():
             entry.delete(0, tk.END)
 
+    # Generar e imprimir
     def generar_y_imprimir():
         try:
             data = {k: v.get() for k, v in entradas.items()}
@@ -180,7 +183,6 @@ def crear_editor_etiqueta(df_clientes, parent=None):
     ttk.Button(frame, text="Imprimir Etiqueta", command=generar_y_imprimir).grid(
         row=len(campos) + 1, column=0, columnspan=2, pady=10
     )
-
     ttk.Button(frame, text="Limpiar Formulario", command=limpiar_formulario).grid(
         row=len(campos) + 2, column=0, columnspan=2, pady=5
     )

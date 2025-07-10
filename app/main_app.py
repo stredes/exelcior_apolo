@@ -1,3 +1,5 @@
+# main_app.py
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
@@ -6,6 +8,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+# Importaciones de módulos internos
 from app.config.config_dialog import ConfigDialog
 from app.core.excel_processor import validate_file, load_excel, apply_transformation
 from app.printer.exporter import export_to_pdf
@@ -27,7 +30,10 @@ class ExcelPrinterApp(tk.Tk):
         self.geometry("750x700")
         self.configure(bg="#F9FAFB")
 
+        # Inicializar base de datos
         init_db()
+
+        # Variables internas
         self.df = None
         self.transformed_df = None
         self.mode = "listados"
@@ -37,18 +43,14 @@ class ExcelPrinterApp(tk.Tk):
         self.config_columns = config if isinstance(config, dict) else {}
         self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
+        # Construcción de interfaz
         self._setup_styles()
         self._setup_sidebar()
         self._setup_main_area()
         self._setup_status_bar()
 
     def safe_messagebox(self, tipo, titulo, mensaje):
-        if tipo == "info":
-            self.after(0, lambda: messagebox.showinfo(titulo, mensaje))
-        elif tipo == "error":
-            self.after(0, lambda: messagebox.showerror(titulo, mensaje))
-        elif tipo == "warning":
-            self.after(0, lambda: messagebox.showwarning(titulo, mensaje))
+        self.after(0, lambda: getattr(messagebox, tipo)(titulo, mensaje))
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -231,7 +233,7 @@ class ExcelPrinterApp(tk.Tk):
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
 
-            # Liberar memoria
+            # Limpiar memoria
             self.df = None
             self.transformed_df = None
 
@@ -310,6 +312,7 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
+
 
 def main():
     app = ExcelPrinterApp()
