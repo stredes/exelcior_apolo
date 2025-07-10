@@ -125,7 +125,7 @@ def crear_editor_etiqueta(df_clientes, parent=None):
         entry.grid(row=idx, column=1, pady=4)
         entradas[key] = entry
 
-    # Combobox de impresoras
+    # Combo de impresoras disponibles
     ttk.Label(frame, text="Impresora:").grid(row=len(campos), column=0, sticky="e", pady=4)
     impresoras = obtener_impresoras_disponibles()
     combo_impresoras = ttk.Combobox(frame, values=impresoras, width=33)
@@ -154,11 +154,12 @@ def crear_editor_etiqueta(df_clientes, parent=None):
             return False
         return True
 
+    # Limpiar formulario
     def limpiar_formulario():
         for entry in entradas.values():
             entry.delete(0, tk.END)
 
-    # Generar e imprimir
+    # Generar e imprimir etiqueta
     def generar_y_imprimir():
         try:
             data = {k: v.get() for k, v in entradas.items()}

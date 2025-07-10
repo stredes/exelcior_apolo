@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.core.logger_eventos import log_evento
 from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
-from app.printer.printer_tools import agregar_nombre_y_firma
+from app.printer.printer_tools import agregar_nombre_firma
 
 def imprimir_urbano(df: pd.DataFrame):
     """
@@ -21,7 +21,7 @@ def imprimir_urbano(df: pd.DataFrame):
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
         titulo = f"FIN DE DÍA URBANO - {fecha_actual}"
 
-        df = agregar_nombre_y_firma(df)
+        df = agregar_nombre_firma(df)
         archivo_temporal: Path = generar_excel_temporal(df, titulo, sheet_name="Urbano")
         log_evento(f"📄 Archivo temporal generado para impresión Urbano: {archivo_temporal}", "info")
 

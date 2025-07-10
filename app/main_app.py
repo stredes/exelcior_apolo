@@ -1,11 +1,18 @@
 # main_app.py
 
+import sys
+from pathlib import Path
+
+# Asegura que la raíz del proyecto esté en sys.path para evitar errores de importación
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 import pandas as pd
 import logging
-from pathlib import Path
 from datetime import datetime
 
 # Importaciones de módulos internos
@@ -30,10 +37,8 @@ class ExcelPrinterApp(tk.Tk):
         self.geometry("750x700")
         self.configure(bg="#F9FAFB")
 
-        # Inicializar base de datos
         init_db()
 
-        # Variables internas
         self.df = None
         self.transformed_df = None
         self.mode = "listados"
@@ -43,7 +48,6 @@ class ExcelPrinterApp(tk.Tk):
         self.config_columns = config if isinstance(config, dict) else {}
         self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
-        # Construcción de interfaz
         self._setup_styles()
         self._setup_sidebar()
         self._setup_main_area()
@@ -233,7 +237,6 @@ class ExcelPrinterApp(tk.Tk):
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
 
-            # Limpiar memoria
             self.df = None
             self.transformed_df = None
 
