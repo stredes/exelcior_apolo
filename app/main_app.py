@@ -1,6 +1,6 @@
-# main_app.py
-
 import sys
+import logging
+import threading
 from pathlib import Path
 
 # Asegura que la raíz del proyecto esté en sys.path para evitar errores de importación
@@ -10,24 +10,20 @@ if str(ROOT_DIR) not in sys.path:
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import threading
-import pandas as pd
-import logging
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
-# Importaciones de módulos internos
-from app.config.config_dialog import ConfigDialog
-from app.core.excel_processor import validate_file, load_excel, apply_transformation
-from app.printer.exporter import export_to_pdf
-from app.gui.herramientas_gui import abrir_herramientas
+from app.services.file_service import validate_file, process_file, printer_map
 from app.db.database import init_db, save_file_history, save_print_history
+from app.config.config_dialog import ConfigDialog
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.utils.utils import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
-from app.printer import printer_fedex, printer_urbano, printer_listados, printer_etiquetas
+from app.printer.exporter import export_to_pdf
+from app.gui.herramientas_gui import abrir_herramientas
+from app.core.excel_processor import load_excel, apply_transformation  # <-- Importaciones corregidas
 
 
 class ExcelPrinterApp(tk.Tk):
@@ -54,7 +50,13 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_status_bar()
 
     def safe_messagebox(self, tipo, titulo, mensaje):
-        self.after(0, lambda: getattr(messagebox, tipo)(titulo, mensaje))
+        tipo_map = {
+            "info": messagebox.showinfo,
+            "warning": messagebox.showwarning,
+            "error": messagebox.showerror
+        }
+        fn = tipo_map.get(tipo, messagebox.showinfo)
+        self.after(0, lambda: fn(titulo, mensaje))
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -133,10 +135,29 @@ class ExcelPrinterApp(tk.Tk):
 
     def _threaded_select_file(self):
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
-        if path and validate_file(path):
+        if path:
+            valid, err = validate_file(path)
+            if not valid:
+                self.safe_messagebox("error", "Archivo no válido", err)
+                return
             set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
             self.processing = True
-            threading.Thread(target=self._process_file, args=(path,), daemon=True).start()
+            if not hasattr(self, 'executor'):
+                self.executor = ThreadPoolExecutor(max_workers=2)
+            future = self.executor.submit(process_file, path, self.config_columns, self.mode)
+            future.add_done_callback(self._file_processed_callback)
+
+    def _file_processed_callback(self, future):
+        try:
+            self.df, self.transformed_df = future.result()
+            save_file_history("n/a", self.mode)
+            self.after(0, self._show_preview)
+        except Exception as e:
+            logging.exception("Error al procesar archivo")
+            self.safe_messagebox("error", "Error", str(e))
+            self.after(0, lambda: self._update_status("Error"))
+        finally:
+            self.processing = False
 
     def _threaded_auto_load(self):
         if not self.processing:
@@ -216,30 +237,36 @@ class ExcelPrinterApp(tk.Tk):
         if self.processing or self.transformed_df is None:
             self.safe_messagebox("error", "Error", "Debe cargar un archivo válido primero.")
             return
-        threading.Thread(target=self._print_document, daemon=True).start()
+        self.processing = True
+        if not hasattr(self, 'executor'):
+            self.executor = ThreadPoolExecutor(max_workers=2)
+        future = self.executor.submit(self._print_document)
+        future.add_done_callback(self._print_complete_callback)
+
+    def _print_complete_callback(self, future):
+        try:
+            future.result()
+            self.safe_messagebox("info", "Listo", "Impresión completada.")
+            self._update_status("Listo")
+        except Exception as e:
+            logging.exception("Error impresión")
+            self.safe_messagebox("error", "Error", str(e))
+            self._update_status("Error")
+        finally:
+            self.processing = False
 
     def _print_document(self):
         try:
-            printer_map = {
-                "fedex": printer_fedex.print_fedex,
-                "urbano": printer_urbano.print_urbano,
-                "listados": printer_listados.print_listados,
-                "etiquetas": printer_etiquetas.print_etiquetas
-            }
             imprimir = printer_map.get(self.mode)
             if not imprimir:
                 raise ValueError(f"No se encontró función para el modo: {self.mode}")
-
             imprimir(None, self.config_columns, self.transformed_df)
-
             save_print_history(
-                archivo=f"{self.mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                archivo=f"{self.mode}_impresion.xlsx",
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
-
             self.df = None
             self.transformed_df = None
-
         except Exception as e:
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
@@ -317,9 +344,32 @@ class ExcelPrinterApp(tk.Tk):
         cargar_log()
 
 
-def main():
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler("logs/app.log", encoding="utf-8"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+
+def run_app():
     app = ExcelPrinterApp()
     app.mainloop()
+
+
+def main():
+    setup_logging()
+    try:
+        run_app()
+    except Exception as e:
+        logging.exception("Error fatal en la aplicación")
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

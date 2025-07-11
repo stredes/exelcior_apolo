@@ -1,6 +1,3 @@
-# Módulo: printer_urbano.py
-# Descripción: Impresión de listados Urbano con formato unificado y soporte multiplataforma.
-
 from datetime import datetime
 import pandas as pd
 from pathlib import Path
@@ -9,10 +6,10 @@ from app.core.logger_eventos import log_evento
 from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
 from app.printer.printer_tools import agregar_nombre_firma
 
-def imprimir_urbano(df: pd.DataFrame):
+
+def print_urbano(file_path, config, df: pd.DataFrame):
     """
-    Imprime un listado Urbano con título, formato de celdas, bordes y centrado.
-    Se genera un archivo Excel temporal estilizado y se envía automáticamente a impresión.
+    Imprime un listado Urbano con título y formato, compatible con printer_map.
     """
     try:
         if df.empty:

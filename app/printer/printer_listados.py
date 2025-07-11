@@ -1,33 +1,28 @@
-# Módulo: printer_listados.py
-# Descripción: Impresión de Listados Generales con formato unificado multiplataforma.
-
 from datetime import datetime
 import pandas as pd
 from pathlib import Path
 
 from app.core.logger_eventos import log_evento
 from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
-from app.printer.printer_tools import agregar_nombre_firma
 
-def imprimir_listado_general(df: pd.DataFrame):
+
+def print_listados(file_path, config, df: pd.DataFrame):
     """
-    Imprime un listado general aplicando título, bordes, centrado y formato en Excel.
-    El archivo generado se envía directamente a la impresora predeterminada.
+    Imprime un listado general (modo 'listados') con encabezado y formato.
     """
     try:
         if df.empty:
-            raise ValueError("El DataFrame del listado general está vacío.")
+            raise ValueError("El DataFrame de Listado está vacío y no se puede imprimir.")
 
-        fecha = datetime.now().strftime("%d/%m/%Y")
-        titulo = f"LISTADO GENERAL - {fecha}"
+        fecha_actual = datetime.now().strftime("%d/%m/%Y")
+        titulo = f"LISTADO GENERAL - {fecha_actual}"
 
-        df = agregar_nombre_firma(df)
         archivo_temporal: Path = generar_excel_temporal(df, titulo, sheet_name="Listado")
-        log_evento(f"📄 Archivo temporal generado para Listado General: {archivo_temporal}", "info")
+        log_evento(f"📄 Archivo temporal generado para impresión Listado General: {archivo_temporal}", "info")
 
         enviar_a_impresora(archivo_temporal)
-        log_evento("✅ Impresión de Listado General completada correctamente.", "info")
+        log_evento("✅ Impresión de listado general completada correctamente.", "info")
 
     except Exception as error:
-        log_evento(f"❌ Error al imprimir Listado General: {error}", "error")
+        log_evento(f"❌ Error al imprimir listado general: {error}", "error")
         raise RuntimeError(f"Error en impresión Listado General: {error}")

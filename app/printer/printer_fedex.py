@@ -1,6 +1,3 @@
-# Módulo: printer_fedex.py
-# Descripción: Impresión de listados FedEx con formato unificado y soporte multiplataforma.
-
 from datetime import datetime
 import pandas as pd
 from pathlib import Path
@@ -10,10 +7,9 @@ from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
 from app.printer.printer_tools import agregar_nombre_firma
 
 
-def imprimir_fedex(df: pd.DataFrame):
+def print_fedex(file_path, config, df: pd.DataFrame):
     """
     Imprime un listado FedEx con título, formato de celdas, bordes y centrado.
-    Se genera un archivo Excel temporal estilizado y se envía automáticamente a impresión.
     """
     try:
         if df.empty:

@@ -1,0 +1,38 @@
+2025-07-10 11:02:06,066 - INFO - Inicializando base de datos...
+2025-07-10 11:02:06,167 - INFO - Tablas creadas o verificadas correctamente.
+2025-07-10 11:02:06,233 - INFO - ✅ Configuración cargada correctamente.
+2025-07-10 11:02:18,385 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:02:18,656 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:02:18,657 - INFO - Transformando datos para modo: listados
+2025-07-10 11:02:18,682 - INFO - Columnas eliminadas: []
+2025-07-10 11:02:18,683 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:02:18,790 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:02:22,759 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-07-04.xlsx
+2025-07-10 11:02:23,020 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-07-04.xlsx
+2025-07-10 11:02:23,020 - INFO - Transformando datos para modo: fedex
+2025-07-10 11:02:23,049 - INFO - Columnas eliminadas: []
+2025-07-10 11:02:23,050 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:02:23,064 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-07-04.xlsx
+2025-07-10 11:02:26,283 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\637814622.xlsx
+2025-07-10 11:02:26,562 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\637814622.xlsx
+2025-07-10 11:02:26,563 - INFO - Transformando datos para modo: urbano
+2025-07-10 11:02:26,568 - INFO - Columnas eliminadas: []
+2025-07-10 11:02:26,569 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:02:26,600 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\637814622.xlsx
+2025-07-10 11:05:09,305 - INFO - Transformando datos para modo: urbano
+2025-07-10 11:05:09,305 - INFO - Columnas eliminadas: []
+2025-07-10 11:05:09,305 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:05:12,060 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:05:12,140 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:05:12,141 - INFO - Transformando datos para modo: listados
+2025-07-10 11:05:12,145 - INFO - Columnas eliminadas: []
+2025-07-10 11:05:12,146 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:05:12,168 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250710_104606.xlsx
+2025-07-10 11:05:20,339 - INFO - Transformando datos para modo: listados
+2025-07-10 11:05:20,355 - INFO - Columnas eliminadas: []
+2025-07-10 11:05:20,355 - INFO - Columnas convertidas a texto: []
+2025-07-10 11:06:18,675 - INFO - ✅ Configuración cargada correctamente.
+2025-07-10 11:06:27,866 - INFO - ✅ Configuración cargada correctamente.
+2025-07-10 15:42:27,052 - INFO - Inicializando base de datos...
+2025-07-10 15:42:27,079 - INFO - Tablas creadas o verificadas correctamente.
+2025-07-10 15:42:27,081 - INFO - ✅ Configuración cargada correctamente.

@@ -6,14 +6,19 @@ import openpyxl
 import pythoncom
 from win32com.client import Dispatch
 from pathlib import Path
+import pandas as pd
+import os
 
 from app.core.logger_eventos import log_evento
 
-# Ruta de plantilla y archivo temporal
+# Rutas de plantilla y archivo temporal
 PLANTILLA_PATH = Path("data/etiqueta pedido.xlsx")
 OUTPUT_PATH = Path("temp/etiqueta_impresion.xlsx")
 
-# Celdas asociadas a cada campo
+# Asegurar carpeta temporal
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# Mapa de celdas por campo
 CELDAS_MAP = {
     "rut": "B2",
     "razsoc": "B3",
@@ -25,15 +30,18 @@ CELDAS_MAP = {
     "transporte": "B9"
 }
 
-DEFAULT_PRINTER = "URBANO"  # Cambiar por nombre de impresora real si es necesario
+# Impresora predeterminada
+DEFAULT_PRINTER = "URBANO"
 
 
 def generar_etiqueta_excel(data: dict, output_path: Path = OUTPUT_PATH):
     """
-    Llena una plantilla Excel con los datos de la etiqueta y la guarda temporalmente.
+    Copia la plantilla, escribe los datos en las celdas mapeadas y guarda en output_path.
     """
     try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)  # Asegurar directorio
         shutil.copy(PLANTILLA_PATH, output_path)
+
         wb = openpyxl.load_workbook(output_path)
         ws = wb.active
 
@@ -50,7 +58,7 @@ def generar_etiqueta_excel(data: dict, output_path: Path = OUTPUT_PATH):
 
 def imprimir_excel(path: Path, impresora: str = DEFAULT_PRINTER):
     """
-    Imprime un archivo Excel mediante COM en Windows.
+    Usa COM para abrir el archivo con Excel y enviarlo a la impresora predeterminada.
     """
     try:
         pythoncom.CoInitialize()
@@ -60,7 +68,6 @@ def imprimir_excel(path: Path, impresora: str = DEFAULT_PRINTER):
         wb = excel.Workbooks.Open(str(path.resolve()))
         hoja = wb.Sheets(1)
 
-        # Configurar escala para impresión
         hoja.PageSetup.Zoom = False
         hoja.PageSetup.FitToPagesWide = 1
         hoja.PageSetup.FitToPagesTall = 1
@@ -80,7 +87,7 @@ def imprimir_excel(path: Path, impresora: str = DEFAULT_PRINTER):
 
 def imprimir_etiqueta_desde_formulario(data: dict, impresora: str = DEFAULT_PRINTER):
     """
-    Flujo completo: generación de etiqueta personalizada y envío a impresión.
+    Imprime una única etiqueta desde los datos ingresados por formulario.
     """
     try:
         generar_etiqueta_excel(data, OUTPUT_PATH)
@@ -88,3 +95,33 @@ def imprimir_etiqueta_desde_formulario(data: dict, impresora: str = DEFAULT_PRIN
         log_evento("✅ Impresión de etiqueta completada correctamente.", "info")
     except Exception as e:
         raise RuntimeError(f"Error en impresión de etiqueta: {e}")
+
+
+def print_etiquetas(file_path, config, df: pd.DataFrame):
+    """
+    Imprime una etiqueta por cada fila del DataFrame proporcionado.
+    """
+    try:
+        if df.empty:
+            raise ValueError("El DataFrame de etiquetas está vacío.")
+
+        for _, row in df.iterrows():
+            data = {
+                "rut": row.get("RUT", ""),
+                "razsoc": row.get("Razón Social", ""),
+                "dir": row.get("Dirección", ""),
+                "comuna": row.get("Comuna", ""),
+                "ciudad": row.get("Ciudad", ""),
+                "guia": row.get("Guía", ""),
+                "bultos": row.get("Bultos", ""),
+                "transporte": row.get("Transporte", DEFAULT_PRINTER)
+            }
+            log_evento(f"🧾 Generando etiqueta para: {data}", "info")
+            generar_etiqueta_excel(data)
+            imprimir_excel(OUTPUT_PATH, data["transporte"])
+
+        log_evento("✅ Impresión de todas las etiquetas finalizada.", "info")
+
+    except Exception as e:
+        log_evento(f"❌ Error en impresión múltiple de etiquetas: {e}", "error")
+        raise RuntimeError(f"Error en impresión múltiple de etiquetas: {e}")
