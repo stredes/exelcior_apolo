@@ -1,17 +1,66 @@
+import unicodedata
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 from datetime import datetime
 import platform
 
 from app.core.logger_eventos import log_evento
-from app.config.config_manager import load_config, save_config  # ✅ Config centralizada
+# ✅ Fuente única de configuración
+from app.config.config_manager import (
+    load_config,
+    save_config,  # mantenido si lo usas en otra parte
+    get_start_row,
+    get_effective_mode_rules,
+)
 
 # Solo importar COM en Windows
 if platform.system() == "Windows":
     import pythoncom
     from win32com.client import Dispatch
 
+
+# ==========================
+# Utilidades de normalización
+# ==========================
+
+_ZWSP = "\u200b"  # zero-width space
+
+def _normalize_name(s: str) -> str:
+    """
+    Normaliza nombres de columnas para comparaciones robustas:
+    - quita invisibles, tildes, colapsa espacios
+    - unifica variantes de 'Nº/N°/No./Nro.'
+    - lower()
+    """
+    if s is None:
+        return ""
+    s = str(s).replace(_ZWSP, "")
+    s = " ".join(s.strip().split())
+    s_nfkd = unicodedata.normalize("NFKD", s)
+    s_no_accents = "".join(ch for ch in s_nfkd if not unicodedata.combining(ch))
+    s_equiv = (
+        s_no_accents
+        .replace("Nº", "N")
+        .replace("N°", "N")
+        .replace("No.", "N")
+        .replace("No ", "N ")
+        .replace("Nro.", "N")
+        .replace("Nro ", "N ")
+    )
+    return s_equiv.lower()
+
+
+def _build_column_map(columns: List[str]) -> Dict[str, str]:
+    """
+    Crea un mapa {nombre_normalizado: nombre_real} de las columnas del DF.
+    """
+    return {_normalize_name(c): c for c in columns}
+
+
+# ==========================
+# Validación de archivo
+# ==========================
 
 def validate_file(file_path: str) -> Tuple[bool, str]:
     """
@@ -31,20 +80,27 @@ def validate_file(file_path: str) -> Tuple[bool, str]:
     return True, ""
 
 
+# ==========================
+# Carga de Excel con config
+# ==========================
+
 def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] = None) -> pd.DataFrame:
     """
-    Carga un archivo Excel o CSV en un DataFrame, aplicando las filas de inicio desde la configuración.
+    Carga un archivo Excel o CSV en un DataFrame, aplicando las filas de inicio desde la configuración efectiva.
+    También limpia nombres de columnas visibles (strip, colapsa espacios, quita ZWSP).
     """
     path = Path(file_path)
     ext = path.suffix.lower()
 
     engine = {
         ".xlsx": "openpyxl",
-        ".xls": "openpyxl",  # Puedes cambiar a 'xlrd' si lo necesitas para .xls antiguos
+        ".xls": "openpyxl",  # usa xlrd si lo necesitas para .xls antiguos
         ".csv": None
     }.get(ext)
 
-    skiprows = list(range(config.get(mode, {}).get("start_row", 0)))
+    # ✅ Usa la fuente única para obtener start_row
+    start_row = get_start_row(mode, config)
+    skiprows = list(range(start_row)) if start_row and start_row > 0 else None
 
     try:
         if ext == ".csv":
@@ -52,8 +108,12 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
         else:
             df = pd.read_excel(path, engine=engine, skiprows=skiprows, nrows=max_rows)
 
-        # Limpieza de nombres de columnas
-        df.columns = df.columns.str.strip().str.replace('\u200b', '', regex=True)
+        # Limpieza de nombres de columnas visibles
+        df.columns = (
+            pd.Index(df.columns)
+              .map(lambda c: str(c).replace(_ZWSP, ""))
+              .map(lambda c: " ".join(c.strip().split()))
+        )
         log_evento(f"Archivo cargado: {file_path}", "info")
         return df
 
@@ -62,39 +122,84 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
         raise
 
 
+# ==========================
+# Transformación según config
+# ==========================
+
 def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFrame:
     """
     Aplica las transformaciones configuradas: eliminación de columnas, sumatoria, y formato.
+    Usa matching tolerante (normalización) para resolver columnas de config vs columnas reales.
     """
     log_evento(f"Transformando datos para modo: {mode}", "info")
 
-    modo_cfg = config.get(mode, {})
-    eliminar = modo_cfg.get("eliminar", [])
-    sumar = modo_cfg.get("sumar", [])
-    mantener = modo_cfg.get("mantener_formato", [])
+    # ✅ Reglas efectivas del modo (misma fuente que usa todo el sistema)
+    rules = get_effective_mode_rules(mode, config)
+    eliminar = list(rules.get("eliminar", []) or [])
+    sumar = list(rules.get("sumar", []) or [])
+    mantener = list(rules.get("mantener_formato", []) or [])
 
-    # Eliminar columnas
-    df.drop(columns=[col for col in eliminar if col in df.columns], errors='ignore', inplace=True)
-    log_evento(f"Columnas eliminadas: {eliminar}", "info")
+    # Construye el mapa normalizado de columnas reales
+    colmap = _build_column_map(list(df.columns))
 
-    # Agregar fila de sumatorias si aplica
-    if sumar:
-        suma = {col: df[col].sum() if col in df.columns else 0 for col in sumar}
-        df = pd.concat([df, pd.DataFrame([suma])], ignore_index=True)
-        log_evento(f"Columnas sumadas: {sumar}", "info")
+    def resolve_targets(targets: List[str]) -> List[str]:
+        resolved: List[str] = []
+        misses: List[str] = []
+        for t in targets:
+            key = _normalize_name(t)
+            real = colmap.get(key)
+            if real is not None:
+                resolved.append(real)
+            else:
+                misses.append(t)
+        if resolved:
+            log_evento(f"[XFORM] Match columnas -> {targets} => {resolved}", "info")
+        if misses:
+            log_evento(f"[XFORM] No encontradas en DF (tras normalizar): {misses}", "warning")
+        return resolved
 
-    # Mantener formato como texto
-    for col in mantener:
-        if col in df.columns:
-            df[col] = df[col].astype(str)
-    log_evento(f"Columnas convertidas a texto: {mantener}", "info")
+    eliminar_resolved = resolve_targets(eliminar)
+    sumar_resolved = resolve_targets(sumar)
+    mantener_resolved = resolve_targets(mantener)
 
-    return df
+    df2 = df.copy()
 
+    # 1) Eliminar columnas
+    if eliminar_resolved:
+        df2.drop(columns=[c for c in eliminar_resolved if c in df2.columns], errors='ignore', inplace=True)
+        log_evento(f"Columnas eliminadas: {eliminar_resolved}", "info")
+    else:
+        log_evento("Columnas eliminadas: []", "info")
+
+    # 2) Sumatorias (conversión a numérico segura)
+    if sumar_resolved:
+        for col in sumar_resolved:
+            if col in df2.columns:
+                df2[col] = pd.to_numeric(df2[col], errors="coerce")
+        suma = {col: (df2[col].sum() if col in df2.columns else 0) for col in sumar_resolved}
+        df2 = pd.concat([df2, pd.DataFrame([suma])], ignore_index=True)
+        log_evento(f"[XFORM] Fila de sumatoria creada: {suma}", "info")
+
+    # 3) Mantener formato como texto
+    if mantener_resolved:
+        for col in mantener_resolved:
+            if col in df2.columns:
+                df2[col] = df2[col].astype(str)
+        log_evento(f"Columnas convertidas a texto: {mantener_resolved}", "info")
+    else:
+        log_evento("Columnas convertidas a texto: []", "info")
+
+    return df2
+
+
+# ==========================
+# Impresión por Excel COM
+# ==========================
 
 def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
     """
     Imprime el DataFrame usando Excel COM en Windows. Inserta título y formatea celdas.
+    Asegura orientación horizontal (Landscape) y ajuste a 1 página de ancho.
     """
     if platform.system() != "Windows":
         log_evento("Impresión Excel solo disponible en Windows.", "warning")
@@ -106,12 +211,14 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
     temp_xlsx = filepath.with_suffix(".temp.xlsx")
     df.to_excel(temp_xlsx, index=False)
 
+    excel = None
+    wb = None
     try:
         pythoncom.CoInitialize()
         excel = Dispatch("Excel.Application")
         excel.Visible = False
         wb = excel.Workbooks.Open(str(temp_xlsx.resolve()))
-        sheet = wb.Sheets(1)
+        sh = wb.Worksheets(1)
 
         # Título dinámico por modo
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
@@ -121,30 +228,51 @@ def imprimir_excel(filepath: Path, df: pd.DataFrame, mode: str):
         }.get(mode.lower(), f"LISTADO GENERAL - {fecha_actual}")
 
         # Insertar título en la primera fila
-        sheet.Rows("1:1").Insert()
-        sheet.Cells(1, 1).Value = titulo
-        sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, df.shape[1])).Merge()
-        sheet.Cells(1, 1).Font.Bold = True
-        sheet.Cells(1, 1).Font.Size = 12
-        sheet.Cells(1, 1).HorizontalAlignment = -4108  # Centrado
+        sh.Rows("1:1").Insert()
+        sh.Cells(1, 1).Value = titulo
+        sh.Range(sh.Cells(1, 1), sh.Cells(1, max(1, df.shape[1]))).Merge()
+        sh.Cells(1, 1).Font.Bold = True
+        sh.Cells(1, 1).Font.Size = 12
+        sh.Cells(1, 1).HorizontalAlignment = -4108  # xlCenter
 
-        # Aplicar bordes y centrado a todas las celdas de datos
-        for row in range(2, df.shape[0] + 2):
-            for col in range(1, df.shape[1] + 1):
-                cell = sheet.Cells(row, col)
-                cell.Borders.LineStyle = 1
-                cell.HorizontalAlignment = -4108
+        # Dar formato a rango usado (bordes + centrado + autofit)
+        used = sh.UsedRange
+        used.Borders.LineStyle = 1            # xlContinuous
+        used.HorizontalAlignment = -4108      # xlCenter
+        used.VerticalAlignment = -4108        # xlCenter
+        used.Columns.AutoFit()
 
-        wb.Save()
-        wb.Close(SaveChanges=True)
+        # ✅ Configurar página: horizontal y ajustar a 1 página de ancho
+        sh.PageSetup.Orientation = 2          # xlLandscape
+        sh.PageSetup.Zoom = False
+        sh.PageSetup.FitToPagesWide = 1
+        sh.PageSetup.FitToPagesTall = False   # tantas páginas de alto como necesite
+
+        # Imprimir
+        sh.PrintOut()
+        wb.Close(SaveChanges=False)
         log_evento(f"Impresión completada: {filepath.name}", "info")
 
     except Exception as e:
         log_evento(f"Error al imprimir: {e}", "error")
+        try:
+            if wb:
+                wb.Close(SaveChanges=False)
+        except Exception:
+            pass
         raise
-
     finally:
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        if temp_xlsx.exists():
-            temp_xlsx.unlink()
+        try:
+            if excel:
+                excel.Quit()
+        except Exception:
+            pass
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+        try:
+            if temp_xlsx.exists():
+                temp_xlsx.unlink()
+        except Exception:
+            pass

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, Union
 
 from app.utils.validate_config_structure import validate_config_structure
 from app.core.logger_eventos import log_evento
@@ -20,11 +20,10 @@ USER_CFG_PATH = APP_HOME / "config.json"
 DEFAULT_CFG_PATH = Path("app/config/excel_printer_default.json")
 
 # Contenido mínimo por si el default se borra accidentalmente
-_MINIMAL_DEFAULT = {
+_MINIMAL_DEFAULT: Dict[str, Any] = {
     "version": 1,
     "listados": {"start_row": 0, "eliminar": [], "sumar": [], "mantener_formato": [], "formato_texto": []}
 }
-
 
 # -----------------------------------------------------------------------------
 # Utilidades internas
@@ -33,7 +32,12 @@ def _read_json(path: Path) -> Dict[str, Any]:
     try:
         if not path.exists():
             return {}
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # Asegurar dict en top-level
+        if not isinstance(data, dict):
+            log_evento(f"⚠️ JSON top-level no es dict en {path}. Se ignora.", "warning")
+            return {}
+        return data
     except Exception as e:
         log_evento(f"❌ Error leyendo JSON en {path}: {e}", "error")
         return {}
@@ -45,8 +49,22 @@ def _write_json_atomic(path: Path, data: Dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    out = dict(a)
+def _ensure_dict(obj: Any, fallback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Normaliza a dict; si no lo es, devuelve fallback (o {})."""
+    if isinstance(obj, dict):
+        return obj
+    return {} if fallback is None else dict(fallback)
+
+
+def _deep_merge(a: Any, b: Any) -> Dict[str, Any]:
+    """
+    Merge profundo tolerante a tipos:
+    - Si a/b no son dict, se normalizan.
+    - b sobreescribe a.
+    """
+    a = _ensure_dict(a)
+    b = _ensure_dict(b)
+    out: Dict[str, Any] = dict(a)
     for k, v in b.items():
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = _deep_merge(out[k], v)
@@ -61,14 +79,36 @@ def get_config_paths() -> Tuple[Optional[Path], Path, Path]:
 
 
 def _validate_and_log(cfg: Dict[str, Any], origin: str) -> Dict[str, Any]:
+    """
+    Ejecuta validate_config_structure, admitiendo varios retornos:
+    - dict validado => se usa
+    - (dict, ...)   => usa el primer elemento si es dict
+    - True/False    => se ignora y se usa cfg original
+    - otros         => se ignora y se usa cfg original
+    """
     try:
-        validated = validate_config_structure(cfg)
-        log_evento(f"✅ Config validada desde {origin}", "info")
-        return validated
-    except Exception as e:
-        log_evento(f"⚠️ Config no válida ({origin}): {e}. Se usará tal cual.", "warning")
+        validated: Union[Dict[str, Any], Tuple[Any, ...], bool, Any] = validate_config_structure(cfg)
+        # dict directo
+        if isinstance(validated, dict):
+            log_evento(f"✅ Config validada desde {origin}", "info")
+            return validated
+        # tuple cuyo primer elemento es dict
+        if isinstance(validated, tuple) and validated and isinstance(validated[0], dict):
+            log_evento(f"✅ Config validada (tuple) desde {origin}", "info")
+            return validated[0]
+        # booleano u otro tipo -> no sustituye
+        if isinstance(validated, bool):
+            if validated:
+                log_evento(f"ℹ️ Validator OK (bool) desde {origin}; se mantiene cfg original.", "info")
+            else:
+                log_evento(f"⚠️ Validator NOT OK (bool) desde {origin}; se mantiene cfg original.", "warning")
+            return cfg
+        # cualquier otro tipo
+        log_evento(f"⚠️ Validator devolvió {type(validated).__name__} desde {origin}; se mantiene cfg original.", "warning")
         return cfg
-
+    except Exception as e:
+        log_evento(f"⚠️ Error en validate_config_structure ({origin}): {e}. Se usa cfg original.", "warning")
+        return cfg
 
 # -----------------------------------------------------------------------------
 # Bootstrap & reparación
@@ -95,11 +135,8 @@ def repair_user_config() -> None:
     default_cfg = _read_json(DEFAULT_CFG_PATH)
     user_cfg = _read_json(USER_CFG_PATH)
     if not user_cfg:
-        # Nada que reparar
         return
-
-    # Completar claves por modo presentes en default
-    repaired = _deep_merge(default_cfg, user_cfg)  # user sobrescribe, pero se asegura base
+    repaired = _deep_merge(default_cfg, user_cfg)
     if repaired != user_cfg:
         try:
             _write_json_atomic(USER_CFG_PATH, repaired)
@@ -111,7 +148,6 @@ def repair_user_config() -> None:
 def restore_user_config_from_defaults() -> None:
     """
     Restaura completamente el user config desde el default (sobrescribe).
-    Útil cuando se borró la config del usuario o quedó corrupta.
     """
     ensure_defaults()
     default_cfg = _read_json(DEFAULT_CFG_PATH) or _MINIMAL_DEFAULT
@@ -120,7 +156,6 @@ def restore_user_config_from_defaults() -> None:
         log_evento(f"🔄 User config restaurado desde default en {USER_CFG_PATH}", "warning")
     except Exception as e:
         log_evento(f"❌ Error restaurando user config: {e}", "error")
-
 
 # -----------------------------------------------------------------------------
 # API pública
@@ -142,23 +177,25 @@ def load_config() -> Dict[str, Any]:
         log_evento(f"[CONFIG] origen=ENV ({env_path})", "info")
         return cfg_env
 
-    cfg_default = _validate_and_log(_read_json(default_path) or _MINIMAL_DEFAULT, f"default:{default_path}")
-    cfg_user = _read_json(user_path)
+    cfg_default_raw = _read_json(default_path) or _MINIMAL_DEFAULT
+    cfg_default = _validate_and_log(cfg_default_raw, f"default:{default_path}")
 
-    if not cfg_user:
-        # Si no hay user config, escribe una copia del default para que el usuario la pueda editar
+    cfg_user_raw = _read_json(user_path)
+    if not cfg_user_raw:
+        # Inicializa user config con default para que el usuario tenga algo editable
         try:
             _write_json_atomic(user_path, cfg_default)
             log_evento(f"📝 User config inicializado desde default: {user_path}", "info")
-            cfg_user = _read_json(user_path)
+            cfg_user_raw = _read_json(user_path)
         except Exception as e:
             log_evento(f"❌ No se pudo inicializar user config: {e}", "error")
-            cfg_user = {}
+            cfg_user_raw = {}
 
-    # Repara el user config si faltan claves (completa desde default)
+    # Repara user config si faltan claves
     repair_user_config()
     cfg_user = _read_json(user_path)
 
+    # Merge final con guardas de tipo
     cfg = _deep_merge(cfg_default, cfg_user)
     log_evento(f"[CONFIG] default={default_path} + user={user_path} -> aplicado", "info")
     return cfg
@@ -167,6 +204,7 @@ def load_config() -> Dict[str, Any]:
 def save_config(config: Dict[str, Any]) -> bool:
     """
     Guarda la configuración del usuario en USER_CFG_PATH.
+    Convierte sets a listas si llega alguno.
     """
     def convert_sets(obj):
         if isinstance(obj, set):

@@ -18,7 +18,8 @@ from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
-from app.utils.utils import load_config
+# ⬇️ CORREGIDO: cargar configuración desde el manager unificado
+from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
@@ -41,8 +42,17 @@ class ExcelPrinterApp(tk.Tk):
         self.mode = "listados"
         self.processing = False
 
-        config = load_config()
-        self.config_columns = config if isinstance(config, dict) else {}
+        # ✅ Carga de config robusta (si algo raro pasa, usa {} y registra)
+        try:
+            config = load_config()
+            if not isinstance(config, dict):
+                logging.warning("[CONFIG] load_config no devolvió dict; usando {}")
+                config = {}
+        except Exception as e:
+            logging.exception("[CONFIG] Error cargando configuración; usando {}")
+            config = {}
+
+        self.config_columns = config
         self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
 
         self._setup_styles()
