@@ -12,7 +12,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from concurrent.futures import ThreadPoolExecutor
 
-from app.services.file_service import validate_file, process_file, printer_map
+# ✅ Importa el dispatcher seguro y helpers de servicio
+from app.services.file_service import validate_file, process_file, print_document
 from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
@@ -23,7 +24,7 @@ from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
 from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
-from app.core.excel_processor import load_excel, apply_transformation  # <-- Importaciones corregidas
+from app.core.excel_processor import load_excel, apply_transformation  # Importaciones correctas
 
 
 class ExcelPrinterApp(tk.Tk):
@@ -114,6 +115,7 @@ class ExcelPrinterApp(tk.Tk):
         self.status_var.set(mensaje)
 
     def _update_mode(self, modo_seleccionado: str):
+        # Simula radio-buttons: solo uno activo a la vez
         for modo in self.mode_vars:
             self.mode_vars[modo].set(modo == modo_seleccionado)
         self.mode = modo_seleccionado
@@ -134,7 +136,7 @@ class ExcelPrinterApp(tk.Tk):
         self.safe_messagebox("info", "Acerca de", mensaje)
 
     def _threaded_select_file(self):
-        path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.csv")])
         if path:
             valid, err = validate_file(path)
             if not valid:
@@ -167,7 +169,13 @@ class ExcelPrinterApp(tk.Tk):
         self._update_status("Buscando archivo más reciente...")
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
-            if estado == "ok" and archivo and validate_file(str(archivo)):
+            if estado == "ok" and archivo:
+                # ✅ Desestructurar validate_file (evita truthiness de tupla)
+                valido, msg = validate_file(str(archivo))
+                if not valido:
+                    self._update_status(f"⚠️ Archivo más reciente inválido: {msg}")
+                    self.safe_messagebox("error", "Archivo no válido", msg)
+                    return
                 self._update_status(f"✅ Cargado: {archivo.name}")
                 self._process_file(str(archivo))
             elif estado == "no_match":
@@ -257,14 +265,14 @@ class ExcelPrinterApp(tk.Tk):
 
     def _print_document(self):
         try:
-            imprimir = printer_map.get(self.mode)
-            if not imprimir:
-                raise ValueError(f"No se encontró función para el modo: {self.mode}")
-            imprimir(None, self.config_columns, self.transformed_df)
+            # ✅ Usa el dispatcher seguro (normaliza modo y valida existencia)
+            print_document(self.mode, self.transformed_df, self.config_columns, None)
+
             save_print_history(
                 archivo=f"{self.mode}_impresion.xlsx",
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
+            # Limpieza post-impresión si así lo prefieres:
             self.df = None
             self.transformed_df = None
         except Exception as e:
