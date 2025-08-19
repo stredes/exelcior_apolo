@@ -1,5 +1,4 @@
 # app/config/config_dialog.py
-
 from __future__ import annotations
 
 import tkinter as tk
@@ -16,10 +15,10 @@ from app.core.logger_eventos import log_evento
 
 class ConfigDialog(tk.Toplevel):
     """
-    Dialogo de configuración por modo.
+    Diálogo de configuración por modo.
     - Permite definir: columnas a eliminar, sumar, mantener como texto y fila inicial (start_row).
-    - Se alimenta y guarda contra la misma fuente de verdad usada por el pipeline:
-      app.config.config_manager (load_config / save_config / get_effective_mode_rules).
+    - Lee y guarda contra la MISMA fuente que usa el pipeline (config_manager).
+    - No usa sets (JSON-friendly).
     """
 
     def __init__(
@@ -33,7 +32,7 @@ class ConfigDialog(tk.Toplevel):
         :param parent: Ventana padre
         :param mode: Modo (p.ej. "listados", "fedex", "urbano")
         :param available_columns: Columnas detectadas en el DataFrame cargado
-        :param config_columns: Config actual cargada (se actualizará en memoria y se persistirá)
+        :param config_columns: Config actual en memoria (se sincroniza con disco al guardar)
         """
         super().__init__(parent)
         self.title(f"Configuración - {mode.capitalize()}")
@@ -55,7 +54,7 @@ class ConfigDialog(tk.Toplevel):
         self._create_widgets()
         self._load_initial_selection()
 
-        # Centrar sobre el padre
+        # Centrar sobre el padre y modal
         self.transient(parent)
         self.grab_set()
         self.focus_set()
@@ -84,7 +83,7 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_eliminar.insert(tk.END, col)
 
-        # --- Columnas para sumatorias (visible para modos logísticos comunes) ---
+        # --- Columnas para sumatorias ---
         frame_sumar = ttk.LabelFrame(container, text="Columnas para sumatorias", padding=10)
         frame_sumar.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
         lbl_info = tk.Label(
@@ -101,8 +100,8 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_sumar.insert(tk.END, col)
 
-        # --- Preservar formato original (por ahora, se comprende como mantener texto) ---
-        frame_preservar = ttk.LabelFrame(container, text="Preservar como texto", padding=10)
+        # --- Preservar como texto (procesamiento) ---
+        frame_preservar = ttk.LabelFrame(container, text="Preservar como texto (procesamiento)", padding=10)
         frame_preservar.grid(row=2, column=0, sticky="nsew", padx=6, pady=6)
         self.listbox_preservar = tk.Listbox(
             frame_preservar, selectmode="extended", font=("Segoe UI", 10), exportselection=False
@@ -111,7 +110,7 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_preservar.insert(tk.END, col)
 
-        # --- Formato texto en impresión (si quieres una lista separada para impresión) ---
+        # --- Formato texto en impresión (opcional, separado) ---
         frame_texto = ttk.LabelFrame(container, text="Formato texto (solo impresión)", padding=10)
         frame_texto.grid(row=2, column=1, sticky="nsew", padx=6, pady=6)
         self.listbox_formato_texto = tk.Listbox(
@@ -137,17 +136,16 @@ class ConfigDialog(tk.Toplevel):
 
     def _load_initial_selection(self) -> None:
         """
-        Carga la selección inicial desde las reglas efectivas del modo (misma fuente que usa el pipeline).
-        Si hay diferencias con self.config_columns, prevalece lo efectivo y se sincroniza al guardar.
+        Carga la selección inicial desde las reglas efectivas del modo (merge default+user/env).
+        Si difiere de self.config_columns, prevalece lo efectivo; al guardar se sincroniza todo.
         """
-        # Cargar configuración efectiva de disco (merge default+user/env) para evitar desalineaciones.
         cfg = load_config()
         rules = get_effective_mode_rules(self.mode, cfg)
 
         eliminar = list(rules.get("eliminar", []))
         sumar = list(rules.get("sumar", []))
         preservar = list(rules.get("mantener_formato", []))
-        # Campo opcional para impresión (si no existe, queda vacío)
+        # Impresión: si no existe, queda vacío (no rompe)
         formato_texto = list((cfg.get(self.mode, {}) or {}).get("formato_texto", []))
         start_row = int(rules.get("start_row", 0) or 0)
 
@@ -165,7 +163,7 @@ class ConfigDialog(tk.Toplevel):
                 self.listbox_formato_texto.select_set(idx)
 
         log_evento(
-            f"[CONFIG-UI] Inicial para '{self.mode}': start_row={start_row}, "
+            f"[CONFIG-UI] Inicial '{self.mode}': start_row={start_row}, "
             f"eliminar={eliminar}, sumar={sumar}, mantener_formato={preservar}, formato_texto={formato_texto}",
             "info",
         )
@@ -180,25 +178,25 @@ class ConfigDialog(tk.Toplevel):
         self.selected_formato_texto = [self.available_columns[i] for i in self.listbox_formato_texto.curselection()]
 
         # Sincroniza en memoria la estructura self.config_columns (para la sesión)
-        # Mantén cualquier otra clave ajena a este modo.
         actual_mode_cfg: Dict[str, Any] = dict(self.config_columns.get(self.mode, {}))
         actual_mode_cfg.update({
             "start_row": int(self.start_row_var.get() or 0),
-            "eliminar": self.selected_eliminar,
-            "sumar": self.selected_sumar,
-            "mantener_formato": self.selected_preservar,
-            # Campo opcional que puedes usar en impresión si quieres reglas distintas a mantener_formato
-            "formato_texto": self.selected_formato_texto,
+            "eliminar": list(self.selected_eliminar),
+            "sumar": list(self.selected_sumar),
+            "mantener_formato": list(self.selected_preservar),
+            "formato_texto": list(self.selected_formato_texto),  # opcional, útil para impresión
         })
         self.config_columns[self.mode] = actual_mode_cfg
 
-        # Cargamos el config global actual desde disco y fusionamos el modo para persistir bien
+        # Carga config efectiva desde disco y aplica override del modo actual
         cfg_disk = load_config()
+        if not isinstance(cfg_disk, dict):
+            cfg_disk = {}
         cfg_disk[self.mode] = actual_mode_cfg
 
         ok = save_config(cfg_disk)
         if ok:
-            log_evento(f"[CONFIG-UI] Guardado para '{self.mode}': {actual_mode_cfg}", "info")
+            log_evento(f"[CONFIG-UI] Guardado '{self.mode}': {actual_mode_cfg}", "info")
         else:
             log_evento(f"[CONFIG-UI] Error al guardar configuración para '{self.mode}'", "error")
 

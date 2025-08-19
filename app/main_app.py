@@ -1,3 +1,4 @@
+# app/main_app.py
 import sys
 import logging
 import threading
@@ -18,7 +19,7 @@ from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
-# ⬇️ CORREGIDO: cargar configuración desde el manager unificado
+# ⬇️ Cargar configuración desde el manager unificado
 from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.gui.sra_mary import SraMaryView
@@ -37,10 +38,13 @@ class ExcelPrinterApp(tk.Tk):
 
         init_db()
 
+        # Estado de la app
         self.df = None
         self.transformed_df = None
         self.mode = "listados"
         self.processing = False
+        # 🧵 Pool de hilos para evitar crear múltiples instancias al vuelo
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         # ✅ Carga de config robusta (si algo raro pasa, usa {} y registra)
         try:
@@ -48,7 +52,7 @@ class ExcelPrinterApp(tk.Tk):
             if not isinstance(config, dict):
                 logging.warning("[CONFIG] load_config no devolvió dict; usando {}")
                 config = {}
-        except Exception as e:
+        except Exception:
             logging.exception("[CONFIG] Error cargando configuración; usando {}")
             config = {}
 
@@ -60,14 +64,39 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_main_area()
         self._setup_status_bar()
 
-    def safe_messagebox(self, tipo, titulo, mensaje):
-        tipo_map = {
-            "info": messagebox.showinfo,
-            "warning": messagebox.showwarning,
-            "error": messagebox.showerror
-        }
-        fn = tipo_map.get(tipo, messagebox.showinfo)
-        self.after(0, lambda: fn(titulo, mensaje))
+        # Cierre limpio
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ---------------- Utilidades GUI seguras ----------------
+
+    def _ui_alive(self) -> bool:
+        """Indica si la ventana principal existe y el intérprete Tk está activo."""
+        try:
+            return bool(self.winfo_exists())
+        except Exception:
+            return False
+
+    def safe_messagebox(self, tipo: str, titulo: str, mensaje: str):
+        """
+        Muestra messagebox desde hilos de fondo sin romper Tk.
+        Si la UI ya no existe (mainloop finalizado), simplemente no hace nada.
+        """
+        if not self._ui_alive():
+            return
+        try:
+            tipo_map = {
+                "info": messagebox.showinfo,
+                "warning": messagebox.showwarning,
+                "error": messagebox.showerror,
+            }
+            fn = tipo_map.get(tipo, messagebox.showinfo)
+            # Programa la llamada en el hilo de UI
+            self.after(0, lambda: fn(titulo, mensaje))
+        except Exception:
+            # Evita excepciones cuando Tk no puede registrar comandos (cierre en curso)
+            pass
+
+    # ---------------- Setup UI ----------------
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -99,7 +128,7 @@ class ExcelPrinterApp(tk.Tk):
             ttk.Button(sidebar, text=texto, command=accion).pack(pady=10, fill="x", padx=10)
 
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
-        ttk.Button(sidebar, text="Salir ❌", command=self.quit).pack(side="bottom", pady=20, fill="x", padx=10)
+        ttk.Button(sidebar, text="Salir ❌", command=self._on_close).pack(side="bottom", pady=20, fill="x", padx=10)
 
     def _setup_main_area(self):
         self.main_frame = tk.Frame(self, bg="#F9FAFB")
@@ -122,7 +151,10 @@ class ExcelPrinterApp(tk.Tk):
                   anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
 
     def _update_status(self, mensaje: str):
-        self.status_var.set(mensaje)
+        if self._ui_alive():
+            self.status_var.set(mensaje)
+
+    # ---------------- Acciones de modo ----------------
 
     def _update_mode(self, modo_seleccionado: str):
         # Simula radio-buttons: solo uno activo a la vez
@@ -145,6 +177,8 @@ class ExcelPrinterApp(tk.Tk):
         )
         self.safe_messagebox("info", "Acerca de", mensaje)
 
+    # ---------------- Carga de archivos ----------------
+
     def _threaded_select_file(self):
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.csv")])
         if path:
@@ -154,33 +188,37 @@ class ExcelPrinterApp(tk.Tk):
                 return
             set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
             self.processing = True
-            if not hasattr(self, 'executor'):
-                self.executor = ThreadPoolExecutor(max_workers=2)
             future = self.executor.submit(process_file, path, self.config_columns, self.mode)
             future.add_done_callback(self._file_processed_callback)
 
     def _file_processed_callback(self, future):
         try:
-            self.df, self.transformed_df = future.result()
+            df, transformed = future.result()
+            if not self._ui_alive():
+                return
+            self.df, self.transformed_df = df, transformed
             save_file_history("n/a", self.mode)
             self.after(0, self._show_preview)
         except Exception as e:
             logging.exception("Error al procesar archivo")
-            self.safe_messagebox("error", "Error", str(e))
-            self.after(0, lambda: self._update_status("Error"))
+            if self._ui_alive():
+                self.safe_messagebox("error", "Error", str(e))
+                self.after(0, lambda: self._update_status("Error"))
         finally:
             self.processing = False
 
     def _threaded_auto_load(self):
-        if not self.processing:
-            threading.Thread(target=self._auto_load_latest_file, daemon=True).start()
+        if self.processing:
+            return
+        self.processing = True
+        t = threading.Thread(target=self._auto_load_latest_file, daemon=True)
+        t.start()
 
     def _auto_load_latest_file(self):
         self._update_status("Buscando archivo más reciente...")
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
             if estado == "ok" and archivo:
-                # ✅ Desestructurar validate_file (evita truthiness de tupla)
                 valido, msg = validate_file(str(archivo))
                 if not valido:
                     self._update_status(f"⚠️ Archivo más reciente inválido: {msg}")
@@ -209,13 +247,16 @@ class ExcelPrinterApp(tk.Tk):
             self.df = load_excel(path, self.config_columns, self.mode)
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
             save_file_history(path, self.mode)
-            self.after(0, self._show_preview)
+            if self._ui_alive():
+                self.after(0, self._show_preview)
         except Exception as e:
             logging.error(f"Error procesando archivo: {e}")
             self.safe_messagebox("error", "Error", f"No se pudo procesar el archivo:\n{e}")
         finally:
             self.processing = False
             self._update_status("Listo")
+
+    # ---------------- Vista previa ----------------
 
     def _show_preview(self):
         if self.transformed_df is None or self.transformed_df.empty:
@@ -251,25 +292,27 @@ class ExcelPrinterApp(tk.Tk):
 
         ttk.Button(vista, text="Imprimir", command=self._threaded_print).pack(pady=5)
 
+    # ---------------- Impresión ----------------
+
     def _threaded_print(self):
         if self.processing or self.transformed_df is None:
             self.safe_messagebox("error", "Error", "Debe cargar un archivo válido primero.")
             return
         self.processing = True
-        if not hasattr(self, 'executor'):
-            self.executor = ThreadPoolExecutor(max_workers=2)
         future = self.executor.submit(self._print_document)
         future.add_done_callback(self._print_complete_callback)
 
     def _print_complete_callback(self, future):
         try:
             future.result()
-            self.safe_messagebox("info", "Listo", "Impresión completada.")
-            self._update_status("Listo")
+            if self._ui_alive():
+                self.safe_messagebox("info", "Listo", "Impresión completada.")
+                self._update_status("Listo")
         except Exception as e:
             logging.exception("Error impresión")
-            self.safe_messagebox("error", "Error", str(e))
-            self._update_status("Error")
+            if self._ui_alive():
+                self.safe_messagebox("error", "Error", str(e))
+                self._update_status("Error")
         finally:
             self.processing = False
 
@@ -288,7 +331,13 @@ class ExcelPrinterApp(tk.Tk):
         except Exception as e:
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
-            self.safe_messagebox("error", "Error", f"Error al imprimir:\n{e}")
+            # ⚠️ NO llamar messagebox aquí directamente: estamos en hilo de fondo.
+            # Usa safe_messagebox en el callback (UI thread) o aquí con after:
+            if self._ui_alive():
+                self.after(0, lambda: self.safe_messagebox("error", "Error", f"Error al imprimir:\n{e}"))
+            raise  # Deja que el callback maneje el estado/UX
+
+    # ---------------- Configuración ----------------
 
     def _open_config_menu(self):
         if self.df is None:
@@ -299,7 +348,13 @@ class ExcelPrinterApp(tk.Tk):
     def open_config_dialog(self, modo: str):
         dialog = ConfigDialog(self, modo, list(self.df.columns), self.config_columns)
         self.wait_window(dialog)
-        self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+        # Reaplicar reglas tras guardar para reflejarse en la vista previa
+        try:
+            self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+        except Exception as e:
+            logging.error(f"Error aplicando reglas tras guardar config: {e}")
+
+    # ---------------- Otras vistas ----------------
 
     def _abrir_editor_etiquetas(self):
         try:
@@ -344,22 +399,41 @@ class ExcelPrinterApp(tk.Tk):
         txt.tag_configure("INFO", foreground="black")
 
         def cargar_log():
-            txt.config(state="normal")
-            txt.delete("1.0", tk.END)
-            with archivo.open("r", encoding="utf-8", errors="replace") as f:
-                for line in f:
-                    if "ERROR" in line:
-                        txt.insert(tk.END, line, "ERROR")
-                    elif "WARNING" in line:
-                        txt.insert(tk.END, line, "WARNING")
-                    elif "DEBUG" in line:
-                        txt.insert(tk.END, line, "DEBUG")
-                    else:
-                        txt.insert(tk.END, line, "INFO")
-            txt.config(state="disabled")
+            try:
+                txt.config(state="normal")
+                txt.delete("1.0", tk.END)
+                with archivo.open("r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        if "ERROR" in line:
+                            txt.insert(tk.END, line, "ERROR")
+                        elif "WARNING" in line:
+                            txt.insert(tk.END, line, "WARNING")
+                        elif "DEBUG" in line:
+                            txt.insert(tk.END, line, "DEBUG")
+                        else:
+                            txt.insert(tk.END, line, "INFO")
+                txt.config(state="disabled")
+            except Exception as e:
+                logging.error(f"Error leyendo log: {e}")
 
         ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
+
+    # ---------------- Cierre limpio ----------------
+
+    def _on_close(self):
+        try:
+            # Evita que callbacks intenten tocar la UI luego del cierre
+            self.processing = False
+            if self.executor:
+                # Cancela futuros pendientes para evitar llamados a after() tras el cierre
+                self.executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
 
 def setup_logging():
@@ -384,9 +458,15 @@ def main():
         run_app()
     except Exception as e:
         logging.exception("Error fatal en la aplicación")
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
+        # Evita crear una nueva raíz si el intérprete Tk está en cierre;
+        # usa un messagebox solo si es seguro.
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
+            root.destroy()
+        except Exception:
+            pass
         sys.exit(1)
 
 
