@@ -11,22 +11,25 @@ if str(ROOT_DIR) not in sys.path:
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from tkinter import font as tkfont  # medir texto y autoajustar Treeview
 from concurrent.futures import ThreadPoolExecutor
 
-# ✅ Importa el dispatcher seguro y helpers de servicio
+# ✅ Lógica de negocio / servicios
 from app.services.file_service import validate_file, process_file, print_document
 from app.db.database import init_db, save_file_history, save_print_history
-from app.config.config_dialog import ConfigDialog
+from app.config.config_dialog import ConfigDialog  # Configuración por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
-# ⬇️ Cargar configuración desde el manager unificado
 from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
 from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
-from app.core.excel_processor import load_excel, apply_transformation  # Importaciones correctas
+from app.core.excel_processor import load_excel, apply_transformation
+
+# 🧩 NUEVO: GUI de ajustes del sistema (Guardar / Default / Limpiar)
+from app.gui.gui_config import open_system_config
 
 
 class ExcelPrinterApp(tk.Tk):
@@ -43,10 +46,9 @@ class ExcelPrinterApp(tk.Tk):
         self.transformed_df = None
         self.mode = "listados"
         self.processing = False
-        # 🧵 Pool de hilos para evitar crear múltiples instancias al vuelo
         self.executor = ThreadPoolExecutor(max_workers=2)
 
-        # ✅ Carga de config robusta (si algo raro pasa, usa {} y registra)
+        # ✅ Carga de config robusta
         try:
             config = load_config()
             if not isinstance(config, dict):
@@ -70,17 +72,12 @@ class ExcelPrinterApp(tk.Tk):
     # ---------------- Utilidades GUI seguras ----------------
 
     def _ui_alive(self) -> bool:
-        """Indica si la ventana principal existe y el intérprete Tk está activo."""
         try:
             return bool(self.winfo_exists())
         except Exception:
             return False
 
     def safe_messagebox(self, tipo: str, titulo: str, mensaje: str):
-        """
-        Muestra messagebox desde hilos de fondo sin romper Tk.
-        Si la UI ya no existe (mainloop finalizado), simplemente no hace nada.
-        """
         if not self._ui_alive():
             return
         try:
@@ -90,10 +87,8 @@ class ExcelPrinterApp(tk.Tk):
                 "error": messagebox.showerror,
             }
             fn = tipo_map.get(tipo, messagebox.showinfo)
-            # Programa la llamada en el hilo de UI
             self.after(0, lambda: fn(titulo, mensaje))
         except Exception:
-            # Evita excepciones cuando Tk no puede registrar comandos (cierre en curso)
             pass
 
     # ---------------- Setup UI ----------------
@@ -109,12 +104,13 @@ class ExcelPrinterApp(tk.Tk):
         sidebar = tk.Frame(self, bg="#111827", width=200)
         sidebar.pack(side="left", fill="y")
 
-        tk.Label(sidebar, text="Menú", bg="#111827", fg="white", font=("Segoe UI", 14, "bold")).pack(pady=20)
+        tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
+                 font=("Segoe UI", 14, "bold")).pack(pady=20)
 
         botones = [
             ("Seleccionar Excel 📂", self._threaded_select_file),
             ("Carga Automática 🚀", self._threaded_auto_load),
-            ("Configuración ⚙️", self._open_config_menu),
+            ("Config. Modo ⚙️", self._open_config_menu),  # diálogo por MODO (listados/fedex/urbano)
             ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
             ("Ver Logs 📋", self._view_logs),
             ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
@@ -157,7 +153,6 @@ class ExcelPrinterApp(tk.Tk):
     # ---------------- Acciones de modo ----------------
 
     def _update_mode(self, modo_seleccionado: str):
-        # Simula radio-buttons: solo uno activo a la vez
         for modo in self.mode_vars:
             self.mode_vars[modo].set(modo == modo_seleccionado)
         self.mode = modo_seleccionado
@@ -283,9 +278,22 @@ class ExcelPrinterApp(tk.Tk):
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
 
+        # --- Autoajuste de columnas basado en contenido ---
+        fnt = tkfont.nametofont("TkDefaultFont")
+        MAX_W = 380  # px
+        MIN_W = 90   # px
+        PADDING = 24 # px
+
         for col in columnas:
+            muestras = [str(col)]
+            muestras += [str(v) for v in self.transformed_df[col].astype(str).head(200).tolist()]
+            if len(muestras) > 50:
+                step = max(1, len(muestras)//50)
+                muestras = muestras[::step][:50]
+            ancho = max((fnt.measure(s) for s in muestras), default=MIN_W) + PADDING
+            ancho = max(MIN_W, min(ancho, MAX_W))
             tree.heading(col, text=col)
-            tree.column(col, width=120, anchor=tk.CENTER)
+            tree.column(col, width=ancho, anchor=tk.CENTER)
 
         for row in self.transformed_df.itertuples(index=False):
             tree.insert("", "end", values=row)
@@ -318,24 +326,20 @@ class ExcelPrinterApp(tk.Tk):
 
     def _print_document(self):
         try:
-            # ✅ Usa el dispatcher seguro (normaliza modo y valida existencia)
             print_document(self.mode, self.transformed_df, self.config_columns, None)
-
             save_print_history(
                 archivo=f"{self.mode}_impresion.xlsx",
                 observacion=f"Impresión realizada en modo '{self.mode}'"
             )
-            # Limpieza post-impresión si así lo prefieres:
             self.df = None
             self.transformed_df = None
         except Exception as e:
             logging.error(f"Error en impresión: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
-            # ⚠️ NO llamar messagebox aquí directamente: estamos en hilo de fondo.
-            # Usa safe_messagebox en el callback (UI thread) o aquí con after:
             if self._ui_alive():
-                self.after(0, lambda: self.safe_messagebox("error", "Error", f"Error al imprimir:\n{e}"))
-            raise  # Deja que el callback maneje el estado/UX
+                msg = f"Error al imprimir:\n{e}"
+                self.after(0, lambda m=msg: self.safe_messagebox("error", "Error", m))
+            raise
 
     # ---------------- Configuración ----------------
 
@@ -346,19 +350,40 @@ class ExcelPrinterApp(tk.Tk):
         self.open_config_dialog(self.mode)
 
     def open_config_dialog(self, modo: str):
+        def on_save(new_config):
+            self.config_columns = new_config
+            try:
+                self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+            except Exception as e:
+                logging.error(f"Error aplicando reglas tras guardar config: {e}")
+
+        # Editor por MODO (listados / fedex / urbano)
         dialog = ConfigDialog(self, modo, list(self.df.columns), self.config_columns)
         self.wait_window(dialog)
-        # Reaplicar reglas tras guardar para reflejarse en la vista previa
+        # El propio diálogo guarda, pero forzamos retransformación por si acaso
         try:
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
         except Exception as e:
-            logging.error(f"Error aplicando reglas tras guardar config: {e}")
+            logging.error(f"Error reaplicando reglas: {e}")
+
+    # 👉 NUEVO: callback cuando se guardan los “Ajustes del Sistema”
+    def _on_system_config_saved(self, new_cfg: dict):
+        self.config_columns = new_cfg or {}
+        # Si hay archivo cargado, reaplicar para reflejar cambios globales
+        if self.df is not None:
+            try:
+                self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+                if self._ui_alive():
+                    self.after(0, self._show_preview)
+            except Exception as e:
+                logging.error(f"Error aplicando reglas tras guardar ajustes del sistema: {e}")
 
     # ---------------- Otras vistas ----------------
 
     def _abrir_editor_etiquetas(self):
         try:
-            path = filedialog.askopenfilename(title="Selecciona archivo de etiquetas", filetypes=[("Excel Files", "*.xlsx")])
+            path = filedialog.askopenfilename(title="Selecciona archivo de etiquetas",
+                                              filetypes=[("Excel Files", "*.xlsx")])
             if not path:
                 return
             df_clientes = cargar_clientes(path)
@@ -423,10 +448,8 @@ class ExcelPrinterApp(tk.Tk):
 
     def _on_close(self):
         try:
-            # Evita que callbacks intenten tocar la UI luego del cierre
             self.processing = False
             if self.executor:
-                # Cancela futuros pendientes para evitar llamados a after() tras el cierre
                 self.executor.shutdown(wait=False, cancel_futures=True)
         except Exception:
             pass
@@ -458,8 +481,6 @@ def main():
         run_app()
     except Exception as e:
         logging.exception("Error fatal en la aplicación")
-        # Evita crear una nueva raíz si el intérprete Tk está en cierre;
-        # usa un messagebox solo si es seguro.
         try:
             root = tk.Tk()
             root.withdraw()

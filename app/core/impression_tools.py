@@ -18,7 +18,7 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
       - Encabezados (fila 2)
       - Datos (desde fila 3)
       - Bordes finos y centrado
-      - Autoajuste de columnas (sobre el Workbook)
+      - Autoajuste real de columnas (sin depender de util externa)
       - Impresión EN HORIZONTAL y ajuste a 1 página de ancho
     """
     if df is None or df.empty:
@@ -27,6 +27,7 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Side, Font
     from openpyxl.worksheet.page import PageMargins
+    from openpyxl.utils import get_column_letter
 
     wb = Workbook()
     ws = wb.active
@@ -34,41 +35,59 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
 
     ncols = max(1, len(df.columns))
 
-    # Título
+    # --- Título (fila 1)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
     celda_titulo = ws.cell(row=1, column=1, value=titulo)
     celda_titulo.font = Font(bold=True, size=14)
     celda_titulo.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Encabezados
+    # --- Encabezados (fila 2)
     for idx, col in enumerate(df.columns, start=1):
         c = ws.cell(row=2, column=idx, value=str(col))
         c.font = Font(bold=True)
         c.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Datos
+    # --- Datos (desde fila 3)
     for r_idx, row in enumerate(df.itertuples(index=False), start=3):
         for c_idx, value in enumerate(row, start=1):
             c = ws.cell(row=r_idx, column=c_idx, value=value)
             c.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Bordes finos
+    # --- Bordes finos (encabezados + datos)
     thin = Side(style="thin")
     thin_border = Border(left=thin, right=thin, top=thin, bottom=thin)
     for fila in ws.iter_rows(min_row=2, max_row=2 + len(df), min_col=1, max_col=ncols):
         for c in fila:
             c.border = thin_border
 
-    # Autoajuste (a nivel de workbook)
-    autoajustar_columnas(wb)
+    # --- Autoajuste de columnas (robusto)
+    # Heurística por longitud de cadena; padding y límites razonables.
+    PAD = 2          # “aire” lateral
+    MIN_W = 10       # ancho mínimo (excel units aprox)
+    MAX_W = 100      # ancho máximo por columna
+    for col_idx in range(1, ncols + 1):
+        header = ws.cell(row=2, column=col_idx).value
+        max_len = len(str(header)) if header is not None else 0
 
-    # Config de página: horizontal y a 1 página de ancho
+        # Revisa todas las filas de datos
+        for r in range(3, 3 + len(df)):
+            v = ws.cell(row=r, column=col_idx).value
+            l = len(str(v)) if v is not None else 0
+            if l > max_len:
+                max_len = l
+
+        # Calcula ancho aproximado (excel units ~ caracteres)
+        width = max(MIN_W, min(MAX_W, max_len + PAD))
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    # --- Config de página: horizontal y a 1 página de ancho
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.page_margins = PageMargins(left=0.3, right=0.3, top=0.5, bottom=0.5)
 
-    # Guardar temporal
+    # --- Guardar temporal
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         temp_path = Path(tmp.name)
     wb.save(str(temp_path))
