@@ -1,4 +1,5 @@
 # app/main_app.py
+import os
 import sys
 import logging
 import threading
@@ -28,8 +29,18 @@ from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
 from app.core.excel_processor import load_excel, apply_transformation
 
-# 🧩 NUEVO: GUI de ajustes del sistema (Guardar / Default / Limpiar)
-from app.gui.gui_config import open_system_config
+# (Opcional) GUI de ajustes del sistema
+try:
+    from app.gui.gui_config import open_system_config  # si existe
+except Exception:
+    open_system_config = None
+
+
+def _has_display() -> bool:
+    """En Linux/Unix, verifica si hay un servidor gráfico disponible."""
+    if sys.platform.startswith("linux") or sys.platform == "darwin":
+        return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    return True  # Windows normalmente tiene subsistema gráfico
 
 
 class ExcelPrinterApp(tk.Tk):
@@ -78,7 +89,9 @@ class ExcelPrinterApp(tk.Tk):
             return False
 
     def safe_messagebox(self, tipo: str, titulo: str, mensaje: str):
-        if not self._ui_alive():
+        """Muestra messagebox desde hilos de fondo sin romper Tk y tolera entorno sin DISPLAY."""
+        if not self._ui_alive() or not _has_display():
+            logging.info(f"[MSGBOX suppressed] {tipo.upper()} - {titulo}: {mensaje}")
             return
         try:
             tipo_map = {
@@ -95,7 +108,16 @@ class ExcelPrinterApp(tk.Tk):
 
     def _setup_styles(self):
         style = ttk.Style(self)
-        style.theme_use('clam')
+        # Fallback de tema para Linux (algunas distros no tienen 'clam' por defecto)
+        try:
+            style.theme_use('clam')
+        except Exception:
+            # Elige el primero disponible
+            try:
+                style.theme_use(style.theme_names()[0])
+            except Exception:
+                pass
+
         style.configure("TButton", font=("Segoe UI", 11), padding=8)
         style.configure("TLabel", font=("Segoe UI", 11))
         style.configure("TCheckbutton", font=("Segoe UI", 11))
@@ -119,6 +141,10 @@ class ExcelPrinterApp(tk.Tk):
             ("Sra Mary 👩‍💼", self._abrir_sra_mary),
             ("Inventario 📦", lambda: InventarioView(self)),
         ]
+
+        # Si la GUI de ajustes del sistema está disponible, añade botón
+        if open_system_config:
+            botones.insert(3, ("Ajustes del Sistema 🌐", lambda: open_system_config(self, self._on_system_config_saved)))
 
         for texto, accion in botones:
             ttk.Button(sidebar, text=texto, command=accion).pack(pady=10, fill="x", padx=10)
@@ -279,7 +305,11 @@ class ExcelPrinterApp(tk.Tk):
         tree_frame.grid_columnconfigure(0, weight=1)
 
         # --- Autoajuste de columnas basado en contenido ---
-        fnt = tkfont.nametofont("TkDefaultFont")
+        try:
+            fnt = tkfont.nametofont("TkDefaultFont")
+        except Exception:
+            fnt = tkfont.Font()  # fallback
+
         MAX_W = 380  # px
         MIN_W = 90   # px
         PADDING = 24 # px
@@ -350,26 +380,18 @@ class ExcelPrinterApp(tk.Tk):
         self.open_config_dialog(self.mode)
 
     def open_config_dialog(self, modo: str):
-        def on_save(new_config):
-            self.config_columns = new_config
-            try:
-                self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
-            except Exception as e:
-                logging.error(f"Error aplicando reglas tras guardar config: {e}")
-
         # Editor por MODO (listados / fedex / urbano)
         dialog = ConfigDialog(self, modo, list(self.df.columns), self.config_columns)
         self.wait_window(dialog)
-        # El propio diálogo guarda, pero forzamos retransformación por si acaso
+        # Reaplicar reglas tras guardar para reflejarse en la vista previa
         try:
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
         except Exception as e:
             logging.error(f"Error reaplicando reglas: {e}")
 
-    # 👉 NUEVO: callback cuando se guardan los “Ajustes del Sistema”
+    # 👉 Callback cuando se guardan los “Ajustes del Sistema”
     def _on_system_config_saved(self, new_cfg: dict):
         self.config_columns = new_cfg or {}
-        # Si hay archivo cargado, reaplicar para reflejar cambios globales
         if self.df is not None:
             try:
                 self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
@@ -393,6 +415,12 @@ class ExcelPrinterApp(tk.Tk):
 
     def _view_logs(self):
         log_dir = Path(__file__).resolve().parent.parent / "logs"
+        # 🔧 Asegura que exista en Linux
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
         if not log_dir.exists():
             self.safe_messagebox("info", "Logs", "No hay logs para mostrar.")
             return
@@ -460,11 +488,17 @@ class ExcelPrinterApp(tk.Tk):
 
 
 def setup_logging():
+    log_dir = (Path(__file__).resolve().parent.parent / "logs")
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler("logs/app.log", encoding="utf-8"),
+            logging.FileHandler(str(log_dir / "app.log"), encoding="utf-8"),
             logging.StreamHandler(sys.stdout)
         ]
     )
@@ -477,15 +511,23 @@ def run_app():
 
 def main():
     setup_logging()
+    # Si no hay servidor gráfico, informa y aborta con código claro
+    if not _has_display():
+        logging.error("No se detectó DISPLAY/servidor gráfico. La interfaz Tkinter requiere entorno gráfico.")
+        print("Error: No se detectó entorno gráfico (DISPLAY/Wayland).")
+        sys.exit(2)
+
     try:
         run_app()
     except Exception as e:
         logging.exception("Error fatal en la aplicación")
         try:
-            root = tk.Tk()
-            root.withdraw()
-            messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
-            root.destroy()
+            # Solo intentes messagebox si hay display
+            if _has_display():
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
+                root.destroy()
         except Exception:
             pass
         sys.exit(1)
