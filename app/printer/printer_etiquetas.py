@@ -14,6 +14,8 @@ from tempfile import NamedTemporaryFile
 from typing import Optional, Dict
 
 import openpyxl
+from openpyxl.worksheet.page import PageMargins
+from pathlib import Path
 import pandas as pd
 from app.core.logger_eventos import log_evento
 
@@ -151,7 +153,7 @@ def _run_cmd(cmd: list[str], timeout_s: int = PRINT_TIMEOUT_S) -> None:
 def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
     """
     Copia la plantilla, escribe datos en celdas mapeadas y guarda en output_path.
-    Devuelve la ruta final generada.
+    Fuerza tamaño de página a 10 cm (ancho) x 14 cm (alto) en orientación vertical.
     """
     try:
         _ensure_exists(PLANTILLA_PATH)
@@ -161,19 +163,34 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         wb = openpyxl.load_workbook(output_path)
         ws = wb.active
 
+        # Insertar datos
         for campo, celda in CELDAS_MAP.items():
             ws[celda] = data.get(campo, "")
 
-        # Formato de página mínimo (opcional)
+        # ---- Configuración de página 10x14 cm (retrato) ----
+        # Nota: openpyxl acepta strings con unidades para paperWidth/paperHeight ("10cm", "14cm").
         try:
             ws.page_setup.orientation = "portrait"
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 1
-        except Exception:
-            pass
+
+            # Márgenes pequeños para aprovechar el área
+            ws.page_margins = PageMargins(
+                left=0.2, right=0.2, top=0.3, bottom=0.3, header=0.1, footer=0.1
+            )
+
+            # Dimensiones exactas en cm
+            ws.page_setup.paperWidth = "10cm"
+            ws.page_setup.paperHeight = "14cm"
+
+            # Asegura que Excel/LibreOffice respeten el ajuste a página
+            if hasattr(ws, "sheet_properties") and hasattr(ws.sheet_properties, "pageSetUpPr"):
+                ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[attr-defined]
+        except Exception as e:
+            log_evento(f"⚠️ No se pudo aplicar tamaño de página personalizado 10x14 cm: {e}", "warning")
 
         wb.save(output_path)
-        log_evento(f"📄 Etiqueta generada en: {output_path}", "info")
+        log_evento(f"📄 Etiqueta (10x14 cm) generada en: {output_path}", "info")
         return output_path
 
     except Exception as e:
@@ -196,6 +213,7 @@ def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str) -> None:
             wb = excel.Workbooks.Open(str(xlsx_path.resolve()))
             hoja = wb.Sheets(1)
 
+            # Mantén el tamaño configurado por openpyxl y asegúrate de ajustar a una hoja
             hoja.PageSetup.Zoom = False
             hoja.PageSetup.FitToPagesWide = 1
             hoja.PageSetup.FitToPagesTall = 1

@@ -1,0 +1,537 @@
+2025-08-19 10:20:47,552 - INFO - Inicializando base de datos...
+2025-08-19 10:20:47,585 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 10:20:47,643 - INFO - ℹ️ Validator OK (bool) desde default:app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 10:20:47,761 - INFO - [CONFIG] default=app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 10:20:59,853 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_083351.xlsx
+2025-08-19 10:20:59,854 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:20:59,921 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_083351.xlsx
+2025-08-19 10:20:59,924 - INFO - Transformando datos para modo: listados
+2025-08-19 10:20:59,925 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 10:20:59,927 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:20:59,928 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:20:59,933 - INFO - Columnas eliminadas: []
+2025-08-19 10:20:59,937 - INFO - Columnas convertidas a texto: []
+2025-08-19 10:20:59,998 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_083351.xlsx
+2025-08-19 10:25:45,034 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 10:25:45,036 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:25:45,117 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 10:25:45,119 - INFO - Transformando datos para modo: listados
+2025-08-19 10:25:45,121 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 10:25:45,123 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:25:45,124 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:25:45,127 - INFO - Columnas eliminadas: []
+2025-08-19 10:25:45,129 - INFO - Columnas convertidas a texto: []
+2025-08-19 10:25:45,141 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 10:25:56,643 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmpy4gixlzb.xlsx
+2025-08-19 10:25:56,644 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmpy4gixlzb.xlsx
+2025-08-19 10:25:56,649 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 10:25:56,663 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 10:25:56,666 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.COM --headless --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmpy4gixlzb.xlsx
+2025-08-19 10:26:43,944 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:26:43,973 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 10:26:43,976 - INFO - Transformando datos para modo: listados
+2025-08-19 10:26:43,978 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 10:26:43,981 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:26:43,982 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 10:26:43,983 - INFO - Columnas eliminadas: []
+2025-08-19 10:26:43,984 - INFO - Columnas convertidas a texto: []
+2025-08-19 10:26:43,999 - INFO - Historial de archivo guardado: n/a
+2025-08-19 10:26:47,631 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmpuiqazg9j.xlsx
+2025-08-19 10:26:47,632 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmpuiqazg9j.xlsx
+2025-08-19 10:26:47,636 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 10:26:47,650 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 10:26:47,652 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.COM --headless --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmpuiqazg9j.xlsx
+2025-08-19 11:33:51,430 - ERROR - Impresión por 'soffice.COM' falló (3221225786). stderr: 
+2025-08-19 11:33:51,438 - ERROR - Impresión por 'soffice.COM' falló (3221225786). stderr: 
+2025-08-19 11:33:51,439 - ERROR - Error al enviar a impresora: No se pudo imprimir con soffice.COM.
+2025-08-19 11:33:51,440 - ERROR - Error al enviar a impresora: No se pudo imprimir con soffice.COM.
+2025-08-19 11:33:51,442 - ERROR - ❌ Error al imprimir listado general: No se pudo imprimir con soffice.COM.
+2025-08-19 11:33:51,442 - ERROR - ❌ Error al imprimir listado general: No se pudo imprimir con soffice.COM.
+2025-08-19 11:33:51,453 - ERROR - Error al imprimir: Error en impresión Listado General: No se pudo imprimir con soffice.COM.
+2025-08-19 11:33:51,458 - ERROR - Error al imprimir: Error en impresión Listado General: No se pudo imprimir con soffice.COM.
+2025-08-19 11:34:29,787 - INFO - Inicializando base de datos...
+2025-08-19 11:34:29,799 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 11:34:29,805 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 11:34:29,813 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 11:35:04,288 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:35:04,290 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:35:04,345 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:35:04,348 - INFO - Transformando datos para modo: listados
+2025-08-19 11:35:04,349 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 11:35:04,351 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:35:04,358 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': [], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:35:04,360 - INFO - Columnas eliminadas: []
+2025-08-19 11:35:04,361 - INFO - Columnas convertidas a texto: []
+2025-08-19 11:35:04,420 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:36:09,209 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp06iemgum.xlsx
+2025-08-19 11:36:09,215 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp06iemgum.xlsx
+2025-08-19 11:36:09,220 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 11:36:09,236 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 11:36:09,244 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.COM --headless --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp06iemgum.xlsx
+2025-08-19 11:43:47,211 - ERROR - Impresión por 'soffice.COM' falló (3221225786). stderr: 
+2025-08-19 11:43:47,212 - ERROR - Error al enviar a impresora: No se pudo imprimir con soffice.COM.
+2025-08-19 11:43:47,213 - ERROR - ❌ Error al imprimir listado general: No se pudo imprimir con soffice.COM.
+2025-08-19 11:43:47,215 - ERROR - Error al imprimir: Error en impresión Listado General: No se pudo imprimir con soffice.COM.
+2025-08-19 11:44:02,024 - INFO - Inicializando base de datos...
+2025-08-19 11:44:02,037 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 11:44:02,040 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 11:44:02,047 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 11:44:26,512 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:44:26,513 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:44:26,565 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:44:26,568 - INFO - Transformando datos para modo: listados
+2025-08-19 11:44:26,569 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 11:44:26,570 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:44:26,573 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 11:44:26,575 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 11:44:26,603 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 11:44:26,605 - INFO - Columnas convertidas a texto: []
+2025-08-19 11:44:26,664 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 11:44:31,311 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp0xqqqgbr.xlsx
+2025-08-19 11:44:31,312 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp0xqqqgbr.xlsx
+2025-08-19 11:44:31,317 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 11:44:31,332 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 11:44:31,334 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.COM --headless --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp0xqqqgbr.xlsx
+2025-08-19 12:07:45,604 - ERROR - Impresión por 'soffice.COM' falló (3221225786). stderr: 
+2025-08-19 12:07:45,607 - ERROR - Error al enviar a impresora: No se pudo imprimir con soffice.COM.
+2025-08-19 12:07:45,608 - ERROR - ❌ Error al imprimir listado general: No se pudo imprimir con soffice.COM.
+2025-08-19 12:07:45,611 - ERROR - Error al imprimir: Error en impresión Listado General: No se pudo imprimir con soffice.COM.
+2025-08-19 12:07:59,316 - INFO - Inicializando base de datos...
+2025-08-19 12:07:59,331 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 12:07:59,336 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 12:07:59,346 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 12:08:07,229 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:08:07,230 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:08:07,282 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:08:07,286 - INFO - Transformando datos para modo: listados
+2025-08-19 12:08:07,288 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 12:08:07,290 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:08:07,292 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:08:07,294 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:08:07,298 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:08:07,309 - INFO - Columnas convertidas a texto: []
+2025-08-19 12:08:07,367 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:08:10,335 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp2o78f4a_.xlsx
+2025-08-19 12:08:10,336 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp2o78f4a_.xlsx
+2025-08-19 12:08:10,341 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 12:08:10,356 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 12:08:10,359 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp2o78f4a_.xlsx
+2025-08-19 12:19:58,223 - INFO - Inicializando base de datos...
+2025-08-19 12:19:58,248 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 12:19:58,251 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 12:19:58,262 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 12:20:09,837 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:20:09,838 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:20:09,887 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:20:09,889 - INFO - Transformando datos para modo: listados
+2025-08-19 12:20:09,890 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 12:20:09,892 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:20:09,893 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:20:09,895 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:20:09,900 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:20:09,907 - INFO - Columnas convertidas a texto: []
+2025-08-19 12:20:09,972 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:20:17,948 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp_ek55ite.xlsx
+2025-08-19 12:20:17,949 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp_ek55ite.xlsx
+2025-08-19 12:20:17,956 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 12:20:17,972 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 12:20:17,974 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp_ek55ite.xlsx
+2025-08-19 12:27:49,337 - INFO - Inicializando base de datos...
+2025-08-19 12:27:49,354 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 12:27:49,359 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 12:27:49,366 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 12:35:17,941 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:35:18,000 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:35:18,091 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:35:18,106 - INFO - Transformando datos para modo: listados
+2025-08-19 12:35:18,128 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 12:35:18,130 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:35:18,133 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 12:35:18,143 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:35:18,151 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 12:35:18,164 - INFO - Columnas convertidas a texto: []
+2025-08-19 12:35:18,261 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 12:35:21,095 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp6t5dygbe.xlsx
+2025-08-19 12:35:21,096 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp6t5dygbe.xlsx
+2025-08-19 12:35:21,104 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 12:35:21,136 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 12:35:21,144 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp6t5dygbe.xlsx
+2025-08-19 12:35:46,181 - ERROR - Tiempo de espera excedido (25s) imprimiendo con soffice.exe. stderr: 
+2025-08-19 12:35:46,186 - ERROR - Error al enviar a impresora: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 12:35:46,190 - ERROR - ❌ Error al imprimir listado general: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 12:35:46,199 - ERROR - Error al imprimir: Error en impresión Listado General: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 13:59:22,643 - INFO - Inicializando base de datos...
+2025-08-19 13:59:22,664 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 13:59:22,671 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 13:59:22,684 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 13:59:30,468 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 13:59:30,469 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 13:59:30,530 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 13:59:30,536 - INFO - Transformando datos para modo: listados
+2025-08-19 13:59:30,537 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 13:59:30,542 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 13:59:30,547 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 13:59:30,548 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 13:59:30,554 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 13:59:30,558 - INFO - Columnas convertidas a texto: []
+2025-08-19 13:59:30,632 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 13:59:32,304 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp91g8yi3m.xlsx
+2025-08-19 13:59:32,305 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp91g8yi3m.xlsx
+2025-08-19 13:59:32,310 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 13:59:32,326 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.COM
+2025-08-19 13:59:32,329 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp91g8yi3m.xlsx
+2025-08-19 13:59:57,392 - ERROR - Tiempo de espera excedido (25s) imprimiendo con soffice.exe. stderr: 
+2025-08-19 13:59:57,394 - ERROR - Error al enviar a impresora: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 13:59:57,396 - ERROR - ❌ Error al imprimir listado general: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 13:59:57,412 - ERROR - Error al imprimir: Error en impresión Listado General: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 14:14:51,990 - INFO - Inicializando base de datos...
+2025-08-19 14:14:52,025 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 14:14:52,084 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 14:14:52,148 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 14:15:01,107 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:15:01,108 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:15:01,248 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:15:01,249 - INFO - Transformando datos para modo: listados
+2025-08-19 14:15:01,250 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:15:01,251 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:15:01,253 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:15:01,256 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:15:01,270 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:15:01,272 - INFO - Columnas convertidas a texto: []
+2025-08-19 14:15:01,354 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:15:06,011 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmp7f3ozd5m.xlsx
+2025-08-19 14:15:06,012 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmp7f3ozd5m.xlsx
+2025-08-19 14:15:06,018 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 14:15:06,054 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 14:15:06,057 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmp7f3ozd5m.xlsx
+2025-08-19 14:15:20,144 - INFO - Enviado a impresora (soffice.exe): tmp7f3ozd5m.xlsx
+2025-08-19 14:15:20,146 - INFO - ✅ Impresión de listado general completada correctamente.
+2025-08-19 14:15:20,211 - INFO - Impresión registrada: listados_impresion.xlsx
+2025-08-19 14:16:02,727 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:16:02,728 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:02,978 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:16:02,979 - INFO - Transformando datos para modo: fedex
+2025-08-19 14:16:02,980 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:16:02,981 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:02,983 - INFO - [XFORM] Reglas efectivas fedex: {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:02,988 - INFO - [XFORM] Match columnas -> ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'] => ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:16:02,992 - INFO - [XFORM] Match columnas -> ['numberOfPackages', 'masterTrackingNumber'] => ['numberOfPackages', 'masterTrackingNumber']
+2025-08-19 14:16:02,993 - INFO - [XFORM] Match columnas -> ['masterTrackingNumber'] => ['masterTrackingNumber']
+2025-08-19 14:16:02,999 - INFO - Columnas eliminadas: ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:16:03,012 - INFO - [XFORM] Fila de sumatoria creada: {'numberOfPackages': np.float64(47.0), 'masterTrackingNumber': np.int64(41527683431147)}
+2025-08-19 14:16:03,017 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-08-19 14:16:03,028 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:16:12,634 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 14:16:12,640 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 14:16:12,641 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:12,651 - INFO - [CONFIG-UI] Inicial 'fedex': start_row=0, eliminar=['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], sumar=['numberOfPackages', 'masterTrackingNumber'], mantener_formato=['masterTrackingNumber'], formato_texto=[]
+2025-08-19 14:16:21,639 - INFO - Transformando datos para modo: fedex
+2025-08-19 14:16:21,640 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:16:21,645 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:21,684 - INFO - [XFORM] Reglas efectivas fedex: {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:21,703 - INFO - [XFORM] Match columnas -> ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'] => ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:16:21,733 - INFO - [XFORM] Match columnas -> ['numberOfPackages', 'masterTrackingNumber'] => ['numberOfPackages', 'masterTrackingNumber']
+2025-08-19 14:16:21,739 - INFO - [XFORM] Match columnas -> ['masterTrackingNumber'] => ['masterTrackingNumber']
+2025-08-19 14:16:21,749 - INFO - Columnas eliminadas: ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:16:21,766 - INFO - [XFORM] Fila de sumatoria creada: {'numberOfPackages': np.float64(47.0), 'masterTrackingNumber': np.int64(41527683431147)}
+2025-08-19 14:16:21,777 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-08-19 14:16:56,008 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:56,084 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\2069812416.xlsx
+2025-08-19 14:16:56,086 - INFO - Transformando datos para modo: urbano
+2025-08-19 14:16:56,088 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:16:56,089 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:56,095 - INFO - [XFORM] Reglas efectivas urbano: {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:16:56,097 - INFO - [XFORM] Match columnas -> ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'] => ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-19 14:16:56,104 - INFO - [XFORM] Match columnas -> ['PIEZAS'] => ['PIEZAS']
+2025-08-19 14:16:56,107 - INFO - Columnas eliminadas: ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-19 14:16:56,113 - INFO - [XFORM] Fila de sumatoria creada: {'PIEZAS': np.int64(4)}
+2025-08-19 14:16:56,125 - INFO - Columnas convertidas a texto: []
+2025-08-19 14:16:56,144 - INFO - Historial de archivo guardado: n/a
+2025-08-19 14:23:58,997 - INFO - Inicializando base de datos...
+2025-08-19 14:23:59,016 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 14:23:59,019 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 14:23:59,036 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 14:24:13,524 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:13,572 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\2069812416.xlsx
+2025-08-19 14:24:13,573 - INFO - Transformando datos para modo: urbano
+2025-08-19 14:24:13,576 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:24:13,580 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:13,582 - INFO - [XFORM] Reglas efectivas urbano: {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:13,584 - INFO - [XFORM] Match columnas -> ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'] => ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-19 14:24:13,586 - INFO - [XFORM] Match columnas -> ['PIEZAS'] => ['PIEZAS']
+2025-08-19 14:24:13,594 - INFO - Columnas eliminadas: ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-19 14:24:13,602 - INFO - [XFORM] Fila de sumatoria creada: {'PIEZAS': np.int64(4)}
+2025-08-19 14:24:13,603 - INFO - Columnas convertidas a texto: []
+2025-08-19 14:24:13,665 - INFO - Historial de archivo guardado: n/a
+2025-08-19 14:24:16,294 - ERROR - ❌ Error al imprimir listado Urbano: agregar_nombre_firma() missing 1 required positional argument: 'fila_inicio'
+2025-08-19 14:24:16,298 - ERROR - Error al imprimir: Error en impresión Urbano: agregar_nombre_firma() missing 1 required positional argument: 'fila_inicio'
+2025-08-19 14:24:29,025 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:24:29,026 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:29,236 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:24:29,237 - INFO - Transformando datos para modo: fedex
+2025-08-19 14:24:29,238 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:24:29,239 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:29,243 - INFO - [XFORM] Reglas efectivas fedex: {'start_row': 0, 'eliminar': ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'], 'sumar': ['numberOfPackages', 'masterTrackingNumber'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:24:29,252 - INFO - [XFORM] Match columnas -> ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode'] => ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:24:29,258 - INFO - [XFORM] Match columnas -> ['numberOfPackages', 'masterTrackingNumber'] => ['numberOfPackages', 'masterTrackingNumber']
+2025-08-19 14:24:29,259 - INFO - [XFORM] Match columnas -> ['masterTrackingNumber'] => ['masterTrackingNumber']
+2025-08-19 14:24:29,263 - INFO - Columnas eliminadas: ['returnTrackingId', 'senderAccountNumber', 'recipientState', 'quoteId', 'creationDate', 'departmentNumber', 'totalShipmentWeight', 'recipientPhoneExtension', 'poNumber', 'paymentType', 'recipientEmail', 'etdEnabled', 'senderResidential', 'packageWeight', 'senderCompany', 'recipientResidential', 'recipientTin', 'recipientCountry', 'recipientLine1', 'height', 'estimatedShippingCosts', 'length', 'recipientContactNumber', 'senderCountry', 'returnRmaNumber', 'senderLine1', 'width', 'senderPhoneExtension', 'errors', 'senderLine3', 'senderState', 'senderTin', 'invoiceNumber', 'senderLine2', 'senderEmail', 'senderContactName', 'senderCity', 'pickupId', 'shipmentType', 'returnReason', 'senderPostcode', 'status', 'senderContactNumber', 'weightUnits', 'recipientLine2', 'recipientPostcode']
+2025-08-19 14:24:29,287 - INFO - [XFORM] Fila de sumatoria creada: {'numberOfPackages': np.float64(47.0), 'masterTrackingNumber': np.int64(41527683431147)}
+2025-08-19 14:24:29,290 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-08-19 14:24:29,305 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-14.xlsx
+2025-08-19 14:24:37,942 - ERROR - ❌ Error al imprimir listado FedEx: agregar_nombre_firma() missing 1 required positional argument: 'fila_inicio'
+2025-08-19 14:24:37,944 - ERROR - Error al imprimir: Error en impresión FedEx: agregar_nombre_firma() missing 1 required positional argument: 'fila_inicio'
+2025-08-19 14:51:24,605 - INFO - Inicializando base de datos...
+2025-08-19 14:51:24,631 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 14:51:24,634 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 14:51:24,644 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 14:51:30,643 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:51:30,644 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:51:30,700 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:51:30,701 - INFO - Transformando datos para modo: listados
+2025-08-19 14:51:30,702 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:51:30,703 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:51:30,707 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:51:30,710 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:51:30,714 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:51:30,716 - INFO - Columnas convertidas a texto: []
+2025-08-19 14:51:30,772 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:51:33,645 - ERROR - ❌ Error al imprimir listado general: autoajustar_columnas() got an unexpected keyword argument 'min_width'. Did you mean 'max_width'?
+2025-08-19 14:51:33,649 - ERROR - Error al imprimir: Error en impresión Listado General: autoajustar_columnas() got an unexpected keyword argument 'min_width'. Did you mean 'max_width'?
+2025-08-19 14:56:23,515 - INFO - Inicializando base de datos...
+2025-08-19 14:56:23,528 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 14:56:23,532 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 14:56:23,540 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 14:56:33,283 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:56:33,285 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:56:33,345 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:56:33,347 - INFO - Transformando datos para modo: listados
+2025-08-19 14:56:33,353 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 14:56:33,354 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:56:33,356 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 14:56:33,359 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:56:33,363 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 14:56:33,369 - INFO - Columnas convertidas a texto: []
+2025-08-19 14:56:33,440 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 14:56:34,860 - ERROR - ❌ Error al imprimir listado general: autoajustar_columnas() got an unexpected keyword argument 'extra'
+2025-08-19 14:56:34,863 - ERROR - Error al imprimir: Error en impresión Listado General: autoajustar_columnas() got an unexpected keyword argument 'extra'
+2025-08-19 15:00:19,337 - INFO - Inicializando base de datos...
+2025-08-19 15:00:19,374 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:00:19,378 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:00:19,404 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:00:29,094 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:00:29,096 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:00:29,166 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:00:29,171 - INFO - Transformando datos para modo: listados
+2025-08-19 15:00:29,173 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:00:29,174 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:00:29,176 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:00:29,179 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:00:29,184 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:00:29,187 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:00:29,269 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:00:30,907 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmpf0ldvsj6.xlsx
+2025-08-19 15:00:30,910 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmpf0ldvsj6.xlsx
+2025-08-19 15:00:30,986 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 15:00:31,063 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 15:00:31,084 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmpf0ldvsj6.xlsx
+2025-08-19 15:00:56,192 - ERROR - Tiempo de espera excedido (25s) imprimiendo con soffice.exe. stderr: 
+2025-08-19 15:00:56,194 - ERROR - Error al enviar a impresora: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 15:00:56,195 - ERROR - ❌ Error al imprimir listado general: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 15:00:56,199 - ERROR - Error al imprimir: Error en impresión Listado General: Tiempo de espera excedido (25s) imprimiendo con soffice.exe.
+2025-08-19 15:01:07,944 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:01:07,945 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:01:07,982 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:01:07,984 - INFO - Transformando datos para modo: listados
+2025-08-19 15:01:07,985 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:01:07,987 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:01:07,995 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:01:07,997 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:01:08,001 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:01:08,003 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:01:08,016 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:01:11,293 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmptqcqwkka.xlsx
+2025-08-19 15:01:11,294 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmptqcqwkka.xlsx
+2025-08-19 15:01:11,298 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 15:01:11,331 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 15:01:11,336 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmptqcqwkka.xlsx
+2025-08-19 15:01:18,803 - INFO - Enviado a impresora (soffice.exe): tmptqcqwkka.xlsx
+2025-08-19 15:01:18,805 - INFO - ✅ Impresión de listado general completada correctamente.
+2025-08-19 15:01:18,822 - INFO - Impresión registrada: listados_impresion.xlsx
+2025-08-19 15:14:35,442 - INFO - Inicializando base de datos...
+2025-08-19 15:14:35,478 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:14:35,498 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:14:35,511 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:14:41,499 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:14:41,500 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:14:41,570 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:14:41,574 - INFO - Transformando datos para modo: listados
+2025-08-19 15:14:41,576 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:14:41,588 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:14:41,592 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:14:41,603 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:14:41,609 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:14:41,617 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:14:41,704 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:16:43,241 - INFO - Inicializando base de datos...
+2025-08-19 15:16:43,276 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:16:43,281 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:16:43,298 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:16:51,439 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:16:51,447 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:16:51,521 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:16:51,524 - INFO - Transformando datos para modo: listados
+2025-08-19 15:16:51,526 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:16:51,527 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:16:51,529 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:16:51,532 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:16:51,538 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:16:51,540 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:16:51,615 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:25:16,138 - INFO - Inicializando base de datos...
+2025-08-19 15:25:16,150 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:25:16,153 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:25:16,161 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:25:20,103 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:25:20,105 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:25:20,158 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:25:20,159 - INFO - Transformando datos para modo: listados
+2025-08-19 15:25:20,160 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:25:20,161 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:25:20,163 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:25:20,166 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:25:20,176 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:25:20,177 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:25:20,233 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:29:23,531 - INFO - Inicializando base de datos...
+2025-08-19 15:29:23,555 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:29:23,558 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:29:23,564 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:29:26,638 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:29:26,640 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:29:26,693 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:29:26,694 - INFO - Transformando datos para modo: listados
+2025-08-19 15:29:26,695 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:29:26,696 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:29:26,700 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:29:26,706 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:29:26,711 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:29:26,712 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:29:26,769 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:43:08,427 - INFO - Inicializando base de datos...
+2025-08-19 15:43:08,446 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:43:08,453 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:43:08,464 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:43:26,415 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:43:26,425 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:43:32,368 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:43:32,370 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:43:32,444 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:43:32,445 - INFO - Transformando datos para modo: listados
+2025-08-19 15:43:32,446 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:43:32,453 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:43:32,457 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:43:32,460 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:43:32,482 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:43:32,488 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:43:32,590 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:44:11,603 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:44:11,605 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:11,642 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:44:11,646 - INFO - Transformando datos para modo: listados
+2025-08-19 15:44:11,647 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:44:11,657 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:11,662 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:11,665 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:44:11,669 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:44:11,674 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:44:11,689 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:44:13,728 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:44:13,734 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:44:13,735 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:13,738 - INFO - [CONFIG-UI] Inicial para 'listados': start_row=0, eliminar=['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], sumar=[], mantener_formato=[], formato_texto=[]
+2025-08-19 15:44:29,102 - INFO - Transformando datos para modo: listados
+2025-08-19 15:44:29,103 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:44:29,104 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:29,106 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:44:29,107 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:44:29,110 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:44:29,112 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:45:22,442 - INFO - Inicializando base de datos...
+2025-08-19 15:45:22,458 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:45:22,462 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:45:22,473 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:46:24,004 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:46:24,005 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:46:24,066 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:46:24,076 - INFO - Transformando datos para modo: listados
+2025-08-19 15:46:24,078 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:46:24,080 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:46:24,086 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:46:24,089 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:46:24,094 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:46:24,095 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:46:24,155 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:46:26,390 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:46:26,395 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:47:20,662 - INFO - Inicializando base de datos...
+2025-08-19 15:47:20,673 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 15:47:20,677 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:47:20,687 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:47:48,559 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:47:48,564 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:47:48,618 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:47:48,619 - INFO - Transformando datos para modo: listados
+2025-08-19 15:47:48,620 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:47:48,621 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:47:48,622 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:47:48,624 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:47:48,628 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-19 15:47:48,631 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:47:48,691 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:47:50,646 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:47:50,652 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:47:50,653 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:47:50,656 - INFO - [CONFIG-UI] Inicial para 'listados': start_row=0, eliminar=['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], sumar=[], mantener_formato=[], formato_texto=[]
+2025-08-19 15:48:00,015 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:48:00,023 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:48:00,028 - INFO - 💾 Config guardada en C:\Users\Recepción 2\.exelcior_apolo\config.json
+2025-08-19 15:48:00,032 - INFO - [CONFIG-UI] Cargado POR DEFECTO para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 15:48:03,903 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 15:48:03,953 - INFO - 🛠️ User config reparado con claves faltantes desde default.
+2025-08-19 15:48:03,955 - INFO - ℹ️ Validator OK (bool) desde user:repaired; se mantiene cfg original.
+2025-08-19 15:48:03,989 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
+2025-08-19 15:48:03,994 - INFO - 💾 Config guardada en C:\Users\Recepción 2\.exelcior_apolo\config.json
+2025-08-19 15:48:03,995 - INFO - [CONFIG-UI] Guardado para 'listados': {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': []}
+2025-08-19 15:48:05,351 - INFO - Transformando datos para modo: listados
+2025-08-19 15:48:05,355 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:48:05,357 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:48:05,363 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:48:05,365 - INFO - [XFORM] Match columnas -> ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'] => ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa']
+2025-08-19 15:48:05,370 - INFO - Columnas eliminadas: ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa']
+2025-08-19 15:48:05,372 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:48:41,780 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:48:41,782 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:48:41,819 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:48:41,821 - INFO - Transformando datos para modo: listados
+2025-08-19 15:48:41,825 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-19 15:48:41,830 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:48:41,832 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'vista_previa_fuente': 10}
+2025-08-19 15:48:41,835 - INFO - [XFORM] Match columnas -> ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa'] => ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa']
+2025-08-19 15:48:41,840 - INFO - Columnas eliminadas: ['Nº', 'Tipo doc', 'RUT', 'Vendedor', 'Tipo cambio', 'Moneda', 'Total', 'Glosa']
+2025-08-19 15:48:41,841 - INFO - Columnas convertidas a texto: []
+2025-08-19 15:48:41,853 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250819_102538.xlsx
+2025-08-19 15:48:43,076 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmpcl_gseco.xlsx
+2025-08-19 15:48:43,102 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmpcl_gseco.xlsx
+2025-08-19 15:48:43,108 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-19 15:48:43,151 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-19 15:48:43,183 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmpcl_gseco.xlsx
+2025-08-19 15:48:49,005 - INFO - Enviado a impresora (soffice.exe): tmpcl_gseco.xlsx
+2025-08-19 15:48:49,007 - INFO - ✅ Impresión de listado general completada correctamente.
+2025-08-19 15:48:49,022 - INFO - Impresión registrada: listados_impresion.xlsx
+2025-08-19 17:52:34,916 - INFO - Inicializando base de datos...
+2025-08-19 17:52:34,925 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-19 17:52:34,929 - INFO - ℹ️ Validator OK (bool) desde default:C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json; se mantiene cfg original.
+2025-08-19 17:52:34,978 - INFO - 🛠️ User config reparado con claves faltantes desde default.
+2025-08-19 17:52:34,979 - INFO - ℹ️ Validator OK (bool) desde user:repaired; se mantiene cfg original.
+2025-08-19 17:52:35,019 - INFO - [CONFIG] default=C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json + user=C:\Users\Recepción 2\.exelcior_apolo\config.json -> aplicado
