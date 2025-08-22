@@ -133,7 +133,6 @@ def insertar_bloque_firma_ws(ws) -> None:
         [Firma quien recibe:]   [__________ (merge B..D)]
     """
     from openpyxl.styles import Alignment, Side, Border
-    from openpyxl.utils import get_column_letter
 
     ncols = ws.max_column or 2
     # Usamos hasta la columna D (4) para el área de la línea, o menos si la hoja es más corta.
@@ -156,7 +155,6 @@ def insertar_bloque_firma_ws(ws) -> None:
         ws.cell(row=r2, column=c, value="")
 
     # Dibuja líneas (borde superior e inferior) en el rango fusionado
-    from openpyxl.styles import Side, Border
     thin = Side(style="thin")
     line_border = Border(top=thin, bottom=thin)
     for r in (r1, r2):
@@ -172,8 +170,8 @@ def insertar_bloque_firma_ws(ws) -> None:
 
 def agregar_footer_info_ws(ws, total_piezas: int) -> None:
     """
-    Agrega pie con fecha/hora e indicador de total de piezas.
-    Ej.:  "Impresa el: 20250820 12:49  |  Total Piezas: 7"
+    Agrega una fila visible al final con fecha/hora y total de piezas.
+    (Opcional: útil como leyenda en vista previa o reimpresiones)
     """
     from openpyxl.styles import Alignment, Font
 
@@ -189,6 +187,24 @@ def agregar_footer_info_ws(ws, total_piezas: int) -> None:
     cell.alignment = Alignment(horizontal="left", vertical="center")
 
 
+def configurar_footer_ws(ws, total_piezas: int) -> None:
+    """
+    ✅ Pie de página REAL dentro del XLSX (lo respeta Excel y LibreOffice al imprimir).
+    - Lado izquierdo: TOTAL BULTOS
+    - Lado derecho : Fecha/hora de impresión
+    """
+    try:
+        ts = datetime.now().strftime("%d/%m/%Y %H:%M")
+        ws.oddFooter.left.text = f"TOTAL BULTOS: {total_piezas}"
+        ws.oddFooter.right.text = f"Impreso: {ts}"
+        # Tamaño de fuente (opcional)
+        ws.oddFooter.left.size = 9
+        ws.oddFooter.right.size = 9
+    except Exception:
+        # No interrumpir el flujo si el motor de header/footer no está disponible
+        pass
+
+
 def formatear_tabla_ws(ws) -> None:
     """
     Aplica formato tipo “listado profesional”:
@@ -199,13 +215,14 @@ def formatear_tabla_ws(ws) -> None:
         22, 12, 18, 18, 22, 8
     """
     from openpyxl.styles import Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter  # ✅ evita error con celdas fusionadas
 
     font_base = Font(name="Segoe UI", size=10)
     font_bold = Font(name="Segoe UI", size=10, bold=True)
     thin = Side(style="thin")
     border_all = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    header_row = 2  # porque la fila 1 es el título
+    header_row = 2  # porque la fila 1 es el título (fusionada)
     max_col = ws.max_column
     max_row = ws.max_row
 
@@ -232,7 +249,8 @@ def formatear_tabla_ws(ws) -> None:
     for i, w in enumerate(min_widths, start=1):
         if i > max_col:
             break
-        col_letter = ws.cell(row=1, column=i).column_letter
+        # ✅ No uses ws.cell(row=1, column=i).column_letter: puede ser MergedCell
+        col_letter = get_column_letter(i)
         cur = ws.column_dimensions[col_letter].width
         if cur is None or cur < w:
             ws.column_dimensions[col_letter].width = w

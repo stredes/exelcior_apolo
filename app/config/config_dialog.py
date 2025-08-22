@@ -11,17 +11,31 @@ from app.config.config_manager import (
     save_config,
     load_config,
     get_effective_mode_rules,
-    DEFAULT_CFG_PATH,   # importamos la ruta de defaults
+    DEFAULT_CFG_PATH,   # ruta absoluta al default del paquete
 )
 from app.core.logger_eventos import log_evento
 
 
 class ConfigDialog(tk.Toplevel):
     """
-    Diálogo de configuración por modo.
-    - Permite definir: columnas a eliminar, sumar, mantener como texto y fila inicial (start_row).
-    - Fuente de verdad: app.config.config_manager (load_config / save_config / get_effective_mode_rules).
-    - Botones extra: Guardar / Cargar por defecto (solo este modo) / Limpiar modo.
+    Diálogo de configuración por modo (compatible con esquema v2):
+      config = {
+        "version": 2,
+        "paths": {...},
+        "modes": {
+          "<mode>": {
+            "eliminar": [...],
+            "sumar": [...],
+            "mantener_formato": [...],
+            "formato_texto": [...],
+            "start_row": int,
+            "vista_previa_fuente": int
+          }
+        }
+      }
+
+    Fuente de verdad: config_manager (load_config / save_config / get_effective_mode_rules).
+    Botones: Guardar / Cargar por defecto (solo este modo) / Limpiar modo.
     """
 
     def __init__(
@@ -42,10 +56,6 @@ class ConfigDialog(tk.Toplevel):
         self.config_columns = config_columns if isinstance(config_columns, dict) else {}
 
         # Estados internos (listas para JSON-friendly)
-        self.selected_eliminar: List[str] = []
-        self.selected_sumar: List[str] = []
-        self.selected_preservar: List[str] = []
-        self.selected_formato_texto: List[str] = []
         self.start_row_var = tk.IntVar(value=0)
 
         self._create_widgets()
@@ -107,7 +117,7 @@ class ConfigDialog(tk.Toplevel):
         for col in self.available_columns:
             self.listbox_preservar.insert(tk.END, col)
 
-        # --- Formato texto (solo impresión, si usas una lista distinta) ---
+        # --- Formato texto (solo impresión; útil si difiere de mantener_formato) ---
         frame_texto = ttk.LabelFrame(container, text="Formato texto (solo impresión)", padding=10)
         frame_texto.grid(row=2, column=1, sticky="nsew", padx=6, pady=6)
         self.listbox_formato_texto = tk.Listbox(
@@ -136,15 +146,22 @@ class ConfigDialog(tk.Toplevel):
 
     def _load_initial_selection(self) -> None:
         """
-        Carga la selección inicial desde las reglas efectivas del modo (misma fuente que usa el pipeline).
+        Carga la selección inicial desde las REGLAS EFECTIVAS del modo (misma fuente que usa el pipeline).
+        Esquema v2: reglas dentro de config["modes"][mode]; se usa get_effective_mode_rules para coalescer.
         """
-        cfg = load_config()
+        cfg = load_config()  # v2 ya mergeado/coalescido por config_manager
         rules = get_effective_mode_rules(self.mode, cfg)
 
         eliminar = list(rules.get("eliminar", []))
         sumar = list(rules.get("sumar", []))
         preservar = list(rules.get("mantener_formato", []))
-        formato_texto = list((cfg.get(self.mode, {}) or {}).get("formato_texto", []))
+
+        # En v2, formato_texto también vive en modes[mode]
+        formato_texto = []
+        modes = cfg.get("modes", {})
+        if isinstance(modes, dict) and self.mode in modes:
+            formato_texto = list(modes[self.mode].get("formato_texto", []) or [])
+
         start_row = int(rules.get("start_row", 0) or 0)
 
         # Aplica al UI
@@ -208,18 +225,31 @@ class ConfigDialog(tk.Toplevel):
     # ------------------------------------------------------------------ Acciones de botones
 
     def _on_save(self) -> None:
+        """
+        Guarda SOLO el modo actual dentro de config['modes'][mode] (esquema v2).
+        Conserva 'paths' y otros modos.
+        """
         actual_mode_cfg = self._collect_from_ui()
 
-        # Sincroniza en memoria y persiste a disco
         cfg_disk = load_config()
         if not isinstance(cfg_disk, dict):
             cfg_disk = {}
-        cfg_disk[self.mode] = actual_mode_cfg
+
+        # Asegurar contenedor v2
+        cfg_disk.setdefault("version", 2)
+        cfg_disk.setdefault("paths", cfg_disk.get("paths", {}))
+        cfg_disk.setdefault("modes", {})
+        if not isinstance(cfg_disk["modes"], dict):
+            cfg_disk["modes"] = {}
+
+        cfg_disk["modes"][self.mode] = actual_mode_cfg  # <-- v2 correcto
 
         ok = save_config(cfg_disk)
         if ok:
-            self.config_columns[self.mode] = actual_mode_cfg
-            log_evento(f"[CONFIG-UI] Guardado para '{self.mode}': {actual_mode_cfg}", "info")
+            # Mantén in-memory para el caller
+            self.config_columns.setdefault("modes", {})
+            self.config_columns["modes"][self.mode] = actual_mode_cfg
+            log_evento(f"[CONFIG-UI] Guardado v2 para '{self.mode}': {actual_mode_cfg}", "info")
             messagebox.showinfo("Configuración", "Configuración guardada.")
             self.destroy()
         else:
@@ -228,8 +258,8 @@ class ConfigDialog(tk.Toplevel):
 
     def _on_load_defaults(self) -> None:
         """
-        Carga los valores por defecto SOLO para el modo actual desde excel_printer_default.json
-        y los aplica al UI y los guarda.
+        Carga los valores por defecto SOLO para el modo actual desde excel_printer_default.json (v2)
+        y los aplica al UI y los guarda en ~/.exelcior_apolo/config.json.
         """
         if not messagebox.askyesno(
             "Cargar por defecto",
@@ -239,8 +269,15 @@ class ConfigDialog(tk.Toplevel):
 
         try:
             defaults = self._read_defaults_from_file()
-            mode_defaults = dict(defaults.get(self.mode, {}))
-            # Normaliza claves esperadas
+
+            # defaults puede venir en v2; si viniera legacy v1, se intenta mapear
+            mode_defaults: Dict[str, Any] = {}
+            if "modes" in defaults and isinstance(defaults["modes"], dict):
+                mode_defaults = dict(defaults["modes"].get(self.mode, {}))
+            else:
+                # fallback v1 (claves por modo en top-level)
+                mode_defaults = dict(defaults.get(self.mode, {}))
+
             rules = {
                 "start_row": int(mode_defaults.get("start_row", 0) or 0),
                 "eliminar": list(mode_defaults.get("eliminar", []) or []),
@@ -248,6 +285,7 @@ class ConfigDialog(tk.Toplevel):
                 "mantener_formato": list(mode_defaults.get("mantener_formato", []) or []),
                 "formato_texto": list(mode_defaults.get("formato_texto", []) or []),
             }
+
             # Aplica al UI
             self._apply_rules_to_ui(
                 start_row=rules["start_row"],
@@ -256,12 +294,18 @@ class ConfigDialog(tk.Toplevel):
                 preservar=rules["mantener_formato"],
                 formato_texto=rules["formato_texto"],
             )
-            # Persiste a disco
+
+            # Persiste a disco (v2)
             cfg_disk = load_config()
-            cfg_disk[self.mode] = rules
+            cfg_disk.setdefault("version", 2)
+            cfg_disk.setdefault("paths", cfg_disk.get("paths", {}))
+            cfg_disk.setdefault("modes", {})
+            cfg_disk["modes"][self.mode] = rules
+
             if save_config(cfg_disk):
-                self.config_columns[self.mode] = rules
-                log_evento(f"[CONFIG-UI] Cargado POR DEFECTO para '{self.mode}': {rules}", "info")
+                self.config_columns.setdefault("modes", {})
+                self.config_columns["modes"][self.mode] = rules
+                log_evento(f"[CONFIG-UI] Cargado POR DEFECTO v2 para '{self.mode}': {rules}", "info")
                 messagebox.showinfo("Configuración", "Valores por defecto aplicados y guardados.")
             else:
                 messagebox.showerror("Configuración", "No se pudo guardar la configuración por defecto.")
@@ -271,7 +315,7 @@ class ConfigDialog(tk.Toplevel):
 
     def _on_clear(self) -> None:
         """
-        Limpia el modo actual (listas vacías, start_row = 0) y guarda.
+        Limpia el modo actual (listas vacías, start_row = 0) y guarda en config['modes'][mode].
         """
         if not messagebox.askyesno(
             "Limpiar configuración",
@@ -286,6 +330,7 @@ class ConfigDialog(tk.Toplevel):
             "mantener_formato": [],
             "formato_texto": [],
         }
+
         # Aplica al UI
         self._apply_rules_to_ui(
             start_row=0,
@@ -294,12 +339,18 @@ class ConfigDialog(tk.Toplevel):
             preservar=[],
             formato_texto=[],
         )
-        # Persiste a disco
+
+        # Persiste en v2
         cfg_disk = load_config()
-        cfg_disk[self.mode] = rules
+        cfg_disk.setdefault("version", 2)
+        cfg_disk.setdefault("paths", cfg_disk.get("paths", {}))
+        cfg_disk.setdefault("modes", {})
+        cfg_disk["modes"][self.mode] = rules
+
         if save_config(cfg_disk):
-            self.config_columns[self.mode] = rules
-            log_evento(f"[CONFIG-UI] Limpieza aplicada para '{self.mode}'", "info")
+            self.config_columns.setdefault("modes", {})
+            self.config_columns["modes"][self.mode] = rules
+            log_evento(f"[CONFIG-UI] Limpieza aplicada (v2) para '{self.mode}'", "info")
             messagebox.showinfo("Configuración", "Configuración del modo limpiada.")
         else:
             messagebox.showerror("Configuración", "No se pudo guardar la limpieza de configuración.")
@@ -310,6 +361,7 @@ class ConfigDialog(tk.Toplevel):
         """
         Lee el JSON de defaults desde DEFAULT_CFG_PATH.
         Devuelve {} si no existe o si hay error de lectura.
+        Acepta tanto v2 (preferido) como legacy v1.
         """
         try:
             p = Path(DEFAULT_CFG_PATH)

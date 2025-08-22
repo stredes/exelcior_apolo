@@ -3,7 +3,7 @@
 Módulo de procesamiento de Excel con:
 - Configuración centralizada (config_manager)
 - Normalización tolerante de nombres de columna
-- Transformaciones por modo (eliminar, sumar, mantener_formato)
+- Transformaciones por modo (eliminar, sumar, mantener_formato, conservar)
 - Impresión por Excel COM en horizontal (Landscape) y ajuste a 1 página de ancho
 
 Requisitos Windows para imprimir:
@@ -67,10 +67,29 @@ def _normalize_name(s: str) -> str:
 
 
 def _build_column_map(columns: List[str]) -> Dict[str, str]:
-    """
-    Devuelve un mapa {nombre_normalizado: nombre_real} de las columnas del DataFrame.
-    """
+    """Devuelve un mapa {nombre_normalizado: nombre_real} de las columnas del DataFrame."""
     return {_normalize_name(c): c for c in columns}
+
+
+# ==========================
+# Helpers de config (soporta v2 y legacy)
+# ==========================
+
+def _get_mode_node(cfg: dict, mode: str) -> dict:
+    """Obtiene el nodo crudo del modo, tanto en v2 (modes[mode]) como legacy (cfg[mode])."""
+    m = (mode or "").strip().lower()
+    if isinstance(cfg, dict):
+        modes = cfg.get("modes", {})
+        if isinstance(modes, dict) and m in modes:
+            return modes.get(m, {}) or {}
+        return cfg.get(m, {}) or {}
+    return {}
+
+def _get_conservar(cfg: dict, mode: str) -> List[str]:
+    """Lee la lista 'conservar' desde la config (si existe)."""
+    node = _get_mode_node(cfg, mode)
+    val = node.get("conservar", [])
+    return list(val) if isinstance(val, list) else []
 
 
 # ==========================
@@ -145,10 +164,15 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
 def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFrame:
     """
     Aplica las transformaciones configuradas para el modo:
+      - conservar: si existe (y/o eliminar == ["*"]), deja SOLO esas columnas (allowlist)
       - eliminar: elimina columnas con matching tolerante (normalización)
       - sumar: agrega una fila con sumatoria de columnas numéricas
       - mantener_formato: convierte columnas a texto (string)
-    Loguea los mapeos encontrados y los que no se encuentran.
+
+    Para FEDEx, con un default como:
+      "eliminar": ["*"],
+      "conservar": ["shipDate","reference","masterTrackingNumber","recipientContactName","numberOfPackages"]
+    se mostrará únicamente ese set de columnas (en ese orden), rellenando vacíos si faltan.
     """
     log_evento(f"Transformando datos para modo: {mode}", "info")
     log_evento(f"[XFORM] excel_processor activo: {__file__}", "info")
@@ -160,6 +184,9 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
     eliminar = list(rules.get("eliminar", []) or [])
     sumar = list(rules.get("sumar", []) or [])
     mantener = list(rules.get("mantener_formato", []) or [])
+
+    # Allowlist opcional (viene fuera del validador estándar)
+    conservar = _get_conservar(config, mode)
 
     # Construye el mapa normalizado de columnas reales
     colmap = _build_column_map(list(df.columns))
@@ -180,20 +207,43 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
             log_evento(f"[XFORM] No encontradas en DF (tras normalizar): {misses}", "warning")
         return resolved
 
-    eliminar_resolved = resolve_targets(eliminar)
-    sumar_resolved = resolve_targets(sumar)
-    mantener_resolved = resolve_targets(mantener)
+    conservar_resolved = resolve_targets(conservar) if conservar else []
+    eliminar_resolved = resolve_targets(eliminar) if eliminar else []
+    sumar_resolved = resolve_targets(sumar) if sumar else []
+    mantener_resolved = resolve_targets(mantener) if mantener else []
 
     df2 = df.copy()
 
-    # 1) Eliminar columnas
+    # ====== 0) CONSERVAR (allowlist) ======
+    # Si hay 'conservar' (y típicamente eliminar == ["*"]), limitamos el DF a ese set, en ese orden.
+    if conservar_resolved:
+        out_cols: List[str] = []
+        # Mantenemos el orden definido en 'conservar'
+        for wanted in conservar:
+            key = _normalize_name(wanted)
+            real = colmap.get(key)
+            if real:
+                out_cols.append(real)
+            else:
+                # Si la columna no existe, la creamos vacía para mantener el layout fijo
+                df2[wanted] = ""
+                out_cols.append(wanted)
+
+        # Filtra y reordena
+        df2 = df2.loc[:, out_cols]
+
+        # Como ya definimos allowlist, ignoramos 'eliminar' (especialmente si era ["*"])
+        eliminar_resolved = []
+        log_evento(f"[XFORM] Conservando solo columnas (allowlist): {out_cols}", "info")
+
+    # ====== 1) ELIMINAR ======
     if eliminar_resolved:
         df2.drop(columns=[c for c in eliminar_resolved if c in df2.columns], errors="ignore", inplace=True)
         log_evento(f"Columnas eliminadas: {eliminar_resolved}", "info")
     else:
         log_evento("Columnas eliminadas: []", "info")
 
-    # 2) Sumatorias (conversión a numérico segura, NaN->0)
+    # ====== 2) SUMAR ======
     if sumar_resolved:
         for col in sumar_resolved:
             if col in df2.columns:
@@ -202,7 +252,7 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
         df2 = pd.concat([df2, pd.DataFrame([suma])], ignore_index=True)
         log_evento(f"[XFORM] Fila de sumatoria creada: {suma}", "info")
 
-    # 3) Mantener formato como texto
+    # ====== 3) MANTENER FORMATO (texto) ======
     if mantener_resolved:
         for col in mantener_resolved:
             if col in df2.columns:

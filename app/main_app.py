@@ -29,6 +29,7 @@ from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
 from app.core.excel_processor import load_excel, apply_transformation
 
+
 # (Opcional) GUI de ajustes del sistema
 try:
     from app.gui.gui_config import open_system_config  # si existe
@@ -47,7 +48,7 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("750x700")
+        self.geometry("850x720")
         self.configure(bg="#F9FAFB")
 
         init_db()
@@ -58,6 +59,8 @@ class ExcelPrinterApp(tk.Tk):
         self.mode = "listados"
         self.processing = False
         self.executor = ThreadPoolExecutor(max_workers=2)
+        self._sidebar_buttons = []
+        self._preview_win: tk.Toplevel | None = None
 
         # ✅ Carga de config robusta
         try:
@@ -70,7 +73,9 @@ class ExcelPrinterApp(tk.Tk):
             config = {}
 
         self.config_columns = config
-        self.mode_vars = {m: tk.BooleanVar(value=(m == "listados")) for m in ["urbano", "fedex", "listados"]}
+
+        # 🎛️ Selector de modo (Radiobutton para exclusividad)
+        self.mode_var = tk.StringVar(value="listados")
 
         self._setup_styles()
         self._setup_sidebar()
@@ -104,6 +109,15 @@ class ExcelPrinterApp(tk.Tk):
         except Exception:
             pass
 
+    def _set_controls_enabled(self, enabled: bool):
+        """Habilita/deshabilita botones de la barra lateral durante procesamiento."""
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for btn in self._sidebar_buttons:
+            try:
+                btn.configure(state=state)
+            except Exception:
+                pass
+
     # ---------------- Setup UI ----------------
 
     def _setup_styles(self):
@@ -121,33 +135,36 @@ class ExcelPrinterApp(tk.Tk):
         style.configure("TButton", font=("Segoe UI", 11), padding=8)
         style.configure("TLabel", font=("Segoe UI", 11))
         style.configure("TCheckbutton", font=("Segoe UI", 11))
+        style.configure("TRadiobutton", font=("Segoe UI", 11))
+
+    def _add_sidebar_button(self, parent, text, cmd):
+        b = ttk.Button(parent, text=text, command=cmd)
+        b.pack(pady=10, fill="x", padx=10)
+        self._sidebar_buttons.append(b)
+        return b
 
     def _setup_sidebar(self):
-        sidebar = tk.Frame(self, bg="#111827", width=200)
+        sidebar = tk.Frame(self, bg="#111827", width=220)
         sidebar.pack(side="left", fill="y")
 
         tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
                  font=("Segoe UI", 14, "bold")).pack(pady=20)
 
-        botones = [
-            ("Seleccionar Excel 📂", self._threaded_select_file),
-            ("Carga Automática 🚀", self._threaded_auto_load),
-            ("Config. Modo ⚙️", self._open_config_menu),  # diálogo por MODO (listados/fedex/urbano)
-            ("Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self)),
-            ("Ver Logs 📋", self._view_logs),
-            ("Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df)),
-            ("Etiquetas 🏷️", self._abrir_editor_etiquetas),
-            ("Buscar Códigos Postales 🧽", self._abrir_buscador_codigos_postales),
-            ("Sra Mary 👩‍💼", self._abrir_sra_mary),
-            ("Inventario 📦", lambda: InventarioView(self)),
-        ]
+        self._add_sidebar_button(sidebar, "Seleccionar Excel 📂", self._threaded_select_file)
+        self._add_sidebar_button(sidebar, "Carga Automática 🚀", self._threaded_auto_load)
+        self._add_sidebar_button(sidebar, "Config. Modo ⚙️", self._open_config_menu)  # diálogo por MODO
+        self._add_sidebar_button(sidebar, "Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self))
+        self._add_sidebar_button(sidebar, "Ver Logs 📋", self._view_logs)
+        self._add_sidebar_button(sidebar, "Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df))
+        self._add_sidebar_button(sidebar, "Etiquetas 🏷️", self._abrir_editor_etiquetas)
+        self._add_sidebar_button(sidebar, "Buscar Códigos Postales 🧽", self._abrir_buscador_codigos_postales)
+        self._add_sidebar_button(sidebar, "Sra Mary 👩‍💼", self._abrir_sra_mary)
+        self._add_sidebar_button(sidebar, "Inventario 📦", lambda: InventarioView(self))
 
         # Si la GUI de ajustes del sistema está disponible, añade botón
         if open_system_config:
-            botones.insert(3, ("Ajustes del Sistema 🌐", lambda: open_system_config(self, self._on_system_config_saved)))
-
-        for texto, accion in botones:
-            ttk.Button(sidebar, text=texto, command=accion).pack(pady=10, fill="x", padx=10)
+            self._add_sidebar_button(sidebar, "Ajustes del Sistema 🌐",
+                                     lambda: open_system_config(self, self._on_system_config_saved))
 
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
         ttk.Button(sidebar, text="Salir ❌", command=self._on_close).pack(side="bottom", pady=20, fill="x", padx=10)
@@ -162,10 +179,15 @@ class ExcelPrinterApp(tk.Tk):
         mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
         mode_frame.pack(pady=10)
 
-        for modo in self.mode_vars:
-            ttk.Checkbutton(mode_frame, text=modo.capitalize(),
-                            variable=self.mode_vars[modo],
-                            command=lambda m=modo: self._update_mode(m)).pack(side=tk.LEFT, padx=10)
+        # Radiobuttons: exclusivo y claro
+        for modo in ("listados", "fedex", "urbano"):
+            ttk.Radiobutton(
+                mode_frame,
+                text=modo.capitalize(),
+                value=modo,
+                variable=self.mode_var,
+                command=lambda m=modo: self._update_mode(m)
+            ).pack(side=tk.LEFT, padx=10)
 
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
@@ -179,8 +201,6 @@ class ExcelPrinterApp(tk.Tk):
     # ---------------- Acciones de modo ----------------
 
     def _update_mode(self, modo_seleccionado: str):
-        for modo in self.mode_vars:
-            self.mode_vars[modo].set(modo == modo_seleccionado)
         self.mode = modo_seleccionado
 
     def _abrir_buscador_codigos_postales(self):
@@ -201,16 +221,20 @@ class ExcelPrinterApp(tk.Tk):
     # ---------------- Carga de archivos ----------------
 
     def _threaded_select_file(self):
+        if self.processing:
+            return
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.csv")])
-        if path:
-            valid, err = validate_file(path)
-            if not valid:
-                self.safe_messagebox("error", "Archivo no válido", err)
-                return
-            set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
-            self.processing = True
-            future = self.executor.submit(process_file, path, self.config_columns, self.mode)
-            future.add_done_callback(self._file_processed_callback)
+        if not path:
+            return
+        valid, err = validate_file(path)
+        if not valid:
+            self.safe_messagebox("error", "Archivo no válido", err)
+            return
+        set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
+        self.processing = True
+        self._set_controls_enabled(False)
+        future = self.executor.submit(process_file, path, self.config_columns, self.mode)
+        future.add_done_callback(self._file_processed_callback)
 
     def _file_processed_callback(self, future):
         try:
@@ -227,11 +251,13 @@ class ExcelPrinterApp(tk.Tk):
                 self.after(0, lambda: self._update_status("Error"))
         finally:
             self.processing = False
+            self._set_controls_enabled(True)
 
     def _threaded_auto_load(self):
         if self.processing:
             return
         self.processing = True
+        self._set_controls_enabled(False)
         t = threading.Thread(target=self._auto_load_latest_file, daemon=True)
         t.start()
 
@@ -260,6 +286,7 @@ class ExcelPrinterApp(tk.Tk):
             self.safe_messagebox("error", "Error", str(e))
         finally:
             self.processing = False
+            self._set_controls_enabled(True)
 
     def _process_file(self, path: str):
         self._update_status("Procesando archivo...")
@@ -274,7 +301,6 @@ class ExcelPrinterApp(tk.Tk):
             logging.error(f"Error procesando archivo: {e}")
             self.safe_messagebox("error", "Error", f"No se pudo procesar el archivo:\n{e}")
         finally:
-            self.processing = False
             self._update_status("Listo")
 
     # ---------------- Vista previa ----------------
@@ -284,9 +310,17 @@ class ExcelPrinterApp(tk.Tk):
             self.safe_messagebox("error", "Error", "No hay datos para mostrar.")
             return
 
+        # Cerrar vista previa anterior para evitar múltiples ventanas
+        try:
+            if self._preview_win is not None and self._preview_win.winfo_exists():
+                self._preview_win.destroy()
+        except Exception:
+            pass
+
         vista = tk.Toplevel(self)
+        self._preview_win = vista
         vista.title("Vista Previa")
-        vista.geometry("950x600")
+        vista.geometry("1000x640")
         vista.configure(bg="#F9FAFB")
 
         tree_frame = ttk.Frame(vista, padding=10)
@@ -314,29 +348,37 @@ class ExcelPrinterApp(tk.Tk):
         MIN_W = 90   # px
         PADDING = 24 # px
 
+        # Limita muestra para no congelar UI con datasets enormes
+        sample_df = self.transformed_df.head(5000).copy()
+
         for col in columnas:
             muestras = [str(col)]
-            muestras += [str(v) for v in self.transformed_df[col].astype(str).head(200).tolist()]
-            if len(muestras) > 50:
-                step = max(1, len(muestras)//50)
-                muestras = muestras[::step][:50]
+            muestras += [str(v) for v in sample_df[col].astype(str).tolist()]
+            if len(muestras) > 120:
+                step = max(1, len(muestras)//120)
+                muestras = muestras[::step][:120]
             ancho = max((fnt.measure(s) for s in muestras), default=MIN_W) + PADDING
             ancho = max(MIN_W, min(ancho, MAX_W))
             tree.heading(col, text=col)
             tree.column(col, width=ancho, anchor=tk.CENTER)
 
-        for row in self.transformed_df.itertuples(index=False):
+        for row in sample_df.itertuples(index=False):
             tree.insert("", "end", values=row)
+
+        # Pie con conteo de filas mostradas
+        lbl_info = ttk.Label(vista, text=f"Mostrando {len(sample_df):,} de {len(self.transformed_df):,} filas")
+        lbl_info.pack(pady=(2, 6))
 
         ttk.Button(vista, text="Imprimir", command=self._threaded_print).pack(pady=5)
 
     # ---------------- Impresión ----------------
 
     def _threaded_print(self):
-        if self.processing or self.transformed_df is None:
+        if self.processing or self.transformed_df is None or self.transformed_df.empty:
             self.safe_messagebox("error", "Error", "Debe cargar un archivo válido primero.")
             return
         self.processing = True
+        self._set_controls_enabled(False)
         future = self.executor.submit(self._print_document)
         future.add_done_callback(self._print_complete_callback)
 
@@ -353,6 +395,7 @@ class ExcelPrinterApp(tk.Tk):
                 self._update_status("Error")
         finally:
             self.processing = False
+            self._set_controls_enabled(True)
 
     def _print_document(self):
         try:
@@ -386,6 +429,8 @@ class ExcelPrinterApp(tk.Tk):
         # Reaplicar reglas tras guardar para reflejarse en la vista previa
         try:
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+            if self._ui_alive():
+                self.after(0, self._show_preview)
         except Exception as e:
             logging.error(f"Error reaplicando reglas: {e}")
 
@@ -479,6 +524,11 @@ class ExcelPrinterApp(tk.Tk):
             self.processing = False
             if self.executor:
                 self.executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+        try:
+            if self._preview_win is not None and self._preview_win.winfo_exists():
+                self._preview_win.destroy()
         except Exception:
             pass
         try:
