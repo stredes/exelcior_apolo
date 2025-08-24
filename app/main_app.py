@@ -12,7 +12,6 @@ if str(ROOT_DIR) not in sys.path:
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from tkinter import font as tkfont  # medir texto y autoajustar Treeview
 from concurrent.futures import ThreadPoolExecutor
 
 # ✅ Lógica de negocio / servicios
@@ -28,6 +27,12 @@ from app.gui.inventario_view import InventarioView
 from app.printer.exporter import export_to_pdf
 from app.gui.herramientas_gui import abrir_herramientas
 from app.core.excel_processor import load_excel, apply_transformation
+
+# 🔽 Vista previa + CRUD externalizada (ventana + widget)
+from app.gui.preview_crud import open_preview_crud
+
+# 🔽 Post-proceso FedEx (shaping/dedupe/total BULTOS)
+from app.printer.printer_tools import prepare_fedex_dataframe
 
 
 # (Opcional) GUI de ajustes del sistema
@@ -60,7 +65,7 @@ class ExcelPrinterApp(tk.Tk):
         self.processing = False
         self.executor = ThreadPoolExecutor(max_workers=2)
         self._sidebar_buttons = []
-        self._preview_win: tk.Toplevel | None = None
+        self._preview_win: tk.Toplevel | None = None  # la maneja open_preview_crud
 
         # ✅ Carga de config robusta
         try:
@@ -242,8 +247,13 @@ class ExcelPrinterApp(tk.Tk):
             if not self._ui_alive():
                 return
             self.df, self.transformed_df = df, transformed
+
+            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
+            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+
             save_file_history("n/a", self.mode)
-            self.after(0, self._show_preview)
+            self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.exception("Error al procesar archivo")
             if self._ui_alive():
@@ -294,82 +304,19 @@ class ExcelPrinterApp(tk.Tk):
         try:
             self.df = load_excel(path, self.config_columns, self.mode)
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+
+            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
+            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+
             save_file_history(path, self.mode)
             if self._ui_alive():
-                self.after(0, self._show_preview)
+                self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.error(f"Error procesando archivo: {e}")
             self.safe_messagebox("error", "Error", f"No se pudo procesar el archivo:\n{e}")
         finally:
             self._update_status("Listo")
-
-    # ---------------- Vista previa ----------------
-
-    def _show_preview(self):
-        if self.transformed_df is None or self.transformed_df.empty:
-            self.safe_messagebox("error", "Error", "No hay datos para mostrar.")
-            return
-
-        # Cerrar vista previa anterior para evitar múltiples ventanas
-        try:
-            if self._preview_win is not None and self._preview_win.winfo_exists():
-                self._preview_win.destroy()
-        except Exception:
-            pass
-
-        vista = tk.Toplevel(self)
-        self._preview_win = vista
-        vista.title("Vista Previa")
-        vista.geometry("1000x640")
-        vista.configure(bg="#F9FAFB")
-
-        tree_frame = ttk.Frame(vista, padding=10)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
-
-        columnas = list(self.transformed_df.columns)
-        tree = ttk.Treeview(tree_frame, columns=columnas, show="headings")
-        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
-        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
-        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-
-        tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
-
-        # --- Autoajuste de columnas basado en contenido ---
-        try:
-            fnt = tkfont.nametofont("TkDefaultFont")
-        except Exception:
-            fnt = tkfont.Font()  # fallback
-
-        MAX_W = 380  # px
-        MIN_W = 90   # px
-        PADDING = 24 # px
-
-        # Limita muestra para no congelar UI con datasets enormes
-        sample_df = self.transformed_df.head(5000).copy()
-
-        for col in columnas:
-            muestras = [str(col)]
-            muestras += [str(v) for v in sample_df[col].astype(str).tolist()]
-            if len(muestras) > 120:
-                step = max(1, len(muestras)//120)
-                muestras = muestras[::step][:120]
-            ancho = max((fnt.measure(s) for s in muestras), default=MIN_W) + PADDING
-            ancho = max(MIN_W, min(ancho, MAX_W))
-            tree.heading(col, text=col)
-            tree.column(col, width=ancho, anchor=tk.CENTER)
-
-        for row in sample_df.itertuples(index=False):
-            tree.insert("", "end", values=row)
-
-        # Pie con conteo de filas mostradas
-        lbl_info = ttk.Label(vista, text=f"Mostrando {len(sample_df):,} de {len(self.transformed_df):,} filas")
-        lbl_info.pack(pady=(2, 6))
-
-        ttk.Button(vista, text="Imprimir", command=self._threaded_print).pack(pady=5)
 
     # ---------------- Impresión ----------------
 
@@ -399,6 +346,7 @@ class ExcelPrinterApp(tk.Tk):
 
     def _print_document(self):
         try:
+            # Imprime exactamente lo que está en la vista previa/CRUD
             print_document(self.mode, self.transformed_df, self.config_columns, None)
             save_print_history(
                 archivo=f"{self.mode}_impresion.xlsx",
@@ -429,8 +377,13 @@ class ExcelPrinterApp(tk.Tk):
         # Reaplicar reglas tras guardar para reflejarse en la vista previa
         try:
             self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+
+            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
+            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+
             if self._ui_alive():
-                self.after(0, self._show_preview)
+                self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.error(f"Error reaplicando reglas: {e}")
 
@@ -440,8 +393,13 @@ class ExcelPrinterApp(tk.Tk):
         if self.df is not None:
             try:
                 self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+
+                # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
+                if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
+                    self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+
                 if self._ui_alive():
-                    self.after(0, self._show_preview)
+                    self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
             except Exception as e:
                 logging.error(f"Error aplicando reglas tras guardar ajustes del sistema: {e}")
 

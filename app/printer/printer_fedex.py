@@ -12,9 +12,8 @@ from app.printer.printer_tools import (
     prepare_fedex_dataframe,
     insertar_bloque_firma_ws,
     agregar_footer_info_ws,
-    formatear_tabla_ws,   # <= formato profesional
+    formatear_tabla_ws,
 )
-
 
 def print_fedex(file_path, config, df: pd.DataFrame):
     """
@@ -31,16 +30,20 @@ def print_fedex(file_path, config, df: pd.DataFrame):
 
         # 1) Preparar datos (limpieza / shaping / dedup)
         df_out, id_col, total_piezas = prepare_fedex_dataframe(df)
-        filas = len(df_out)
-        log_evento(
-            f"[FedEx] Columna de tracking usada: '{id_col}'. "
-            f"Filas tras dedup: {filas}. Total piezas: {total_piezas}.",
-            "info"
-        )
-
-        # Si por alguna razón quedó vacío tras dedup, avisar
         if df_out.empty:
             raise ValueError("No hay filas válidas tras eliminar duplicados por Tracking Number.")
+
+        filas = len(df_out)
+        if id_col:
+            log_evento(
+                f"[FedEx] Columna tracking usada: '{id_col}'. Filas tras dedup: {filas}. Total piezas: {total_piezas}.",
+                "info"
+            )
+        else:
+            log_evento(
+                f"[FedEx] No se detectó columna de tracking válida. Filas tras limpieza: {filas}.",
+                "warning"
+            )
 
         # 2) Título
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
@@ -54,15 +57,17 @@ def print_fedex(file_path, config, df: pd.DataFrame):
         wb = load_workbook(tmp_path)
         try:
             ws = wb.active
-            formatear_tabla_ws(ws)            # estilo profesional (bordes/anchos/encabezados)
-            insertar_bloque_firma_ws(ws)      # líneas de firma (Nombre/Firma)
+            formatear_tabla_ws(ws)                  # estilo profesional (bordes/anchos/encabezados)
+            insertar_bloque_firma_ws(ws)            # líneas de firma (Nombre/Firma)
             agregar_footer_info_ws(ws, total_piezas)  # fecha/hora + total piezas
             wb.save(tmp_path)
         finally:
             wb.close()
 
-        # 5) Imprimir
-        enviar_a_impresora(tmp_path)
+        # 5) Imprimir (permite config de impresora si está definida)
+        printer_name = (config or {}).get("printer_name")
+        enviar_a_impresora(tmp_path, printer_name=printer_name)
+
         log_evento("✅ Impresión de listado FedEx completada correctamente.", "info")
 
     except Exception as error:
