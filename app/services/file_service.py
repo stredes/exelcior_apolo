@@ -37,6 +37,41 @@ def validate_file(path: str | Path) -> Tuple[bool, str]:
 
 
 # =============================================================================
+#                       CHEQUEO DE DEPENDENCIAS DE EXCEL
+# =============================================================================
+
+def _ensure_excel_engine(path: Path) -> None:
+    """
+    Verifica que exista el motor de lectura apropiado según la extensión:
+      - .xls  -> xlrd >= 2.0.1
+      - .xlsx -> openpyxl
+    Lanza un ValueError con mensaje claro si falta la dependencia.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".xls":
+        try:
+            import xlrd  # noqa: F401
+        except Exception:
+            raise ValueError(
+                "Missing optional dependency 'xlrd'. "
+                "Instala 'xlrd>=2.0.1' para leer archivos .xls "
+                "(ej.: pip install xlrd==2.0.1)."
+            )
+    elif suffix == ".xlsx":
+        try:
+            import openpyxl  # noqa: F401
+        except Exception:
+            raise ValueError(
+                "Missing optional dependency 'openpyxl'. "
+                "Instala 'openpyxl' para leer archivos .xlsx "
+                "(ej.: pip install openpyxl)."
+            )
+    else:
+        # Permitimos CSV u otros si el core los maneja, solo registramos
+        logger.info(f"[excel] Extensión no-xls/xlsx detectada: {suffix}. Se delega a core.load_excel.")
+
+
+# =============================================================================
 #                              PROCESAMIENTO
 # =============================================================================
 
@@ -56,13 +91,14 @@ def process_file(
         else:
             path = Path(path_or_df) if not isinstance(path_or_df, Path) else path_or_df
             logger.info(f"[process_file] Cargando archivo: {path}")
+            _ensure_excel_engine(path)  # <- chequeo explícito de dependencia
             df = load_excel(path, config_columns, mode)
 
         transformed = apply_transformation(df.copy(), config_columns, mode)
         logger.info(f"[process_file] Transformación OK. Filas: src={len(df)}, out={len(transformed)}")
         return df, transformed
 
-    except Exception as e:
+    except Exception:
         logger.exception(f"[process_file] Error procesando archivo/DF (modo={mode})")
         raise
 

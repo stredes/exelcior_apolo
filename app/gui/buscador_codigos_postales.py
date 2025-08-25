@@ -11,8 +11,7 @@ from typing import Dict, Iterable, Optional
 from functools import partial
 
 from app.core.logger_eventos import capturar_log_bod1
-# En utils.py no existe load_config_from_file; se expone load_config.
-# Lo aliasamos para mantener compatibilidad.
+# utils expone load_config y guardar_ultimo_path
 from app.utils.utils import guardar_ultimo_path, load_config as load_config_from_file
 
 
@@ -20,13 +19,15 @@ class BuscadorCodigosPostales(tk.Toplevel):
     """
     Ventana de búsqueda de códigos postales por comuna o región.
 
-    - Caso preferente de tu archivo: encabezados en FILA 2 (index=1) con columnas A:D.
+    - Caso preferente: encabezados en FILA 2 (index=1) con columnas A:D.
       (Comuna/Localidad | Provincia | Region | Codigo Postal)
     - Si falla, se prueban otros headers/estrategias (header=2, header=0..5, sin encabezado, inferencia).
     - Normaliza a: REGIÓN, COMUNA, CÓDIGO POSTAL.
     - Búsqueda sin acentos y sin mayúsculas (debounce).
     - Copia por doble clic, botón o Ctrl+C.
     """
+
+    CONFIG_KEY_FILE = "archivo_codigos_postales"
 
     COLS_TARGET = ("REGIÓN", "COMUNA", "CÓDIGO POSTAL")
 
@@ -48,8 +49,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         "cp": "CÓDIGO POSTAL",
     }
 
-    # Orden de headers preferidos: primero header=1 (tu archivo),
-    # luego header=2 (si algún archivo trae encabezado en fila 3) y el resto 0..5.
+    # Orden de headers preferidos
     PREFERRED_HEADER_ROWS = [1, 2, 0, 3, 4, 5]
 
     def __init__(self, parent: tk.Misc):
@@ -156,24 +156,50 @@ class BuscadorCodigosPostales(tk.Toplevel):
     # ---------------------------- Flujo de carga -----------------------------
 
     def _resolver_ruta_y_cargar(self) -> None:
+        """
+        Comportamiento solicitado:
+        - Si hay ruta guardada y el archivo existe -> cargar sin preguntar.
+        - Si hay ruta guardada pero el archivo ya no existe -> NO abrir diálogo; mostrar aviso
+          y permitir que el usuario use “Cambiar archivo…”.
+        - Si no hay ruta guardada (primera vez) -> abrir diálogo y guardar la elección.
+        """
         cfg = load_config_from_file() or {}
-        ruta = cfg.get("archivo_codigos_postales")
+        ruta = cfg.get(self.CONFIG_KEY_FILE)
 
-        if not ruta or not Path(ruta).exists():
-            ruta = filedialog.askopenfilename(
-                title="Selecciona el archivo de Códigos Postales",
-                filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        # Caso 1: tenemos ruta válida -> cargar sin preguntar
+        if ruta and Path(ruta).exists():
+            self._usar_ruta_y_cargar(ruta)
+            return
+
+        # Caso 2: ruta guardada pero ya no existe -> NO abrir diálogo (dejar al usuario)
+        if ruta and not Path(ruta).exists():
+            capturar_log_bod1(f"[CP] Ruta guardada no existe: {ruta}", "warning")
+            self._ruta_excel = None
+            self.lbl_archivo.config(
+                text="Archivo: (no encontrado; use «Cambiar archivo…»)",
+                fg="#a00"
             )
-            if not ruta:
-                self._error("No se seleccionó archivo de Códigos Postales.")
-                return
-            guardar_ultimo_path(ruta, clave="archivo_codigos_postales")
-            capturar_log_bod1(f"Ruta de códigos postales guardada: {ruta}", "info")
+            self._set_estado("Ruta guardada no encontrada.")
+            return
 
+        # Caso 3: primera vez -> pedir archivo y guardar
+        ruta_sel = filedialog.askopenfilename(
+            title="Selecciona el archivo de Códigos Postales",
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        )
+        if not ruta_sel:
+            self._error("No se seleccionó archivo de Códigos Postales.")
+            return
+
+        guardar_ultimo_path(ruta_sel, clave=self.CONFIG_KEY_FILE)
+        capturar_log_bod1(f"[CP] Ruta de códigos postales guardada: {ruta_sel}", "info")
+        self._usar_ruta_y_cargar(ruta_sel)
+
+    def _usar_ruta_y_cargar(self, ruta: str) -> None:
+        """Actualiza la UI de inmediato y lanza la carga en segundo plano."""
         self._ruta_excel = ruta
-        self.lbl_archivo.config(text=f"Archivo: {Path(ruta).name}")
+        self.lbl_archivo.config(text=f"Archivo: {Path(ruta).name}", fg="#555")
         self._set_estado("Cargando datos…")
-
         threading.Thread(target=self._cargar_en_background, args=(ruta,), daemon=True).start()
 
     def _cargar_en_background(self, ruta: str) -> None:
@@ -184,9 +210,13 @@ class BuscadorCodigosPostales(tk.Toplevel):
                 df[c] = df[c].astype(str).str.strip()
 
             self.df = df.reset_index(drop=True)
-            capturar_log_bod1(f"Archivo de códigos postales cargado: {ruta}", "info")
-            self.after(0, lambda: self._poblar_tree(self.df))
+            # Reafirma la ruta usada (por si vino de Cambiar archivo…)
+            guardar_ultimo_path(ruta, clave=self.CONFIG_KEY_FILE)
 
+            capturar_log_bod1(f"[CP] Archivo de códigos postales cargado: {ruta}", "info")
+
+            # Actualiza UI en el hilo principal
+            self.after(0, lambda: (self._poblar_tree(self.df), self._set_estado("Listo")))
         except Exception as e:
             capturar_log_bod1(f"Error al cargar archivo de códigos postales: {e}", "error")
             self.after(0, partial(self._error, f"No se pudo cargar el archivo:\n{e}"))
@@ -198,6 +228,9 @@ class BuscadorCodigosPostales(tk.Toplevel):
         Preferente: header=1 (fila 2 visible) + usecols A:D con renombrado seguro.
         Respaldos: header en [2,0,3,4,5], sin encabezado + heurística, inferencia.
         """
+        # Prepara lista de hojas por defecto
+        sheet_names = [0]
+
         # 0) INTENTO PREFERENTE: header=1, A:D
         try:
             try:
@@ -211,8 +244,8 @@ class BuscadorCodigosPostales(tk.Toplevel):
                     df = pd.read_excel(
                         path,
                         sheet_name=sheet,
-                        header=1,            # fila 2 visible en tu archivo
-                        usecols="A:D",       # A:Comuna/Localidad, B:Provincia, C:Region, D:Codigo Postal
+                        header=1,            # fila 2 visible
+                        usecols="A:D",       # A..D esperado
                         dtype=str,
                         engine="openpyxl",
                     )
@@ -229,7 +262,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         except Exception as e:
             capturar_log_bod1(f"[CP] preferente error general: {e}", "error")
 
-        # 1) RESPALDO: headers en orden preferido (incluye 2,0..5), sin limitar columnas
+        # 1) RESPALDO: headers en orden preferido
         try:
             try:
                 xls = pd.ExcelFile(path, engine="openpyxl")
@@ -250,7 +283,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         except Exception as e:
             capturar_log_bod1(f"[CP] respaldo error general: {e}", "error")
 
-        # 2) RESPALDO: sin encabezado + heurística de posición
+        # 2) RESPALDO: sin encabezado + heurística
         for sheet in sheet_names:
             try:
                 df_no_header = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine="openpyxl")
@@ -286,13 +319,8 @@ class BuscadorCodigosPostales(tk.Toplevel):
         )
 
     def _rename_soft(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Renombrado fuerte + suave de columnas conocidas a REGIÓN/COMUNA/CÓDIGO POSTAL.
-        No lanza errores si faltan; solo renombra lo que reconoce.
-        """
+        """Renombrado fuerte + suave a REGIÓN/COMUNA/CÓDIGO POSTAL."""
         df = df.copy()
-
-        # Renombrado fuerte (exactos más comunes)
         df.rename(columns={
             "Comuna/Localidad": "COMUNA",
             "Comuna": "COMUNA",
@@ -304,7 +332,6 @@ class BuscadorCodigosPostales(tk.Toplevel):
             "Código Postal": "CÓDIGO POSTAL",
         }, inplace=True)
 
-        # Renombrado "suave" (normalizado)
         def _norm(s: str) -> str:
             s = str(s).strip().lower()
             return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
@@ -321,7 +348,6 @@ class BuscadorCodigosPostales(tk.Toplevel):
                 elif ("codigo" in k and "postal" in k) or k == "cp":
                     df.rename(columns={col: "CÓDIGO POSTAL"}, inplace=True)
 
-        # Limpieza básica
         for c in ("REGIÓN", "COMUNA", "CÓDIGO POSTAL"):
             if c in df.columns:
                 df[c] = df[c].astype(str).str.strip()
@@ -329,7 +355,6 @@ class BuscadorCodigosPostales(tk.Toplevel):
         return df
 
     def _normalizar_columnas(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compatibilidad con caminos de respaldo (usa el mismo criterio que _rename_soft)."""
         return self._rename_soft(df)
 
     def _tiene_columnas_target(self, df: pd.DataFrame) -> bool:
@@ -374,7 +399,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
 
         def score_keys(col, keys):
             vals = [norm(v) for v in sample.iloc[:, col].astype(str).tolist()]
-            return sum(any(k in v for k in keys) for v in vals)
+            return sum(any(k in v for v in vals) for k in keys)
 
         reg_scores = {c: score_keys(c, KEY_REG) for c in text_candidates} or {text_candidates[0]: 0}
         com_scores = {c: score_keys(c, KEY_COM) for c in text_candidates} or {text_candidates[-1]: 0}
@@ -487,12 +512,9 @@ class BuscadorCodigosPostales(tk.Toplevel):
         )
         if not ruta:
             return
-        guardar_ultimo_path(ruta, clave="archivo_codigos_postales")
-        capturar_log_bod1(f"Ruta de códigos postales cambiada por el usuario: {ruta}", "info")
-        self._ruta_excel = ruta
-        self.lbl_archivo.config(text=f"Archivo: {Path(ruta).name}")
-        self._set_estado("Cargando datos…")
-        threading.Thread(target=self._cargar_en_background, args=(ruta,), daemon=True).start()
+        guardar_ultimo_path(ruta, clave=self.CONFIG_KEY_FILE)
+        capturar_log_bod1(f"[CP] Ruta cambiada por el usuario: {ruta}", "info")
+        self._usar_ruta_y_cargar(ruta)
 
     # -------------------------------- Utils ----------------------------------
 

@@ -35,13 +35,6 @@ from app.gui.preview_crud import open_preview_crud
 from app.printer.printer_tools import prepare_fedex_dataframe
 
 
-# (Opcional) GUI de ajustes del sistema
-try:
-    from app.gui.gui_config import open_system_config  # si existe
-except Exception:
-    open_system_config = None
-
-
 def _has_display() -> bool:
     """En Linux/Unix, verifica si hay un servidor gráfico disponible."""
     if sys.platform.startswith("linux") or sys.platform == "darwin":
@@ -166,10 +159,8 @@ class ExcelPrinterApp(tk.Tk):
         self._add_sidebar_button(sidebar, "Sra Mary 👩‍💼", self._abrir_sra_mary)
         self._add_sidebar_button(sidebar, "Inventario 📦", lambda: InventarioView(self))
 
-        # Si la GUI de ajustes del sistema está disponible, añade botón
-        if open_system_config:
-            self._add_sidebar_button(sidebar, "Ajustes del Sistema 🌐",
-                                     lambda: open_system_config(self, self._on_system_config_saved))
+        # ❌ Eliminado: botón/ventana "Ajustes del Sistema"
+        # (antes aquí se agregaba condicionalmente si open_system_config existía)
 
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
         ttk.Button(sidebar, text="Salir ❌", command=self._on_close).pack(side="bottom", pady=20, fill="x", padx=10)
@@ -386,22 +377,6 @@ class ExcelPrinterApp(tk.Tk):
                 self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.error(f"Error reaplicando reglas: {e}")
-
-    # 👉 Callback cuando se guardan los “Ajustes del Sistema”
-    def _on_system_config_saved(self, new_cfg: dict):
-        self.config_columns = new_cfg or {}
-        if self.df is not None:
-            try:
-                self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
-
-                # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
-                if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
-                    self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
-
-                if self._ui_alive():
-                    self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
-            except Exception as e:
-                logging.error(f"Error aplicando reglas tras guardar ajustes del sistema: {e}")
 
     # ---------------- Otras vistas ----------------
 

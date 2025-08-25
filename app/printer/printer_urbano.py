@@ -1,20 +1,41 @@
 # app/printer/printer_urbano.py
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
+
 import pandas as pd
 from openpyxl import load_workbook
 
 from app.core.logger_eventos import log_evento
 from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
 from app.printer.printer_tools import (
-    prepare_urbano_dataframe,   # normaliza columnas y calcula total PIEZAS
-    formatear_tabla_ws,         # bordes, anchos, encabezados
-    insertar_bloque_firma_ws,   # líneas reales para nombre/firma
-    agregar_footer_info_ws,     # pie: "Impresa el ... | Total Piezas: X"
+    prepare_urbano_dataframe,
+    insertar_bloque_firma_ws,
+    agregar_footer_info_ws,
+    formatear_tabla_ws,
 )
+
+# ---------------------------------------------------------------------
+# Enviar a impresora con compatibilidad de firma:
+# ver comentarios en printer_fedex.py
+# ---------------------------------------------------------------------
+def _send_to_printer_compat(path: Path, printer_name: Optional[str]) -> None:
+    try:
+        enviar_a_impresora(path, printer_name=printer_name)
+        return
+    except TypeError:
+        pass
+
+    try:
+        if printer_name is not None:
+            enviar_a_impresora(path, printer_name)
+            return
+    except TypeError:
+        pass
+
+    enviar_a_impresora(path)
 
 
 def print_urbano(file_path, config, df: pd.DataFrame):
@@ -34,10 +55,13 @@ def print_urbano(file_path, config, df: pd.DataFrame):
         # 1) Preparar datos (limpieza + totales)
         df_out, total_piezas = prepare_urbano_dataframe(df)
         if df_out is None or df_out.empty:
-            raise ValueError("No hay filas válidas para imprimir Urbano.")
+            # Permisivo: imprime el DF original y estima total
+            log_evento("[Urbano] DF vacío tras preparación. Se imprimirá el DataFrame original.", "warning")
+            df_out = df.copy()
+            total_piezas = int(df_out.select_dtypes(include="number").sum().sum()) or len(df_out)
 
         filas = len(df_out)
-        log_evento(f"[Urbano] Filas tras limpieza: {filas}. Total PIEZAS: {total_piezas}.", "info")
+        log_evento(f"[Urbano] Filas a imprimir: {filas}. Total PIEZAS: {total_piezas}.", "info")
 
         # 2) Título
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
@@ -51,16 +75,16 @@ def print_urbano(file_path, config, df: pd.DataFrame):
         wb = load_workbook(tmp_path)
         try:
             ws = wb.active
-            formatear_tabla_ws(ws)                     # estilo profesional
-            insertar_bloque_firma_ws(ws)               # bloque firma con líneas
-            agregar_footer_info_ws(ws, total_piezas)   # pie con timestamp + total piezas
+            formatear_tabla_ws(ws)                   # estilo profesional
+            insertar_bloque_firma_ws(ws)             # bloque firma con líneas
+            agregar_footer_info_ws(ws, total_piezas) # pie con timestamp + total piezas
             wb.save(tmp_path)
         finally:
             wb.close()
 
-        # 5) Enviar a impresora (permite definir impresora en config)
+        # 5) Enviar a impresora (compatibilidad de firma)
         printer_name = (config or {}).get("printer_name")
-        enviar_a_impresora(tmp_path, printer_name=printer_name)
+        _send_to_printer_compat(tmp_path, printer_name)
 
         log_evento("✅ Impresión de listado Urbano completada correctamente.", "info")
 

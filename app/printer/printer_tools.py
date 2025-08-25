@@ -8,23 +8,52 @@ Herramientas de impresión y preparación de datos para FedEx/Urbano.
 • insertar_bloque_firma_ws(ws)  -> Bloque "Nombre/Firma" al final de la hoja
 • agregar_footer_info_ws(ws,t)  -> Pie con timestamp y total de piezas
 • formatear_tabla_ws(ws)        -> Estilo de tabla profesional (anchos/bordes auto por modo)
-
-Notas:
-- La vista previa puede llamar a prepare_fedex_dataframe / prepare_urbano_dataframe
-  para que el usuario vea exactamente lo que se imprimirá.
-- Todas las funciones openpyxl modifican el workbook in-place.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Tuple
+import numpy as np
 import pandas as pd
 
 
 # ======================================================================
 #                      Normalización / Limpieza de datos
 # ======================================================================
+
+def _df_safe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Reemplaza pd.NA/NaN por "" y normaliza dtypes a 'object' en columnas de texto,
+    para que openpyxl no falle con 'Cannot convert <NA> to Excel'.
+    """
+    df2 = df.copy()
+    df2 = df2.replace({pd.NA: "", np.nan: ""})
+    df2 = df2.replace({"nan": "", "<NA>": ""})
+    for c in df2.columns:
+        if pd.api.types.is_string_dtype(df2[c]) or pd.api.types.is_object_dtype(df2[c]):
+            df2[c] = df2[c].astype(object)
+    return df2
+
+
+def _clean_text_series(series: pd.Series) -> pd.Series:
+    """
+    Convierte a texto, quita espacios, y normaliza valores "vacíos":
+    NaN, <NA>, nan, none, null -> "" (case-insensitive).
+    """
+    if series is None:
+        return pd.Series([], dtype="string")
+    s = series.astype("string").fillna("").str.strip()
+    # Marcar como vacío valores típicos de 'no dato'
+    s = s.replace(
+        to_replace=r"^(nan|<na>|none|null)$",
+        value="",
+        regex=True,
+        flags=re.I if hasattr(pd, "re") else 0,  # compat: pandas antiguas ignoran flags
+    )
+    return s
+
 
 def _stringify_tracking(series: pd.Series) -> pd.Series:
     """
@@ -105,15 +134,10 @@ def _normalize_date(series: pd.Series) -> pd.Series:
 
 def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
     """
-    Devuelve (df_limpio, id_col, total_piezas)
+    Devuelve (df_limpio, id_col, total_piezas).
 
-    - Prioridad de ID: masterTrackingNumber > pieceTrackingNumber > trackingNumber
-    - Normaliza tracking (texto limpio) y fechas
-    - BULTOS: usa numberOfPackages (>=1) o 1 por defecto
-    - Agrupa por tracking y **suma** BULTOS (no se pierden piezas)
-    - Columnas finales y orden:
-        Tracking Number | Fecha | Referencia | Ciudad | Receptor | BULTOS
-    - Filtro extra: solo conserva filas con Tracking y Receptor no vacíos.
+    Soporta columnas en inglés y en español. Si el DF ya trae las columnas finales
+    (Tracking Number | Fecha | Referencia | Ciudad | Receptor | BULTOS), se usan tal cual.
     """
     cols_final = ["Tracking Number", "Fecha", "Referencia", "Ciudad", "Receptor", "BULTOS"]
     if df is None or df.empty:
@@ -121,44 +145,82 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
 
     df = df.copy()
 
-    # 1) Selección de columna de tracking (por prioridad)
-    candidates = ["masterTrackingNumber", "pieceTrackingNumber", "trackingNumber"]
+    # 0) Si ya viene listo (p. ej., desde tu vista previa), usarlo tal cual
+    if set(cols_final).issubset(df.columns):
+        out = df.loc[:, cols_final].copy()
+        # Normalización mínima
+        out["Tracking Number"] = _stringify_tracking(out["Tracking Number"])
+        out["Fecha"]           = _normalize_date(out["Fecha"])
+        out["Referencia"]      = _stringify_generic(out["Referencia"])
+        out["Ciudad"]          = out["Ciudad"].astype("string").str.strip()
+        out["Receptor"]        = out["Receptor"].astype("string").str.strip()
+        # BULTOS entero >= 1
+        b = pd.to_numeric(out["BULTOS"], errors="coerce").fillna(0).astype(int)
+        b.loc[b <= 0] = 1
+        out["BULTOS"] = b
+
+        # Agrupar por tracking (por si hay duplicados) y sumar piezas
+        grouped = (out.groupby("Tracking Number", as_index=False)
+                      .agg({
+                          "Fecha": "first",
+                          "Referencia": "first",
+                          "Ciudad": "first",
+                          "Receptor": "first",
+                          "BULTOS": "sum",
+                      }))
+        total_piezas = int(grouped["BULTOS"].sum())
+        grouped = _df_safe_for_excel(grouped)
+        return grouped.reset_index(drop=True), "Tracking Number", total_piezas
+
+    # 1) Tracking: prioridad + alias
+    candidates = [
+        "masterTrackingNumber", "pieceTrackingNumber", "trackingNumber",
+        "Tracking Number", "tracking number", "TRACKING", "tracking",
+    ]
     id_col = next((c for c in candidates if c in df.columns), None)
     if id_col is None:
         return pd.DataFrame(columns=cols_final), "", 0
 
-    # 2) BULTOS (mínimo 1)
-    if "numberOfPackages" in df.columns:
-        b = pd.to_numeric(df["numberOfPackages"], errors="coerce").fillna(0).astype(int)
+    # 2) BULTOS / piezas: varios alias
+    bultos_candidates = [
+        "BULTOS", "bultos", "PIEZAS", "piezas", "pieces",
+        "numberOfPackages", "packages", "pieceCount",
+    ]
+    b_col = next((c for c in bultos_candidates if c in df.columns), None)
+    if b_col:
+        b = pd.to_numeric(df[b_col], errors="coerce").fillna(0).astype(int)
         b.loc[b <= 0] = 1
     else:
         b = pd.Series(1, index=df.index, dtype=int)
-    df["BULTOS"] = b
 
-    # 3) Mapeo de columnas visibles (acepta alias comunes)
-    fecha_col = "shipDate" if "shipDate" in df.columns else None
-    ref_col   = "reference" if "reference" in df.columns else None
-    city_col  = next((c for c in ["recipientCity", "recipient_city", "city"] if c in df.columns), None)
-    recv_col  = next((c for c in ["recipientContactName", "recipientName", "recipient_name"] if c in df.columns), None)
+    # 3) Alias para el resto (ES/EN)
+    def pick(*names):
+        return next((c for c in names if c in df.columns), None)
 
-    # 4) Construcción base + normalización
+    fecha_col = pick("shipDate", "Ship Date", "Fecha", "fecha", "date", "Date")
+    ref_col   = pick("reference", "Reference", "Referencia", "referencia", "Ref", "ref")
+    city_col  = pick("recipientCity", "recipient_city", "city", "City", "Ciudad", "ciudad", "Localidad", "localidad")
+    recv_col  = pick("recipientContactName", "recipientName", "recipient_name",
+                     "Receptor", "receptor", "Destinatario", "destinatario")
+
+    # 4) Construcción + normalización
     base = pd.DataFrame(index=df.index)
     base["Tracking Number"] = _stringify_tracking(df[id_col])
     base["Fecha"]           = _normalize_date(df[fecha_col]) if fecha_col else pd.Series("", index=df.index, dtype="string")
     base["Referencia"]      = _stringify_generic(df[ref_col]) if ref_col else pd.Series("", index=df.index, dtype="string")
     base["Ciudad"]          = df[city_col].astype("string").str.strip() if city_col else pd.Series("", index=df.index, dtype="string")
     base["Receptor"]        = df[recv_col].astype("string").str.strip() if recv_col else pd.Series("", index=df.index, dtype="string")
-    base["BULTOS"]          = df["BULTOS"].astype(int)
+    base["BULTOS"]          = b
 
-    # 5) Filtro: Tracking y Receptor obligatorios
-    base = base.loc[
-        (base["Tracking Number"] != "") &
-        (base["Receptor"] != "")
-    ].copy()
+    # 5) Filtro: siempre exigir Tracking; Receptor sólo si existe
+    mask = base["Tracking Number"] != ""
+    if recv_col:
+        mask &= base["Receptor"] != ""
+    base = base.loc[mask].copy()
     if base.empty:
         return pd.DataFrame(columns=cols_final), id_col, 0
 
-    # 6) Agrupar por tracking y **sumar** BULTOS
+    # 6) Agrupar + sumar BULTOS (primer no vacío para texto)
     def _first_non_empty(s: pd.Series) -> str:
         s2 = s.fillna("").astype("string")
         non_empty = s2[s2.str.strip() != ""]
@@ -175,7 +237,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
             })
     )
 
-    # 7) Orden sugerido: Fecha ascendente, luego Tracking
+    # 7) Ordenar por fecha si existe
     if "Fecha" in grouped.columns:
         _sd = pd.to_datetime(grouped["Fecha"], errors="coerce")
         grouped = grouped.assign(_sd=_sd).sort_values(["_sd", "Tracking Number"], na_position="last").drop(columns=["_sd"])
@@ -183,6 +245,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
         grouped = grouped.sort_values(["Tracking Number"])
 
     total_piezas = int(grouped["BULTOS"].sum())
+    grouped = _df_safe_for_excel(grouped)
     return grouped.reset_index(drop=True), id_col, total_piezas
 
 
@@ -195,9 +258,10 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     Expectativa de columnas visibles:
         GUIA | CLIENTE | LOCALIDAD | PIEZAS | COD RASTREO
 
-    - Convierte PIEZAS a entero >= 1
-    - Elimina filas completamente vacías (o sin ninguna info relevante)
-    - Calcula total de PIEZAS
+    Reglas especiales:
+    - Trata 'nan', '<NA>', 'none', 'null' como vacío (no pasan filtro).
+    - Excluye filas de 'total' (texto que contenga 'total' o todas las
+      columnas de texto vacías). El total se mostrará sólo en el footer.
     """
     cols_final = ["GUIA", "CLIENTE", "LOCALIDAD", "PIEZAS", "COD RASTREO"]
     if df is None or df.empty:
@@ -208,7 +272,7 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     # Helper para elegir alias más probable
     def pick(*names):
         for n in names:
-            if n in df.columns: 
+            if n in df.columns:
                 return n
         return None
 
@@ -218,24 +282,46 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     piezas_c  = pick("PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
     rastreo_c = pick("COD RASTREO", "COD_RASTREO", "codRastreo", "TRACKING", "tracking")
 
+    # Construcción base + limpieza de texto (marcando 'nan' y similares como vacío)
     out = pd.DataFrame(index=df.index)
-    out["GUIA"]        = df[guia_col].astype("string").str.strip() if guia_col else ""
-    out["CLIENTE"]     = df[cli_col].astype("string").str.strip() if cli_col else ""
-    out["LOCALIDAD"]   = df[loc_col].astype("string").str.strip() if loc_col else ""
+
+    txt_guia  = _clean_text_series(df[guia_col])  if guia_col  else pd.Series("", index=df.index, dtype="string")
+    txt_cli   = _clean_text_series(df[cli_col])   if cli_col   else pd.Series("", index=df.index, dtype="string")
+    txt_loc   = _clean_text_series(df[loc_col])   if loc_col   else pd.Series("", index=df.index, dtype="string")
+    txt_track = _clean_text_series(df[rastreo_c]) if rastreo_c else pd.Series("", index=df.index, dtype="string")
+
+    out["GUIA"]        = txt_guia
+    out["CLIENTE"]     = txt_cli
+    out["LOCALIDAD"]   = txt_loc
+    out["COD RASTREO"] = txt_track
+
+    # PIEZAS
     if piezas_c:
         p = pd.to_numeric(df[piezas_c], errors="coerce").fillna(0).astype(int)
         p.loc[p <= 0] = 1
     else:
         p = pd.Series(1, index=df.index, dtype=int)
     out["PIEZAS"]      = p
-    out["COD RASTREO"] = df[rastreo_c].astype("string").str.strip() if rastreo_c else ""
 
-    # Filtra filas "basura": que no tengan ninguna columna de texto con valor
-    mask_valid = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].astype(str).apply(lambda s: s.str.strip() != "").any(axis=1)
+    # --- Filtro de filas válidas ---
+    # 1) Filas con alguna columna de texto no vacía
+    has_any_text = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() != "", axis=0).any(axis=1)
+
+    # 2) Excluir filas "totales": si en cualquiera de las columnas de texto aparece 'total'
+    contains_total = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(
+        lambda s: s.str.contains(r"\btotal\b", case=False, regex=True, na=False), axis=0
+    ).any(axis=1)
+
+    # 3) Fila completamente sin texto (todas vacías) -> no se muestra en la grilla impresa
+    all_text_empty = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() == "", axis=0).all(axis=1)
+
+    mask_valid = has_any_text & (~contains_total) & (~all_text_empty)
     out = out.loc[mask_valid].reset_index(drop=True)
 
     total_piezas = int(out["PIEZAS"].sum()) if not out.empty else 0
-    return out[cols_final], total_piezas
+    out = out[cols_final]
+    out = _df_safe_for_excel(out)
+    return out, total_piezas
 
 
 # ======================================================================
@@ -248,34 +334,39 @@ def insertar_bloque_firma_ws(ws) -> None:
     Genera:
         [Nombre quien recibe:]  [__________ (merge B..D)]
         [Firma quien recibe:]   [__________ (merge B..D)]
+
+    Importante:
+    - En openpyxl sólo se escribe valor en la **celda superior izquierda**
+      de un rango fusionado. No asignes en las demás celdas del merge.
     """
     from openpyxl.styles import Alignment, Side, Border
 
     ncols = ws.max_column or 2
-    right = max(2, min(ncols, 4))
+    right = max(2, min(ncols, 4))  # fusionaremos desde la col 2 hasta 'right'
 
+    # Separador visual
     ws.append([])
 
     # Fila "Nombre quien recibe:"
     r1 = ws.max_row + 1
     ws.cell(row=r1, column=1, value="Nombre quien recibe:")
     ws.merge_cells(start_row=r1, start_column=2, end_row=r1, end_column=right)
-    for c in range(2, right + 1):
-        ws.cell(row=r1, column=c, value="")
+    ws.cell(row=r1, column=2, value="")
 
     # Fila "Firma quien recibe:"
     r2 = r1 + 1
     ws.cell(row=r2, column=1, value="Firma quien recibe:")
     ws.merge_cells(start_row=r2, start_column=2, end_row=r2, end_column=right)
-    for c in range(2, right + 1):
-        ws.cell(row=r2, column=c, value="")
+    ws.cell(row=r2, column=2, value="")
 
+    # Dibujar líneas (bordes superior/inferior) sobre el rango fusionado
     thin = Side(style="thin")
     line_border = Border(top=thin, bottom=thin)
     for r in (r1, r2):
         for c in range(2, right + 1):
             ws.cell(row=r, column=c).border = line_border
 
+    # Alineación
     for r in (r1, r2):
         for c in range(1, right + 1):
             ws.cell(row=r, column=c).alignment = Alignment(horizontal="left", vertical="center")
@@ -343,7 +434,6 @@ def formatear_tabla_ws(ws) -> None:
         cell.border = Border(bottom=thin)
 
     # Datos
-    # Detectar si la última columna es cuantitativa (BULTOS/PIEZAS) para centrar
     last_is_qty = False
     if headers:
         last_is_qty = headers[-1].upper() in {"BULTOS", "PIEZAS"}
@@ -364,7 +454,6 @@ def formatear_tabla_ws(ws) -> None:
     elif is_urbano:
         min_widths = [18, 22, 18, 8, 22]
     else:
-        # Fallback genérico (12px aprox. por columna)
         min_widths = [16] * max_col
 
     for i, w in enumerate(min_widths, start=1):
