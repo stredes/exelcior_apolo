@@ -1,0 +1,3 @@
+== Checksums Exelcior Apolo v1.4.0 ==
+EXE (dist): 2C27FA91F46A93C918D29B881FF9902D042F493F5888B5BAAC67AEB0D05D2666  *C:\Users\Recepci?n 2\Desktop\workspace\exelcior_apolo\dist\ExelciorApolo\ExelciorApolo.exe
+SETUP:      6824524FD0D4A5C430B5E278A9CB1894CB27B698747456A6D308266B9BE23EF1  *C:\Users\Recepci?n 2\Desktop\workspace\exelcior_apolo\installer\output\ExelciorApolo_1.4.0_Setup.exe
