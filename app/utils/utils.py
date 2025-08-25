@@ -1,10 +1,17 @@
 # app/utils/utils.py
-
+# -*- coding: utf-8 -*-
 """
 Módulo de utilidades generales del sistema.
+
 Las funciones de configuración fueron trasladadas a app/config/config_manager.py
 para evitar duplicación y mejorar la arquitectura.
+
+Este módulo expone un alias de compatibilidad `load_config_from_file()`
+para código legado que aún lo importa desde aquí.
 """
+
+from typing import Iterable
+import openpyxl
 
 # 🔄 Delegación explícita a la fuente única de configuración
 from app.config.config_manager import (
@@ -13,8 +20,13 @@ from app.config.config_manager import (
     guardar_ultimo_path,
 )
 
-from typing import Iterable
-import openpyxl
+__all__ = [
+    "load_config",
+    "save_config",
+    "guardar_ultimo_path",
+    "autoajustar_columnas",
+    "load_config_from_file",  # alias de compatibilidad
+]
 
 
 def _iter_worksheets(libro_o_hoja) -> Iterable[openpyxl.worksheet.worksheet.Worksheet]:
@@ -30,7 +42,7 @@ def _iter_worksheets(libro_o_hoja) -> Iterable[openpyxl.worksheet.worksheet.Work
 
 def autoajustar_columnas(libro_o_hoja, max_width: int = 60, padding: int = 2) -> None:
     """
-    Autoajusta el ancho de columnas de una o varias hojas.
+    Autoajusta el ancho de columnas de una o varias hojas (openpyxl).
 
     Acepta:
       - openpyxl.Workbook (ajusta todas sus hojas)
@@ -45,29 +57,28 @@ def autoajustar_columnas(libro_o_hoja, max_width: int = 60, padding: int = 2) ->
       - Si una columna no tiene celdas con valor, mantiene el ancho por defecto.
     """
     for sheet in _iter_worksheets(libro_o_hoja):
-        # openpyxl.sheet.columns es un generador de tuplas de celdas por columna
+        # openpyxl.Worksheet.columns es un generador de tuplas de celdas por columna
         for column_cells in sheet.columns:
             try:
-                # Obtiene la letra de columna de la primera celda de la columna
+                # Primera celda de la columna para obtener la letra
                 first_cell = next(iter(column_cells))
             except StopIteration:
-                # Columna vacía (no debería ocurrir), continuar
+                # Columna vacía
                 continue
 
             column_letter = getattr(first_cell, "column_letter", None)
             if not column_letter:
-                # En casos muy atípicos, podría no existir; saltar
+                # Caso atípico: sin letra de columna
                 continue
 
             max_len = 0
             for cell in column_cells:
-                # Evitar fallos por tipos no serializables o muy pesados
                 try:
                     value = "" if cell.value is None else str(cell.value)
                     if len(value) > max_len:
                         max_len = len(value)
                 except Exception:
-                    # No romper por una celda defectuosa
+                    # No romper por una celda problemática
                     continue
 
             # Ajuste con padding y tope de seguridad
@@ -75,5 +86,15 @@ def autoajustar_columnas(libro_o_hoja, max_width: int = 60, padding: int = 2) ->
             try:
                 sheet.column_dimensions[column_letter].width = adjusted
             except Exception:
-                # No romper el proceso por un fallo puntual de dimensionado
+                # No romper por un fallo puntual de dimensionado
                 continue
+
+
+# --- Compatibilidad con código existente ---
+def load_config_from_file():
+    """
+    Alias de compatibilidad para el código que aún importa
+    'load_config_from_file' desde app.utils.utils.
+    Internamente delega en app.config.config_manager.load_config().
+    """
+    return load_config()
