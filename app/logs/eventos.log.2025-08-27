@@ -1,0 +1,70 @@
+2025-08-27 12:36:43,469 - INFO - Inicializando base de datos...
+2025-08-27 12:36:43,495 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-27 12:36:43,497 - INFO - [CONFIG] DEFAULT: C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json
+2025-08-27 12:36:43,497 - INFO - [CONFIG] USER   : C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\user_config.json
+2025-08-27 12:36:43,529 - INFO - ✅ Config validada desde merged
+2025-08-27 14:13:24,174 - INFO - Inicializando base de datos...
+2025-08-27 14:13:24,192 - INFO - Tablas creadas o verificadas correctamente.
+2025-08-27 14:13:24,193 - INFO - [CONFIG] DEFAULT: C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\excel_printer_default.json
+2025-08-27 14:13:24,194 - INFO - [CONFIG] USER   : C:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\config\user_config.json
+2025-08-27 14:13:24,198 - INFO - ✅ Config validada desde merged
+2025-08-27 14:14:17,380 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:17,511 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\2069812416.xlsx
+2025-08-27 14:14:17,512 - INFO - Transformando datos para modo: urbano
+2025-08-27 14:14:17,512 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-27 14:14:17,512 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:17,512 - INFO - [XFORM] Reglas efectivas urbano: {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:17,514 - INFO - [XFORM] Match columnas -> ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'] => ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-27 14:14:17,514 - INFO - [XFORM] Match columnas -> ['PIEZAS'] => ['PIEZAS']
+2025-08-27 14:14:17,527 - INFO - Columnas eliminadas: ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-27 14:14:17,532 - INFO - [XFORM] Fila de sumatoria creada: {'PIEZAS': np.int64(4)}
+2025-08-27 14:14:17,533 - INFO - Columnas convertidas a texto: []
+2025-08-27 14:14:17,576 - INFO - Historial de archivo guardado: n/a
+2025-08-27 14:14:28,908 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-22.xlsx
+2025-08-27 14:14:28,909 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['*'], 'sumar': ['numberOfPackages'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'conservar': ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'city', 'Ciudad', 'numberOfPackages'], 'vista_previa_fuente': 10}
+2025-08-27 14:14:29,016 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-22.xlsx
+2025-08-27 14:14:29,016 - INFO - Transformando datos para modo: fedex
+2025-08-27 14:14:29,017 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-27 14:14:29,017 - INFO - [CONFIG] Reglas efectivas para 'fedex': {'start_row': 0, 'eliminar': ['*'], 'sumar': ['numberOfPackages'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'conservar': ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'city', 'Ciudad', 'numberOfPackages'], 'vista_previa_fuente': 10}
+2025-08-27 14:14:29,017 - INFO - [XFORM] Reglas efectivas fedex: {'start_row': 0, 'eliminar': ['*'], 'sumar': ['numberOfPackages'], 'mantener_formato': ['masterTrackingNumber'], 'formato_texto': [], 'conservar': ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'city', 'Ciudad', 'numberOfPackages'], 'vista_previa_fuente': 10}
+2025-08-27 14:14:29,019 - INFO - [XFORM] Match columnas -> ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'city', 'Ciudad', 'numberOfPackages'] => ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'numberOfPackages']
+2025-08-27 14:14:29,019 - WARNING - [XFORM] No encontradas en DF (tras normalizar): ['city', 'Ciudad']
+2025-08-27 14:14:29,019 - WARNING - [XFORM] No encontradas en DF (tras normalizar): ['*']
+2025-08-27 14:14:29,020 - INFO - [XFORM] Match columnas -> ['numberOfPackages'] => ['numberOfPackages']
+2025-08-27 14:14:29,020 - INFO - [XFORM] Match columnas -> ['masterTrackingNumber'] => ['masterTrackingNumber']
+2025-08-27 14:14:29,028 - INFO - [XFORM] Conservando solo columnas (allowlist): ['shipDate', 'reference', 'masterTrackingNumber', 'recipientContactName', 'recipientCity', 'city', 'Ciudad', 'numberOfPackages']
+2025-08-27 14:14:29,029 - INFO - Columnas eliminadas: []
+2025-08-27 14:14:29,053 - INFO - [XFORM] Fila de sumatoria creada: {'numberOfPackages': np.float64(5.0)}
+2025-08-27 14:14:29,055 - INFO - Columnas convertidas a texto: ['masterTrackingNumber']
+2025-08-27 14:14:29,222 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\Shipment_Report_2025-08-22.xlsx
+2025-08-27 14:14:50,534 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:50,560 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\2069812416.xlsx
+2025-08-27 14:14:50,560 - INFO - Transformando datos para modo: urbano
+2025-08-27 14:14:50,561 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-27 14:14:50,561 - INFO - [CONFIG] Reglas efectivas para 'urbano': {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:50,562 - INFO - [XFORM] Reglas efectivas urbano: {'start_row': 2, 'eliminar': ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'], 'sumar': ['PIEZAS'], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:14:50,562 - INFO - [XFORM] Match columnas -> ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO'] => ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-27 14:14:50,563 - INFO - [XFORM] Match columnas -> ['PIEZAS'] => ['PIEZAS']
+2025-08-27 14:14:50,565 - INFO - Columnas eliminadas: ['AGENCIA', 'SHIPPER', 'FECHA CHK', 'DIAS', 'ESTADO', 'SERVICIO', 'PESO']
+2025-08-27 14:14:50,571 - INFO - [XFORM] Fila de sumatoria creada: {'PIEZAS': np.int64(4)}
+2025-08-27 14:14:50,571 - INFO - Columnas convertidas a texto: []
+2025-08-27 14:14:50,584 - INFO - Historial de archivo guardado: n/a
+2025-08-27 14:44:16,744 - INFO - Iniciando procesamiento: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250827_144404.xlsx
+2025-08-27 14:44:16,746 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:44:16,874 - INFO - Archivo cargado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250827_144404.xlsx
+2025-08-27 14:44:16,875 - INFO - Transformando datos para modo: listados
+2025-08-27 14:44:16,875 - INFO - [XFORM] excel_processor activo: c:\Users\Recepción 2\Desktop\workspace\exelcior_apolo\app\core\excel_processor.py
+2025-08-27 14:44:16,875 - INFO - [CONFIG] Reglas efectivas para 'listados': {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:44:16,875 - INFO - [XFORM] Reglas efectivas listados: {'start_row': 0, 'eliminar': ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'], 'sumar': [], 'mantener_formato': [], 'formato_texto': [], 'conservar': [], 'vista_previa_fuente': 10}
+2025-08-27 14:44:16,877 - INFO - [XFORM] Match columnas -> ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa'] => ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-27 14:44:16,880 - INFO - Columnas eliminadas: ['Vendedor', 'Total', 'Nº', 'Moneda', 'Tipo cambio', 'Tipo doc', 'RUT', 'Glosa']
+2025-08-27 14:44:16,881 - INFO - Columnas convertidas a texto: []
+2025-08-27 14:44:16,912 - INFO - Historial de archivo guardado: C:\Users\Recepción 2\Downloads\lista_doc_venta_20250827_144404.xlsx
+2025-08-27 14:44:20,374 - INFO - Archivo temporal Excel generado: C:\Users\RECEPC~1\AppData\Local\Temp\tmpi774pnjw.xlsx
+2025-08-27 14:44:20,375 - INFO - 📄 Archivo temporal generado para impresión Listado General: C:\Users\RECEPC~1\AppData\Local\Temp\tmpi774pnjw.xlsx
+2025-08-27 14:44:20,551 - WARNING - Excel COM no disponible o falló: (-2147221005, 'Cadena clase no válida', None, None)
+2025-08-27 14:44:20,570 - INFO - LibreOffice detectado: C:\Program Files\LibreOffice\program\soffice.exe
+2025-08-27 14:44:20,572 - INFO - Intentando imprimir con: C:\Program Files\LibreOffice\program\soffice.exe --headless --invisible --norestore --nolockcheck --nodefault --nologo --nofirststartwizard --pt Default C:\Users\Recepción 2\AppData\Local\Temp\tmpi774pnjw.xlsx
+2025-08-27 14:44:40,909 - INFO - Enviado a impresora (soffice.exe): tmpi774pnjw.xlsx
+2025-08-27 14:44:40,913 - INFO - ✅ Impresión de listado general completada correctamente.
+2025-08-27 14:44:40,953 - INFO - Impresión registrada: listados_impresion.xlsx

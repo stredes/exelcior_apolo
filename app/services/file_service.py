@@ -25,6 +25,9 @@ from app.printer import (
     printer_inventario_ubicacion,
 )
 
+# >>> NUEVO: para que la vista previa FedEx consolide igual que la impresión
+from app.printer.printer_tools import prepare_fedex_dataframe
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -75,6 +78,16 @@ def _ensure_excel_engine(path: Path) -> None:
 #                              PROCESAMIENTO
 # =============================================================================
 
+def _normalize_mode(mode: Optional[str]) -> str:
+    """Normaliza el nombre del modo y soporta algunos alias comunes."""
+    m = (mode or "").strip().lower()
+    aliases = {
+        "inventario-codigo": "inventario_codigo",
+        "inventario-códig": "inventario_codigo",
+        "inventario_ubic": "inventario_ubicacion",
+    }
+    return aliases.get(m, m)
+
 def process_file(
     path_or_df: str | Path | pd.DataFrame,
     config_columns: dict,
@@ -83,8 +96,16 @@ def process_file(
     """
     Carga y transforma el archivo/DF según el modo y la configuración.
     Devuelve (df_original, df_transformado).
+
+    Cambio clave:
+    - Para modo 'fedex' la vista previa usa prepare_fedex_dataframe(...) para
+      consolidar por masterTrackingNumber y mapear numberOfPackages -> BULTOS,
+      igual que la impresión. Así evitas ver '1' por fila en la grilla.
     """
     try:
+        mode_norm = _normalize_mode(mode)
+
+        # ---- Carga origen ----
         if isinstance(path_or_df, pd.DataFrame):
             df = path_or_df.copy()
             logger.info("[process_file] Recibido DataFrame en memoria")
@@ -92,9 +113,34 @@ def process_file(
             path = Path(path_or_df) if not isinstance(path_or_df, Path) else path_or_df
             logger.info(f"[process_file] Cargando archivo: {path}")
             _ensure_excel_engine(path)  # <- chequeo explícito de dependencia
-            df = load_excel(path, config_columns, mode)
+            df = load_excel(path, config_columns, mode_norm)
 
-        transformed = apply_transformation(df.copy(), config_columns, mode)
+        # ---- Transformación genérica del core ----
+        base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
+
+        # ---- Transformación específica por modo (vista previa coherente con impresión) ----
+        if mode_norm == "fedex":
+            try:
+                df_preview, _id_col, _total = prepare_fedex_dataframe(base_transformed)
+                # Aseguramos tipo int en BULTOS si existe
+                if "BULTOS" in df_preview.columns:
+                    df_preview["BULTOS"] = (
+                        pd.to_numeric(df_preview["BULTOS"], errors="coerce")
+                          .fillna(0)
+                          .astype(int)
+                    )
+                logger.info(
+                    "[process_file] FedEx preview consolidada. Filas: %d | Total BULTOS: %d",
+                    len(df_preview),
+                    int(df_preview["BULTOS"].sum()) if "BULTOS" in df_preview.columns else 0,
+                )
+                transformed = df_preview
+            except Exception:
+                logger.exception("[process_file] FedEx preview: error en prepare_fedex_dataframe; usando base_transformed")
+                transformed = base_transformed
+        else:
+            transformed = base_transformed
+
         logger.info(f"[process_file] Transformación OK. Filas: src={len(df)}, out={len(transformed)}")
         return df, transformed
 
@@ -131,17 +177,6 @@ _safe_register("inventario_codigo", printer_inventario_codigo, "print_inventario
 _safe_register("inventario_ubicacion", printer_inventario_ubicacion, "print_inventario_ubicacion")
 
 logger.info(f"[dispatcher] Printers registrados (eager): {sorted(printer_map.keys())}")
-
-
-def _normalize_mode(mode: Optional[str]) -> str:
-    """Normaliza el nombre del modo y soporta algunos alias comunes."""
-    m = (mode or "").strip().lower()
-    aliases = {
-        "inventario-codigo": "inventario_codigo",
-        "inventario-códig": "inventario_codigo",
-        "inventario_ubic": "inventario_ubicacion",
-    }
-    return aliases.get(m, m)
 
 
 def _lazy_load_printer(mode_norm: str) -> Optional[Callable]:

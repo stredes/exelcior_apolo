@@ -1,7 +1,14 @@
 # app/printer/printer_etiquetas.py
-# Generación e impresión de etiquetas desde plantilla Excel.
-# - Windows: intenta Excel COM; si falla, usa LibreOffice (soffice).
-# - Linux/macOS: usa LibreOffice (soffice) o 'lp' como fallback.
+# -*- coding: utf-8 -*-
+"""
+Generación e impresión de etiquetas desde plantilla Excel y soporte de impresión PDF.
+- Windows:
+    • Primero intenta Excel COM (si hay Office).
+    • Luego LibreOffice (soffice) directo a impresora (recomendado para evitar asociación).
+    • Último recurso: asociación del sistema (os.startfile(..., 'print')).
+- Linux/macOS:
+    • LibreOffice (soffice) o fallback 'lp'.
+"""
 
 from __future__ import annotations
 
@@ -15,8 +22,8 @@ from typing import Optional, Dict
 
 import openpyxl
 from openpyxl.worksheet.page import PageMargins
-from pathlib import Path
 import pandas as pd
+
 from app.core.logger_eventos import log_evento
 
 # ----------------- Imports condicionales (Windows) -----------------
@@ -27,12 +34,13 @@ try:
     else:
         pythoncom = None  # type: ignore
         Dispatch = None   # type: ignore
-except Exception:  # por seguridad
+except Exception:
     pythoncom = None  # type: ignore
     Dispatch = None   # type: ignore
 
 # ----------------- Constantes / Config -----------------
 PLANTILLA_PATH = Path("data/etiqueta pedido.xlsx")
+
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -49,13 +57,14 @@ CELDAS_MAP: Dict[str, str] = {
 }
 
 # Impresora por defecto (puedes sobreescribir con EXCELCIOR_PRINTER)
-DEFAULT_PRINTER = os.environ.get("EXCELCIOR_PRINTER", "Default")
+DEFAULT_PRINTER = os.environ.get("EXCELCIOR_PRINTER", "").strip()
 
 # Timeout en segundos para procesos de impresión (LibreOffice)
 PRINT_TIMEOUT_S = int(os.environ.get("EXCELCIOR_PRINT_TIMEOUT", "25"))
 
 # Ejecutable forzado opcional (ruta a soffice)
 FORCED_PRINT_APP = os.environ.get("EXCELCIOR_PRINT_APP", "").strip().strip('"')
+
 
 # ----------------- Utilidades -----------------
 def _ensure_exists(path: Path) -> None:
@@ -71,12 +80,11 @@ def _find_soffice() -> Optional[str]:
     """
     from shutil import which
 
-    # 1) PATH
     exe = which("soffice") or which("libreoffice")
     if exe:
         return exe
 
-    # 2) Windows: rutas típicas
+    # Windows: rutas típicas
     candidates = [
         r"C:\Program Files\LibreOffice\program\soffice.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
@@ -87,7 +95,7 @@ def _find_soffice() -> Optional[str]:
         if Path(c).exists():
             return c
 
-    # 3) Windows: Registro
+    # Windows: registro
     if platform.system() == "Windows":
         try:
             import winreg  # type: ignore
@@ -114,8 +122,17 @@ def _find_soffice() -> Optional[str]:
 
     return None
 
+def _normalize_soffice(app: str) -> str:
+    """Normaliza soffice.COM → soffice.exe si existe el .exe al lado (Windows)."""
+    p = Path(app)
+    if p.suffix.lower() == ".com":
+        exe = p.with_suffix(".exe")
+        if exe.exists():
+            return str(exe)
+    return app
+
 def _run_cmd(cmd: list[str], timeout_s: int = PRINT_TIMEOUT_S) -> None:
-    """Ejecuta un comando con timeout, loguea stdout/stderr y lanza error si rc != 0."""
+    """Ejecuta comando con timeout, loguea y lanza si rc != 0."""
     creationflags = 0
     startupinfo = None
     if platform.system() == "Windows":
@@ -123,7 +140,7 @@ def _run_cmd(cmd: list[str], timeout_s: int = PRINT_TIMEOUT_S) -> None:
         startupinfo = sp.STARTUPINFO()
         startupinfo.dwFlags |= sp.STARTF_USESHOWWINDOW
 
-    log_evento(f"Ejecutando: {' '.join(cmd)}", "info")
+    log_evento(f"▶ Ejecutando: {' '.join(cmd)}", "info")
     try:
         proc = sp.Popen(
             cmd,
@@ -138,22 +155,22 @@ def _run_cmd(cmd: list[str], timeout_s: int = PRINT_TIMEOUT_S) -> None:
         except sp.TimeoutExpired:
             proc.kill()
             stdout, stderr = proc.communicate()
-            log_evento(f"⏳ Timeout ({timeout_s}s). stderr: {stderr.strip()[:400]}", "error")
-            raise RuntimeError(f"Tiempo de espera excedido ({timeout_s}s) ejecutando impresión.")
+            log_evento(f"⏳ Timeout ({timeout_s}s). stderr: {str(stderr).strip()[:400]}", "error")
+            raise RuntimeError(f"Tiempo de espera excedido ({timeout_s}s).")
 
         if stdout:
             log_evento(stdout.strip()[:400], "debug")
         if proc.returncode != 0:
-            log_evento(f"Comando falló ({proc.returncode}). stderr: {str(stderr).strip()[:400]}", "error")
-            raise RuntimeError(f"Error al ejecutar impresión (rc={proc.returncode}).")
+            log_evento(f"Comando falló (rc={proc.returncode}). stderr: {str(stderr).strip()[:400]}", "error")
+            raise RuntimeError(f"Error al ejecutar comando (rc={proc.returncode}).")
     except FileNotFoundError as e:
         raise RuntimeError(f"No se encontró ejecutable: {cmd[0]}") from e
 
-# ----------------- Generación de etiqueta -----------------
+
+# ----------------- Generación de etiqueta (xlsx) -----------------
 def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
     """
-    Copia la plantilla, escribe datos en celdas mapeadas y guarda en output_path.
-    Fuerza tamaño de página a 10 cm (ancho) x 14 cm (alto) en orientación vertical.
+    Copia la plantilla, escribe datos y fuerza tamaño de página 10x14 cm (retrato).
     """
     try:
         _ensure_exists(PLANTILLA_PATH)
@@ -167,38 +184,32 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         for campo, celda in CELDAS_MAP.items():
             ws[celda] = data.get(campo, "")
 
-        # ---- Configuración de página 10x14 cm (retrato) ----
-        # Nota: openpyxl acepta strings con unidades para paperWidth/paperHeight ("10cm", "14cm").
+        # Config de página 10x14 cm
         try:
             ws.page_setup.orientation = "portrait"
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 1
-
-            # Márgenes pequeños para aprovechar el área
             ws.page_margins = PageMargins(
                 left=0.2, right=0.2, top=0.3, bottom=0.3, header=0.1, footer=0.1
             )
-
-            # Dimensiones exactas en cm
             ws.page_setup.paperWidth = "10cm"
             ws.page_setup.paperHeight = "14cm"
-
-            # Asegura que Excel/LibreOffice respeten el ajuste a página
             if hasattr(ws, "sheet_properties") and hasattr(ws.sheet_properties, "pageSetUpPr"):
                 ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[attr-defined]
         except Exception as e:
-            log_evento(f"⚠️ No se pudo aplicar tamaño de página personalizado 10x14 cm: {e}", "warning")
+            log_evento(f"⚠️ No se pudo aplicar tamaño 10x14 cm: {e}", "warning")
 
         wb.save(output_path)
-        log_evento(f"📄 Etiqueta (10x14 cm) generada en: {output_path}", "info")
+        log_evento(f"📄 Etiqueta generada: {output_path}", "info")
         return output_path
 
     except Exception as e:
         log_evento(f"❌ Error al generar etiqueta Excel: {e}", "error")
         raise RuntimeError(f"Error al generar etiqueta: {e}")
 
-# ----------------- Impresión -----------------
-def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str) -> None:
+
+# ----------------- Impresión XLSX -----------------
+def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str | None) -> None:
     """Intenta imprimir con Excel COM en Windows."""
     if pythoncom is None or Dispatch is None:
         raise RuntimeError("COM/pywin32 no disponible en este sistema.")
@@ -213,7 +224,7 @@ def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str) -> None:
             wb = excel.Workbooks.Open(str(xlsx_path.resolve()))
             hoja = wb.Sheets(1)
 
-            # Mantén el tamaño configurado por openpyxl y asegúrate de ajustar a una hoja
+            # Respetar ajuste a página
             hoja.PageSetup.Zoom = False
             hoja.PageSetup.FitToPagesWide = 1
             hoja.PageSetup.FitToPagesTall = 1
@@ -222,8 +233,7 @@ def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str) -> None:
                 excel.ActivePrinter = impresora
             hoja.PrintOut()
 
-            wb.Close(False)
-            log_evento(f"🖨️ Enviado por Excel COM: {xlsx_path.name} -> {impresora or '[predeterminada]'}", "info")
+            log_evento(f"🖨️ Excel COM: {xlsx_path.name} -> {impresora or '[predeterminada]'}", "info")
         finally:
             try:
                 if wb:
@@ -243,69 +253,56 @@ def _imprimir_excel_windows_via_com(xlsx_path: Path, impresora: str) -> None:
     except Exception as e:
         raise RuntimeError(f"Excel COM falló: {e}")
 
-def _imprimir_via_soffice(xlsx_path: Path, impresora: str) -> None:
+def _imprimir_via_soffice_xlsx(xlsx_path: Path, impresora: str | None) -> None:
     """
-    Imprime con LibreOffice (soffice).
-    Flags silenciosas para evitar diálogos.
+    Imprime XLSX con LibreOffice (soffice).
     """
-    app = FORCED_PRINT_APP or _find_soffice()
+    app = _normalize_soffice(FORCED_PRINT_APP or (_find_soffice() or ""))
     if not app:
         raise RuntimeError("No se encontró LibreOffice (soffice). Instálalo o define EXCELCIOR_PRINT_APP.")
 
-    # Normalizar .COM -> .exe si existe al lado (Windows)
-    app_path = Path(app)
-    if app_path.name.lower().endswith(".com"):
-        exe_candidate = app_path.with_suffix(".exe")
-        if exe_candidate.exists():
-            app = str(exe_candidate)
-
     cmd = [
         app,
-        "--headless",
-        "--invisible",
-        "--norestore",
-        "--nolockcheck",
-        "--nodefault",
-        "--nologo",
-        "--nofirststartwizard",
-        "--pt", impresora or DEFAULT_PRINTER,
+        "--headless", "--invisible", "--norestore", "--nolockcheck",
+        "--nodefault", "--nologo", "--nofirststartwizard",
+        "--pt", impresora or DEFAULT_PRINTER or "",
         str(xlsx_path.resolve()),
     ]
     _run_cmd(cmd, timeout_s=PRINT_TIMEOUT_S)
-    log_evento(f"🖨️ Enviado a impresora (soffice): {xlsx_path.name} -> {impresora or DEFAULT_PRINTER}", "info")
+    log_evento(f"🖨️ soffice (xlsx): {xlsx_path.name} -> {impresora or DEFAULT_PRINTER or '[predeterminada]'}", "info")
 
-def _imprimir_via_lp(xlsx_path: Path) -> None:
-    """Fallback básico en Linux/macOS usando 'lp' (requerirá asociación/driver)."""
-    cmd = ["lp", str(xlsx_path.resolve())]
+def _imprimir_via_lp(file_path: Path) -> None:
+    """Fallback básico en Linux/macOS usando 'lp'."""
+    cmd = ["lp", str(file_path.resolve())]
     _run_cmd(cmd, timeout_s=PRINT_TIMEOUT_S)
-    log_evento(f"🖨️ Enviado a impresora (lp): {xlsx_path.name}", "info")
+    log_evento(f"🖨️ lp: {file_path.name}", "info")
 
 def imprimir_excel(path: Path, impresora: Optional[str] = None) -> None:
     """
     Envia el .xlsx a imprimir:
-      - Windows: Excel COM -> (fallback) soffice -> (último) asociación 'startfile/print'
-      - Linux/macOS: soffice -> (fallback) lp
+      - Windows: Excel COM → soffice → asociación Windows (último recurso)
+      - Linux/macOS: soffice → lp
     """
     _ensure_exists(path)
     so = platform.system()
-    printer = impresora or DEFAULT_PRINTER
+    printer = (impresora or DEFAULT_PRINTER).strip()
 
     if so == "Windows":
         # 1) Excel COM
         try:
-            _imprimir_excel_windows_via_com(path, printer)
+            _imprimir_excel_windows_via_com(path, printer or None)
             return
         except Exception as com_err:
             log_evento(f"Excel COM no disponible o falló: {com_err}", "warning")
 
         # 2) soffice
         try:
-            _imprimir_via_soffice(path, printer)
+            _imprimir_via_soffice_xlsx(path, printer or None)
             return
         except Exception as lo_err:
             log_evento(f"LibreOffice no disponible o falló: {lo_err}", "warning")
 
-        # 3) Último recurso: asociación del sistema
+        # 3) Asociación del sistema (puede fallar si no hay visor predeterminado)
         try:
             os.startfile(str(path), "print")  # type: ignore
             log_evento(f"Impresión por asociación Windows: {path.name}", "info")
@@ -319,12 +316,11 @@ def imprimir_excel(path: Path, impresora: Optional[str] = None) -> None:
     else:
         # Linux / macOS
         try:
-            _imprimir_via_soffice(path, printer)
+            _imprimir_via_soffice_xlsx(path, printer or None)
             return
         except Exception as lo_err:
             log_evento(f"LibreOffice no disponible o falló: {lo_err}", "warning")
 
-        # Fallback a 'lp'
         try:
             _imprimir_via_lp(path)
             return
@@ -334,7 +330,55 @@ def imprimir_excel(path: Path, impresora: Optional[str] = None) -> None:
                 "Instala LibreOffice o configura CUPS correctamente."
             ) from e
 
-# ----------------- API pública -----------------
+
+# ----------------- Impresión PDF (nuevo) -----------------
+def imprimir_pdf(path: Path, impresora: Optional[str] = None) -> None:
+    """
+    Imprime un PDF **sin** depender de la app predeterminada de Windows,
+    usando LibreOffice cuando sea posible.
+    """
+    _ensure_exists(path)
+    so = platform.system()
+    printer = (impresora or DEFAULT_PRINTER).strip()
+
+    # Intentar siempre con LibreOffice (evita WinError 1155)
+    try:
+        app = _normalize_soffice(FORCED_PRINT_APP or (_find_soffice() or ""))
+        if app:
+            cmd = [
+                app, "--headless", "--invisible", "--norestore", "--nolockcheck",
+                "--nodefault", "--nologo", "--nofirststartwizard",
+                "--pt", printer or "",
+                str(path.resolve()),
+            ]
+            _run_cmd(cmd, timeout_s=PRINT_TIMEOUT_S)
+            log_evento(f"🖨️ soffice (pdf): {path.name} -> {printer or '[predeterminada]'}", "info")
+            return
+    except Exception as lo_err:
+        log_evento(f"LibreOffice no disponible o falló (pdf): {lo_err}", "warning")
+
+    # Fallbacks por SO
+    if so == "Windows":
+        try:
+            os.startfile(str(path), "print")  # type: ignore
+            log_evento(f"Impresión por asociación Windows (pdf): {path.name}", "info")
+            return
+        except Exception as e:
+            raise RuntimeError(
+                "No se pudo imprimir PDF en Windows: LibreOffice y asociación fallaron. "
+                "Instala LibreOffice o un visor PDF y configúralo como predeterminado."
+            ) from e
+    else:
+        try:
+            _imprimir_via_lp(path)
+            return
+        except Exception as e:
+            raise RuntimeError(
+                "No se pudo imprimir PDF en este sistema: LibreOffice y 'lp' fallaron."
+            ) from e
+
+
+# ----------------- API pública (etiquetas) -----------------
 def imprimir_etiqueta_desde_formulario(data: dict, impresora: Optional[str] = None) -> None:
     """
     Genera e imprime una única etiqueta con los datos del formulario.
@@ -343,8 +387,8 @@ def imprimir_etiqueta_desde_formulario(data: dict, impresora: Optional[str] = No
         with NamedTemporaryFile(delete=False, suffix=".xlsx", dir=TEMP_DIR) as tmp:
             tmp_path = Path(tmp.name)
         generar_etiqueta_excel(data, tmp_path)
-        imprimir_excel(tmp_path, impresora or data.get("transporte") or DEFAULT_PRINTER)
-        log_evento("✅ Impresión de etiqueta completada correctamente.", "info")
+        imprimir_excel(tmp_path, impresora or data.get("transporte") or DEFAULT_PRINTER or None)
+        log_evento("✅ Impresión de etiqueta completada.", "info")
     except Exception as e:
         log_evento(f"❌ Error en impresión de etiqueta: {e}", "error")
         raise RuntimeError(f"Error en impresión de etiqueta: {e}")
@@ -367,7 +411,7 @@ def print_etiquetas(file_path, config, df: pd.DataFrame) -> None:
                 "ciudad": row.get("Ciudad", ""),
                 "guia": row.get("Guía", "") or row.get("Guia", ""),
                 "bultos": row.get("Bultos", ""),
-                "transporte": row.get("Transporte", "") or DEFAULT_PRINTER,
+                "transporte": row.get("Transporte", "") or DEFAULT_PRINTER or "",
             }
             log_evento(f"🧾 Generando etiqueta para: {data}", "info")
 
@@ -375,7 +419,7 @@ def print_etiquetas(file_path, config, df: pd.DataFrame) -> None:
                 tmp_path = Path(tmp.name)
 
             generar_etiqueta_excel(data, tmp_path)
-            imprimir_excel(tmp_path, data.get("transporte") or DEFAULT_PRINTER)
+            imprimir_excel(tmp_path, data.get("transporte") or DEFAULT_PRINTER or None)
 
         log_evento("✅ Impresión de todas las etiquetas finalizada.", "info")
 

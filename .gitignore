@@ -8,7 +8,7 @@ venv/
 .idea/
 
 # Archivos de Python compilados
-*.pyc
+*.pyc       
 *.pyo
 *.pyd
 __pycache__/

@@ -4,6 +4,8 @@ import sys
 import logging
 import threading
 from pathlib import Path
+import pandas as pd  # <-- necesario para to_numeric() en _ui_set_status_preview_totals
+
 
 # Asegura que la raíz del proyecto esté en sys.path para evitar errores de importación
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +36,15 @@ from app.gui.preview_crud import open_preview_crud
 # 🔽 Post-proceso FedEx (shaping/dedupe/total BULTOS)
 from app.printer.printer_tools import prepare_fedex_dataframe
 
+# --- helper para acceder a recursos en dev/pyinstaller ---
+def _resource_path(rel_path: str) -> Path:
+    """
+    Devuelve una ruta válida tanto en desarrollo como en ejecutable PyInstaller.
+    Usa sys._MEIPASS cuando está empacado.
+    """
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return (base / rel_path).resolve()
+
 
 def _has_display() -> bool:
     """En Linux/Unix, verifica si hay un servidor gráfico disponible."""
@@ -52,8 +63,8 @@ class ExcelPrinterApp(tk.Tk):
         init_db()
 
         # Estado de la app
-        self.df = None
-        self.transformed_df = None
+        self.df = None                 # DF original cargado del Excel
+        self.transformed_df = None     # DF que se muestra/imprime (vista previa)
         self.mode = "listados"
         self.processing = False
         self.executor = ThreadPoolExecutor(max_workers=2)
@@ -159,9 +170,6 @@ class ExcelPrinterApp(tk.Tk):
         self._add_sidebar_button(sidebar, "Sra Mary 👩‍💼", self._abrir_sra_mary)
         self._add_sidebar_button(sidebar, "Inventario 📦", lambda: InventarioView(self))
 
-        # ❌ Eliminado: botón/ventana "Ajustes del Sistema"
-        # (antes aquí se agregaba condicionalmente si open_system_config existía)
-
         ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
         ttk.Button(sidebar, text="Salir ❌", command=self._on_close).pack(side="bottom", pady=20, fill="x", padx=10)
 
@@ -185,6 +193,37 @@ class ExcelPrinterApp(tk.Tk):
                 command=lambda m=modo: self._update_mode(m)
             ).pack(side=tk.LEFT, padx=10)
 
+        # -------- LOGO debajo del selector de modo --------
+        try:
+            from PIL import Image, ImageTk  # pip install pillow
+
+            candidates = [
+                "app/data/logo.png",
+                "app/data/image.png",
+                "app/data/logo.jpg",
+                "app/data/image.jpg",
+                "app/data/image.ico",
+                "data/logo.png",
+                "data/image.png",
+                "data/image.ico",
+            ]
+            logo_file = None
+            for c in candidates:
+                p = _resource_path(c)
+                if p.exists():
+                    logo_file = p
+                    break
+
+            if logo_file is not None:
+                img = Image.open(logo_file)
+                img.thumbnail((180, 180), Image.LANCZOS)
+                self._logo_image = ImageTk.PhotoImage(img)  # guardar referencia
+                tk.Label(self.main_frame, image=self._logo_image, bg="#F9FAFB").pack(pady=18)
+            else:
+                tk.Label(self.main_frame, text="[Logo no encontrado]", bg="#F9FAFB", fg="#c00").pack(pady=18)
+        except Exception as e:
+            tk.Label(self.main_frame, text=f"[Error cargando logo: {e}]", bg="#F9FAFB", fg="#c00").pack(pady=18)
+
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
         ttk.Label(self, textvariable=self.status_var, relief=tk.SUNKEN,
@@ -193,6 +232,18 @@ class ExcelPrinterApp(tk.Tk):
     def _update_status(self, mensaje: str):
         if self._ui_alive():
             self.status_var.set(mensaje)
+
+    # NUEVO: pinta totales en barra según DF mostrado
+    def _ui_set_status_preview_totals(self, df: pd.DataFrame, mode: str):
+        try:
+            filas = int(len(df) if df is not None else 0)
+            if (mode or "").strip().lower() == "fedex" and df is not None and "BULTOS" in df.columns:
+                total_bultos = int(pd.to_numeric(df["BULTOS"], errors="coerce").fillna(0).sum())
+                self._update_status(f"Filas: {filas} | Total BULTOS: {total_bultos}")
+            else:
+                self._update_status(f"Filas: {filas}")
+        except Exception:
+            self._update_status("")
 
     # ---------------- Acciones de modo ----------------
 
@@ -237,13 +288,15 @@ class ExcelPrinterApp(tk.Tk):
             df, transformed = future.result()
             if not self._ui_alive():
                 return
+            # Guarda el DF de origen y, por defecto, el transformado genérico
             self.df, self.transformed_df = df, transformed
 
-            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
-            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+            # 🔽 Vista Previa FedEx: construir desde el DF original (NO desde transformed)
+            if (self.mode or "").strip().lower() == "fedex" and self.df is not None:
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
 
             save_file_history("n/a", self.mode)
+            self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.exception("Error al procesar archivo")
@@ -294,13 +347,16 @@ class ExcelPrinterApp(tk.Tk):
         capturar_log_bod1(f"Iniciando procesamiento: {path}", "info")
         try:
             self.df = load_excel(path, self.config_columns, self.mode)
-            self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+            transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
 
-            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
-            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+            # 🔽 Vista Previa FedEx: construir desde DF original
+            if (self.mode or "").strip().lower() == "fedex":
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
+            else:
+                self.transformed_df = transformed_base
 
             save_file_history(path, self.mode)
+            self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             if self._ui_alive():
                 self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
@@ -367,12 +423,16 @@ class ExcelPrinterApp(tk.Tk):
         self.wait_window(dialog)
         # Reaplicar reglas tras guardar para reflejarse en la vista previa
         try:
-            self.transformed_df = apply_transformation(self.df, self.config_columns, self.mode)
+            # Reaplica transformación base por si hay reglas para otros modos
+            transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
 
-            # 🔽 Post-proceso para Vista Previa en modo FedEx (dedupe + consolidación)
-            if (self.mode or "").strip().lower() == "fedex" and self.transformed_df is not None:
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.transformed_df)
+            # 🔽 Vista Previa FedEx: construir desde DF original
+            if (self.mode or "").strip().lower() == "fedex":
+                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
+            else:
+                self.transformed_df = transformed_base
 
+            self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             if self._ui_alive():
                 self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:

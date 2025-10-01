@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
+import os
 import pandas as pd
 from openpyxl import load_workbook
 
@@ -17,29 +18,126 @@ from app.printer.printer_tools import (
     formatear_tabla_ws,
 )
 
-# ------------------------- Utilidades internas (permisivo) -------------------------
+# =============================================================================
+#                    Utilidades internas (modo permisivo)
+# =============================================================================
 
-def _colname_map(df: pd.DataFrame) -> dict:
+def _colname_map(df: pd.DataFrame) -> Dict[str, str]:
+    """Mapa 'nombre en minúscula' -> 'nombre real' para búsqueda flexible."""
     return {str(c).strip().lower(): c for c in df.columns}
 
+def _find_col(df: pd.DataFrame, *candidates: str) -> Optional[str]:
+    """Devuelve la primera columna existente (case-insensitive) de una lista de candidatos."""
+    if df is None or df.empty:
+        return None
+    cmap = _colname_map(df)
+    for name in candidates:
+        key = name.strip().lower()
+        if key in cmap:
+            return cmap[key]
+    return None
+
+def _agg_mode() -> str:
+    """
+    Modo de agregación coherente con printer_tools.prepare_fedex_dataframe:
+    EXCELCIOR_FEDEX_BULTOS_AGG = last|max|min|sum  (default: last)
+    """
+    return os.environ.get("EXCELCIOR_FEDEX_BULTOS_AGG", "last").lower()
+
+def _agg_series_bultos(series: pd.Series) -> int:
+    """Agrega una serie de BULTOS de forma robusta según _agg_mode()."""
+    b = pd.to_numeric(series, errors="coerce").fillna(0).astype(int)
+    b.loc[b <= 0] = 1
+    if b.empty:
+        return 0
+    mode = _agg_mode()
+    if mode == "sum":
+        return int(b.sum())
+    if mode == "max":
+        return int(b.max())
+    if mode == "min":
+        return int(b.min())
+    # last (determinista si se ordena antes)
+    return int(b.iloc[-1])
+
 def _heur_total_piezas(df: pd.DataFrame) -> int:
+    """
+    Heurística estable:
+    - Si existe una columna de Tracking y una de BULTOS/PIEZAS, consolidar por Tracking usando _agg_series_bultos.
+    - Si sólo existe BULTOS/PIEZAS, sumar (asegurando mínimo 1).
+    - Si no, usar len(df).
+    """
     if df is None or df.empty:
         return 0
-    cmap = _colname_map(df)
-    candidatos = [
-        "piezas", "bultos", "numberofpackages", "num_packages",
-        "cantidad", "total piezas", "total_piezas", "total_bultos"
-    ]
-    for key in candidatos:
-        if key in cmap:
-            serie = pd.to_numeric(df[cmap[key]], errors="coerce")
-            return int(serie.fillna(0).sum())
+
+    # Detectar columnas probables
+    tracking_col = _find_col(df,
+        "mastertrackingnumber", "piecetrackingnumber", "trackingnumber",
+        "tracking number", "tracking", "track", "codigo rastreo", "cod rastreo"
+    )
+    bultos_col = _find_col(df,
+        "bultos", "piezas", "numberofpackages", "num_packages",
+        "packages", "piececount", "cantidad", "total piezas", "total_piezas", "total_bultos"
+    )
+
+    if bultos_col is not None:
+        b = pd.to_numeric(df[bultos_col], errors="coerce").fillna(0).astype(int)
+        b.loc[b <= 0] = 1
+        if tracking_col:
+            # Consolidar por tracking para NO inflar por duplicados
+            tmp = (
+                df.assign(__b=b)
+                  .sort_values([tracking_col], kind="stable")
+                  .groupby(tracking_col)["__b"]
+                  .apply(_agg_series_bultos)
+                  .reset_index(drop=True)
+            )
+            return int(tmp.sum()) if not tmp.empty else int(b.sum())
+        return int(b.sum())
+
+    # Último recurso: contar filas
     return int(len(df))
 
 def _fallback_permisivo(df: pd.DataFrame) -> Tuple[pd.DataFrame, Optional[str], int]:
+    """
+    Modo permisivo: no tocamos el DF (más que clonar) y calculamos total de piezas
+    con la heurística robusta (que evita inflar por duplicados si hay tracking).
+    """
     df_out = (df or pd.DataFrame()).copy()
     total_piezas = _heur_total_piezas(df_out)
     return df_out, None, total_piezas
+
+# =============================================================================
+#             Envío a impresora (resuelve impresora/timeout/logs)
+# =============================================================================
+
+def _get_effective_printer_name(config: Optional[dict]) -> Optional[str]:
+    """
+    Orden de precedencia:
+      1) config["printer_name"] | config["printer"] | config["impresora"]
+      2) EXCELCIOR_PRINTER (env)  -> será usada por impression_tools si no pasas nada
+      3) Impresora por defecto del SO (la resuelve impression_tools)
+    """
+    if isinstance(config, dict):
+        return config.get("printer_name") or config.get("printer") or config.get("impresora")
+    return None
+
+def _get_effective_timeout_s(config: Optional[dict]) -> int:
+    """
+    Timeout efectivo para impresión. Prioriza:
+      - config["print_timeout_s"]
+      - EXCELCIOR_PRINT_TIMEOUT (env)
+      - 120 por defecto
+    """
+    if isinstance(config, dict) and "print_timeout_s" in config:
+        try:
+            return int(config["print_timeout_s"])
+        except Exception:
+            pass
+    try:
+        return int(os.environ.get("EXCELCIOR_PRINT_TIMEOUT", "120"))
+    except Exception:
+        return 120
 
 def _enviar_a_impresora_flexible(path: Path, config: Optional[dict]) -> None:
     """
@@ -48,11 +146,20 @@ def _enviar_a_impresora_flexible(path: Path, config: Optional[dict]) -> None:
       - enviar_a_impresora(path, printer=...)
       - enviar_a_impresora(path, <printer_name_posicional>)
       - enviar_a_impresora(path)
+    Además: loguea impresora/timeout y propaga EXCELCIOR_PRINT_TIMEOUT.
     """
-    printer_name = None
-    if isinstance(config, dict):
-        # soporta claves comunes
-        printer_name = config.get("printer_name") or config.get("printer") or config.get("impresora")
+    printer_name = _get_effective_printer_name(config)
+    timeout_s = _get_effective_timeout_s(config)
+
+    # Log diagnóstico de impresión
+    log_evento(
+        f"[FedEx] Enviando a impresora. Archivo='{path.name}', "
+        f"printer='{printer_name or 'default-SO'}', timeout_s={timeout_s}",
+        "info"
+    )
+
+    # Propaga timeout para la capa soffice.exe
+    os.environ["EXCELCIOR_PRINT_TIMEOUT"] = str(timeout_s)
 
     # 1) keyword 'printer_name'
     if printer_name:
@@ -74,21 +181,25 @@ def _enviar_a_impresora_flexible(path: Path, config: Optional[dict]) -> None:
     # 4) sin parámetro (impresora predeterminada del SO)
     return enviar_a_impresora(path)
 
-# -----------------------------------------------------------------------------------
+# =============================================================================
+#                              Flujo principal
+# =============================================================================
 
-def print_fedex(file_path, config, df: pd.DataFrame):
+def print_fedex(file_path: Path, config: Optional[Dict[str, Any]], df: pd.DataFrame):
     """
     Genera un informe FedEx profesional:
-      - Dedup por Tracking Number (si hay columna válida).
+      - Dedup/consolidación por Tracking Number (si hay columna válida).
       - Pie con TOTAL PIEZAS + timestamp.
       - Bloque de firma y formato de tabla.
-      - **Modo permisivo**: si no se puede deduplicar, imprime el DF original.
+      - **Modo permisivo**: si falla la preparación, imprime el DF original pero con
+        total_piezas calculado por heurística robusta (sin inflar por duplicados).
+      - Opcional: fallback a PDF si 'fallback_pdf' en config (requiere helpers en impression_tools).
     """
     try:
         if df is None or df.empty:
             raise ValueError("El DataFrame de FedEx está vacío y no se puede imprimir.")
 
-        # 1) Preparar datos (limpieza / dedup)
+        # ---------------- 1) Preparar datos (limpieza / dedup) ----------------
         try:
             df_out, id_col, total_piezas = prepare_fedex_dataframe(df)
             if df_out is None or df_out.empty:
@@ -101,7 +212,7 @@ def print_fedex(file_path, config, df: pd.DataFrame):
         filas = len(df_out)
         if id_col:
             log_evento(
-                f"[FedEx] Columna tracking usada: '{id_col}'. Filas tras dedup: {filas}. "
+                f"[FedEx] Tracking usado: '{id_col}'. Filas tras consolidación: {filas}. "
                 f"Total piezas: {total_piezas}.",
                 "info",
             )
@@ -115,15 +226,15 @@ def print_fedex(file_path, config, df: pd.DataFrame):
         if df_out is None or df_out.empty:
             raise ValueError("No hay filas para imprimir, incluso en modo permisivo.")
 
-        # 2) Título
+        # ---------------- 2) Título ----------------
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
         titulo = f"FIN DE DÍA FEDEX - {fecha_actual}"
 
-        # 3) Excel temporal base
+        # ---------------- 3) Excel temporal base ----------------
         tmp_path: Path = generar_excel_temporal(df_out, titulo, sheet_name="FedEx")
         log_evento(f"📄 Archivo temporal generado para impresión FedEx: {tmp_path}", "info")
 
-        # 4) Post-procesar con openpyxl
+        # ---------------- 4) Post-procesar con openpyxl ----------------
         wb = load_workbook(tmp_path)
         try:
             ws = wb.active
@@ -134,10 +245,38 @@ def print_fedex(file_path, config, df: pd.DataFrame):
         finally:
             wb.close()
 
-        # 5) Imprimir con wrapper flexible
-        _enviar_a_impresora_flexible(tmp_path, config)
+        # ---------------- 5) Imprimir (XLSX) ----------------
+        try:
+            _enviar_a_impresora_flexible(tmp_path, config)
+            log_evento("✅ Impresión de listado FedEx (XLSX) completada correctamente.", "info")
+            return
+        except Exception as e_xlsx:
+            log_evento(f"⚠️ Falló impresión XLSX: {e_xlsx}", "warning")
 
-        log_evento("✅ Impresión de listado FedEx completada correctamente.", "info")
+            # Fallback PDF opcional
+            fallback_pdf = bool(config.get("fallback_pdf")) if isinstance(config, dict) else False
+            if not fallback_pdf:
+                raise  # Propaga el error si no hay fallback habilitado
+
+            # ---------------- 6) Fallback a PDF (opcional) ----------------
+            try:
+                # Import tardío para no romper si no existen aún
+                from app.core.impression_tools import convert_xlsx_to_pdf, enviar_pdf_a_impresora
+            except Exception as imp_err:
+                raise RuntimeError(
+                    "Fallback PDF habilitado pero faltan helpers en impression_tools. "
+                    f"Detalle: {imp_err}"
+                )
+
+            try:
+                pdf_path = convert_xlsx_to_pdf(tmp_path)  # usa soffice --convert-to pdf
+                log_evento(f"🧾 PDF generado para fallback: {pdf_path}", "info")
+                _enviar_a_impresora_flexible(pdf_path, config)
+                log_evento("✅ Impresión de listado FedEx (PDF fallback) completada correctamente.", "info")
+                return
+            except Exception as e_pdf:
+                log_evento(f"❌ Falló impresión PDF (fallback): {e_pdf}", "error")
+                raise  # Propagar al caller
 
     except Exception as error:
         log_evento(f"❌ Error al imprimir listado FedEx: {error}", "error")
