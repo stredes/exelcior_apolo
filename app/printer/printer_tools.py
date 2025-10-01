@@ -12,8 +12,8 @@ Herramientas de impresión y preparación de datos para FedEx/Urbano.
 Novedades (FedEx):
 - Consolidación por masterTrackingNumber (no pieceTrackingNumber).
 - Usa numberOfPackages del envío; NO suma por cada pieza (evita inflar/deflactar).
-- EXCELCIOR_FEDEX_BULTOS_AGG = last|max|min|sum (default: last) para elegir cómo
-  resolver BULTOS dentro del grupo (por si hay múltiples filas del mismo master).
+- EXCELCIOR_FEDEX_BULTOS_AGG = smart|max|min|last|sum (default: smart)
+  • smart: si hay algún valor >= 2 en el grupo, usa el máximo; si no, toma el último.
 """
 
 from __future__ import annotations
@@ -118,18 +118,30 @@ def _pick_ci(df: pd.DataFrame, *names: str) -> Optional[str]:
 # ======================================================================
 
 def _agg_bultos(series: pd.Series) -> int:
-    mode = os.environ.get("EXCELCIOR_FEDEX_BULTOS_AGG", "last").lower()
+    """
+    Modo por ENV (default: 'smart'):
+      - smart: si hay algún valor >=2 en el grupo, devuelve el máximo; si no, el último.
+      - max/min/last/sum: forzados.
+    """
+    mode = os.environ.get("EXCELCIOR_FEDEX_BULTOS_AGG", "smart").lower()
     b = pd.to_numeric(series, errors="coerce").fillna(0).astype(int)
     b.loc[b <= 0] = 1
     if b.empty:
         return 0
+
     if mode == "sum":
         return int(b.sum())
     if mode == "max":
         return int(b.max())
     if mode == "min":
         return int(b.min())
-    return int(b.iloc[-1])  # last (default)
+    if mode == "last":
+        return int(b.iloc[-1])
+
+    # smart (por defecto)
+    if (b >= 2).any():
+        return int(b.max())
+    return int(b.iloc[-1])
 
 
 # ------------------------- FEDEX -------------------------
@@ -140,9 +152,9 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
 
     Reglas clave:
     - Consolida por masterTrackingNumber (ID del envío). Si no existe, cae a Tracking Number genérico.
-    - Usa numberOfPackages como BULTOS del envío; NO suma por cada pieza.
+    - Usa numberOfPackages (o alias) como BULTOS del envío; NO suma por cada pieza.
     - Column matching case-insensitive + strip.
-    - Aplica agregación _agg_bultos dentro del grupo (default 'last').
+    - Agregación _agg_bultos dentro del grupo (default 'smart').
     """
     cols_final = ["Tracking Number", "Fecha", "Referencia", "Ciudad", "Receptor", "BULTOS"]
     if df is None or df.empty:
@@ -151,27 +163,27 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
     df = df.copy()
     cmap = _cimap(df)
 
-    # ------------------------------------------------------------------
-    # CASO 1: el DF YA trae las columnas finales (probablemente por apply_transformation)
-    #         -> En este caso, si además existe numberOfPackages en el DF original,
-    #            lo usamos para CORREGIR BULTOS aunque ya exista una columna BULTOS=1.
-    # ------------------------------------------------------------------
+    # ----------------- CASO 1: DF ya trae columnas finales -----------------
     have_all = all(str(h).strip().lower() in cmap for h in cols_final)
     if have_all:
         real_cols = [cmap[str(h).strip().lower()] for h in cols_final]
         out = df.loc[:, real_cols].copy()
         out.columns = cols_final
 
-        # --- ⬇️ Corrección clave: priorizar numberOfPackages si está presente en el DF ⬇️ ---
-        b_alias_col = _pick_ci(df, "numberOfPackages", "numberofpackages", "pieceCount", "packages", "pieces")
+        # Prioriza columna oficial de paquetes si existe en el DF original
+        b_alias_col = _pick_ci(
+            df,
+            "numberOfPackages", "numberofpackages",
+            "totalPackageCount", "packageCount", "packagesCount", "totalPackages",
+            "pieceCount", "packages", "pieces",
+        )
         if b_alias_col is not None:
             b_alias = pd.to_numeric(df[b_alias_col], errors="coerce")
-            # Si el alias tiene valores válidos, lo usa; si no, mantiene el BULTOS existente
             out["BULTOS"] = b_alias.where(b_alias > 0, np.nan).fillna(
                 pd.to_numeric(out["BULTOS"], errors="coerce")
             )
 
-        # Normalización final
+        # Normalización
         out["Tracking Number"] = _stringify_tracking(out["Tracking Number"])
         out["Fecha"]           = _normalize_date(out["Fecha"])
         out["Referencia"]      = _stringify_generic(out["Referencia"])
@@ -181,7 +193,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
         b = pd.to_numeric(out["BULTOS"], errors="coerce").fillna(0).astype(int)
         b.loc[b <= 0] = 1
         out["BULTOS"] = b
-        # Agrupar por tracking y aplicar política de agregación de BULTOS
+
         out = out.sort_values(["Tracking Number", "Fecha"], kind="stable")
         grouped = (
             out.groupby("Tracking Number", as_index=False)
@@ -197,17 +209,20 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
         grouped = _df_safe_for_excel(grouped)
         return grouped.reset_index(drop=True), "Tracking Number", total_piezas
 
-    # ------------------------------------------------------------------
-    # CASO 2: rama general con alias, priorizando masterTrackingNumber y numberOfPackages
-    # ------------------------------------------------------------------
+    # --------------- CASO 2: Mapear alias y construir salida ---------------
     id_col_master = _pick_ci(df, "masterTrackingNumber", "mastertrackingnumber", "master tracking number")
     id_col_generic = _pick_ci(df, "trackingNumber", "tracking number", "Tracking Number", "tracking")
     id_col = id_col_master or id_col_generic
     if id_col is None:
         return pd.DataFrame(columns=cols_final), "", 0
 
-    b_col = _pick_ci(df, "numberOfPackages", "numberofpackages", "BULTOS", "bultos",
-                     "PIEZAS", "piezas", "pieces", "pieceCount", "packages")
+    b_col = _pick_ci(
+        df,
+        "numberOfPackages", "numberofpackages",
+        "totalPackageCount", "packageCount", "packagesCount", "totalPackages",
+        "BULTOS", "bultos", "PIEZAS", "piezas",
+        "pieces", "pieceCount", "packages"
+    )
     if b_col:
         b = pd.to_numeric(df[b_col], errors="coerce").fillna(0).astype(int)
         b.loc[b <= 0] = 1
@@ -249,7 +264,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
                 "Referencia": _first_non_empty_last,
                 "Ciudad": _first_non_empty_last,
                 "Receptor": _first_non_empty_last,
-                "BULTOS": _agg_bultos,   # last|max|min|sum (ENV)
+                "BULTOS": _agg_bultos,   # smart|max|min|last|sum
             })
     )
 
