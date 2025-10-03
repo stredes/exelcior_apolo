@@ -1,21 +1,43 @@
 # tests/conftest.py
-import os
-import sys
+import builtins
+import types
+import pandas as pd
 import pytest
-from pathlib import Path
 
-# Asegura que el paquete "app" esté disponible en los tests
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-
-@pytest.fixture(autouse=True)
-def _no_real_print_env(monkeypatch, tmp_path):
+@pytest.fixture
+def mod_buscador():
     """
-    Evita cualquier impresión real en entornos donde se usen herramientas del SO.
+    Importa el módulo del buscador una sola vez para los tests.
     """
-    # Redirige variables de impresión si tu código las usara
-    monkeypatch.setenv("EXCELCIOR_PRINTER", "TestPrinter")
-    monkeypatch.setenv("EXCELCIOR_PRINT_TIMEOUT", "3")
-    yield
+    import importlib
+    mod = importlib.import_module("app.gui.buscador_codigos_postales")
+    return mod
+
+@pytest.fixture
+def inst(mod_buscador):
+    """
+    Crea una instancia 'vacía' sin ejecutar __init__ para poder
+    testear métodos internos sin lanzar la GUI ni hilos.
+    """
+    cls = mod_buscador.BuscadorCodigosPostales
+    obj = object.__new__(cls)
+    # Atributos mínimos que usan los métodos
+    obj.COLS_TARGET = ("REGIÓN", "COMUNA", "CÓDIGO POSTAL")
+    obj.COL_SYNONYMS = cls.COL_SYNONYMS
+    obj.PREFERRED_HEADER_ROWS = cls.PREFERRED_HEADER_ROWS
+    return obj
+
+class FakeExcelFile:
+    def __init__(self, path, engine=None):
+        self.path = path
+        self.engine = engine
+        # emula 1 sola hoja por defecto
+        self.sheet_names = ["Hoja1"]
+
+@pytest.fixture
+def fake_excel_file(monkeypatch):
+    """
+    Parcha pandas.ExcelFile para evitar leer archivos reales.
+    """
+    monkeypatch.setattr(pd, "ExcelFile", FakeExcelFile)
+    return FakeExcelFile
