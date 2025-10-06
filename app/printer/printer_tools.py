@@ -334,23 +334,82 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 #                    Utilidades de formato (openpyxl)
 # ======================================================================
 
-def insertar_bloque_firma_ws(ws) -> None:
-    # Usar el footer físico de la hoja para firmas
-    ws.oddFooter.left.text = "Nombre quien recibe: ______________________"
-    ws.oddFooter.center.text = "Firma quien recibe: ______________________"
-    ws.oddFooter.right.text = ""
-    ws.evenFooter.left.text = ws.oddFooter.left.text
-    ws.evenFooter.center.text = ws.oddFooter.center.text
-    ws.evenFooter.right.text = ws.oddFooter.right.text
+def insertar_bloque_firma_ws(ws, total_piezas: Optional[int] = None) -> None:
+    """
+    Inserta al final de la hoja un bloque de firma y total visualmente alineado como en el formato físico:
+    
+    Nombre: ___________
+    Firma:  ___________                           total: 28
+    """
+    from openpyxl.styles import Alignment, Font
+
+    # Detecta la última fila con contenido
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    # Añade separación vertical para que quede visualmente bien
+    start_row = max_row + 3
+
+    # Fuente base
+    font_text = Font(name="Segoe UI", size=11)
+
+    # Bloque de firma a la izquierda
+    ws.cell(row=start_row, column=1, value="Nombre:").font = font_text
+    ws.cell(row=start_row + 1, column=1, value="Firma:").font = font_text
+
+    # Línea de firma con guiones
+    ws.cell(row=start_row, column=2, value="_____________________").font = font_text
+    ws.cell(row=start_row + 1, column=2, value="_____________________").font = font_text
+
+    # Total a la derecha (alineado última columna)
+    if total_piezas is not None:
+        try:
+            total_val = int(total_piezas)
+        except (TypeError, ValueError):
+            total_val = total_piezas
+        c_total = ws.cell(row=start_row + 1, column=max_col, value=f"TOTAL: ({total_val})")
+        c_total.font = Font(name="Segoe UI", size=11, bold=True)
+        c_total.alignment = Alignment(horizontal="right", vertical="center")
+
+    # Ajuste visual opcional (para evitar bordes de tabla previos)
+    for i in range(start_row - 2, start_row + 3):
+        for c in range(1, max_col + 1):
+            if not ws.cell(row=i, column=c).value:
+                ws.cell(row=i, column=c, value="")
 
 
 def agregar_footer_info_ws(ws, total_piezas: int) -> None:
-    # Usar el footer físico de la hoja para info de impresión
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-    texto = f"Impresa el: {ts}  |  Total Piezas: {total_piezas}"
-    ws.oddFooter.right.text = texto
-    ws.evenFooter.right.text = texto
+    """
+    Configura el pie de página con el total de piezas y timestamp de generación.
+    Se replica en páginas pares para mantener consistencia al imprimir.
+    """
+    try:
+        total_value = int(total_piezas)
+    except (TypeError, ValueError):
+        total_value = total_piezas
 
+    if isinstance(total_value, (int, float)):
+        total_label = f"TOTAL: ({int(total_value)})"
+    else:
+        total_label = f"TOTAL: ({total_value})"
+
+    timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    try:
+        ws.oddFooter.left.text = total_label
+        ws.oddFooter.right.text = timestamp
+        ws.evenFooter.left.text = total_label
+        ws.evenFooter.right.text = timestamp
+    except Exception:
+        from openpyxl.styles import Alignment, Font
+
+        row = ws.max_row + 2
+        ws.cell(row=row, column=1, value=total_label).font = Font(name="Segoe UI", size=10, bold=True)
+        last_col = ws.max_column or 1
+        ts_cell = ws.cell(row=row, column=last_col, value=timestamp)
+        ts_cell.font = Font(name="Segoe UI", size=10)
+        ts_cell.alignment = Alignment(horizontal="right", vertical="center")
+ 
 
 def formatear_tabla_ws(ws) -> None:
     from openpyxl.styles import Font, Alignment, Border, Side

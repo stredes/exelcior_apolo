@@ -76,8 +76,8 @@ def print_urbano(file_path, config, df: pd.DataFrame):
         try:
             ws = wb.active
             formatear_tabla_ws(ws)                   # estilo profesional
-            insertar_bloque_firma_ws(ws)             # bloque firma con líneas
-            agregar_footer_info_ws(ws, total_piezas) # pie con timestamp + total piezas
+            insertar_bloque_firma_ws(ws, total_piezas)  # bloque firma con líneas
+            agregar_footer_info_ws(ws, total_piezas)    # pie con timestamp + total piezas
             wb.save(tmp_path)
         finally:
             wb.close()

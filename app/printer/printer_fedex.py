@@ -239,7 +239,7 @@ def print_fedex(file_path: Path, config: Optional[Dict[str, Any]], df: pd.DataFr
         try:
             ws = wb.active
             formatear_tabla_ws(ws)
-            insertar_bloque_firma_ws(ws)
+            insertar_bloque_firma_ws(ws, total_piezas)
             agregar_footer_info_ws(ws, total_piezas)
             wb.save(tmp_path)
         finally:
