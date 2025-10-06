@@ -250,6 +250,18 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
                 df2[col] = pd.to_numeric(df2[col], errors="coerce")
         suma = {col: (df2[col].sum() if col in df2.columns else 0) for col in sumar_resolved}
         df2 = pd.concat([df2, pd.DataFrame([suma])], ignore_index=True)
+        total_idx = df2.index[-1]
+        # Limpia columnas no sumadas para evitar mostrar NaN y etiqueta la fila como TOTAL.
+        if total_idx >= 0:
+            label_col = next((c for c in df2.columns if c not in sumar_resolved), df2.columns[0] if df2.columns.size else None)
+            for col in df2.columns:
+                if col in sumar_resolved:
+                    continue
+                if col == label_col:
+                    continue
+                df2.at[total_idx, col] = ""
+            if label_col is not None:
+                df2.at[total_idx, label_col] = "TOTAL"
         log_evento(f"[XFORM] Fila de sumatoria creada: {suma}", "info")
 
     # ====== 3) MANTENER FORMATO (texto) ======

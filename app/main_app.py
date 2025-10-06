@@ -57,8 +57,8 @@ class ExcelPrinterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.geometry("850x720")
         self.configure(bg="#F9FAFB")
+        self._apply_initial_geometry()
 
         init_db()
         from app.core.logger_eventos import log_evento
@@ -72,6 +72,7 @@ class ExcelPrinterApp(tk.Tk):
         self.executor = ThreadPoolExecutor(max_workers=2)
         self._sidebar_buttons = []
         self._preview_win = None  # la maneja open_preview_crud
+        self.sidebar = None
 
         # ✅ Carga de config robusta
         try:
@@ -92,6 +93,7 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_sidebar()
         self._setup_main_area()
         self._setup_status_bar()
+        self.bind("<Configure>", self._on_root_resize)
 
         # Cierre limpio
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -103,6 +105,71 @@ class ExcelPrinterApp(tk.Tk):
             return bool(self.winfo_exists())
         except Exception:
             return False
+
+    def _apply_initial_geometry(self) -> None:
+        """
+        Calcula un tamaño de ventana proporcional a la resolución disponible
+        y centra la aplicación en pantalla, manteniendo un mínimo cómodo.
+        """
+        try:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+        except Exception:
+            screen_w, screen_h = 1366, 768
+
+        min_w, min_h = 960, 640
+        width = max(min_w, int(screen_w * 0.85))
+        height = max(min_h, int(screen_h * 0.85))
+
+        width = min(width, screen_w)
+        height = min(height, screen_h)
+
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+
+        self._initial_window_size = (width, height)
+        self.minsize(min(width, screen_w), min(height, screen_h))
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
+
+    def _on_root_resize(self, event) -> None:
+        """
+        Ajusta elementos dependientes del tamaño cuando el usuario
+        redimensiona la ventana principal.
+        """
+        if event.widget is not self:
+            return
+        if self.sidebar is not None:
+            try:
+                target_width = max(220, int(event.width * 0.18))
+                self.sidebar.configure(width=target_width)
+            except Exception:
+                pass
+
+    def _sanitize_preview_dataframe(self, df: pd.DataFrame | None, mode: str | None) -> pd.DataFrame | None:
+        """
+        Limpia filas de resumen (TOTAL) que no se desean en la vista previa,
+        actualmente aplicado para el modo Urbano.
+        """
+        if df is None or df.empty:
+            return df
+
+        mode_norm = (mode or "").strip().lower()
+        if mode_norm != "urbano":
+            return df
+
+        try:
+            mask_total = pd.Series(False, index=df.index)
+            for col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    continue
+                col_values = df[col].astype(str).str.strip().str.upper()
+                mask_total = mask_total | (col_values == "TOTAL")
+            if mask_total.any():
+                df = df.loc[~mask_total].reset_index(drop=True)
+        except Exception:
+            pass
+        return df
 
     def safe_messagebox(self, tipo: str, titulo: str, mensaje: str):
         """Muestra messagebox desde hilos de fondo sin romper Tk y tolera entorno sin DISPLAY."""
@@ -155,8 +222,12 @@ class ExcelPrinterApp(tk.Tk):
         return b
 
     def _setup_sidebar(self):
-        sidebar = tk.Frame(self, bg="#111827", width=220)
+        initial_width = getattr(self, "_initial_window_size", (1200, 800))[0]
+        sidebar_width = max(220, int(initial_width * 0.18))
+        sidebar = tk.Frame(self, bg="#111827", width=sidebar_width)
         sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+        self.sidebar = sidebar
 
         tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
                  font=("Segoe UI", 14, "bold")).pack(pady=20)
@@ -178,12 +249,13 @@ class ExcelPrinterApp(tk.Tk):
     def _setup_main_area(self):
         self.main_frame = tk.Frame(self, bg="#F9FAFB")
         self.main_frame.pack(side="left", fill="both", expand=True)
+        self.main_frame.pack_propagate(False)
 
         tk.Label(self.main_frame, text="Transformador Excel", bg="#F9FAFB", fg="#111827",
-                 font=("Segoe UI", 18, "bold")).pack(pady=20)
+                 font=("Segoe UI", 18, "bold")).pack(pady=20, padx=20, fill="x")
 
         mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
-        mode_frame.pack(pady=10)
+        mode_frame.pack(fill="x", padx=20, pady=10)
 
         # Radiobuttons: exclusivo y claro
         for modo in ("listados", "fedex", "urbano"):
@@ -193,7 +265,7 @@ class ExcelPrinterApp(tk.Tk):
                 value=modo,
                 variable=self.mode_var,
                 command=lambda m=modo: self._update_mode(m)
-            ).pack(side=tk.LEFT, padx=10)
+            ).pack(side=tk.LEFT, expand=True, fill="x", padx=10)
 
         # -------- LOGO debajo del selector de modo --------
         try:
@@ -226,6 +298,9 @@ class ExcelPrinterApp(tk.Tk):
         except Exception as e:
             tk.Label(self.main_frame, text=f"[Error cargando logo: {e}]", bg="#F9FAFB", fg="#c00").pack(pady=18)
 
+        self._content_spacer = tk.Frame(self.main_frame, bg="#F9FAFB")
+        self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
         ttk.Label(self, textvariable=self.status_var, relief=tk.SUNKEN,
@@ -239,9 +314,13 @@ class ExcelPrinterApp(tk.Tk):
     def _ui_set_status_preview_totals(self, df: pd.DataFrame, mode: str):
         try:
             filas = int(len(df) if df is not None else 0)
-            if (mode or "").strip().lower() == "fedex" and df is not None and "BULTOS" in df.columns:
+            mode_norm = (mode or "").strip().lower()
+            if mode_norm == "fedex" and df is not None and "BULTOS" in df.columns:
                 total_bultos = int(pd.to_numeric(df["BULTOS"], errors="coerce").fillna(0).sum())
                 self._update_status(f"Filas: {filas} | Total BULTOS: {total_bultos}")
+            elif mode_norm == "urbano" and df is not None and "PIEZAS" in df.columns:
+                total_piezas = int(pd.to_numeric(df["PIEZAS"], errors="coerce").fillna(0).sum())
+                self._update_status(f"Filas: {filas} | Total PIEZAS: {total_piezas}")
             else:
                 self._update_status(f"Filas: {filas}")
         except Exception:
@@ -296,9 +375,13 @@ class ExcelPrinterApp(tk.Tk):
             df, transformed = future.result()
             if not self._ui_alive():
                 return
-            self.df, self.transformed_df = df, transformed
-            if (self.mode or "").strip().lower() == "fedex" and self.df is not None:
+            self.df = df
+            mode_norm = (self.mode or "").strip().lower()
+            if mode_norm == "fedex" and self.df is not None:
                 self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
+            else:
+                self.transformed_df = transformed
+            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
             save_file_history("n/a", self.mode)
             self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             log_evento("Archivo procesado correctamente", nivel="info", accion="procesamiento_archivo")
@@ -355,11 +438,14 @@ class ExcelPrinterApp(tk.Tk):
             self.df = load_excel(path, self.config_columns, self.mode)
             transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
 
-            # 🔽 Vista Previa FedEx: construir desde DF original
-            if (self.mode or "").strip().lower() == "fedex":
+            # Vista Previa FedEx: construir desde DF original
+            mode_norm = (self.mode or "").strip().lower()
+            if mode_norm == "fedex":
                 self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
             else:
                 self.transformed_df = transformed_base
+
+            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
 
             save_file_history(path, self.mode)
             self._ui_set_status_preview_totals(self.transformed_df, self.mode)
@@ -432,11 +518,14 @@ class ExcelPrinterApp(tk.Tk):
             # Reaplica transformación base por si hay reglas para otros modos
             transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
 
-            # 🔽 Vista Previa FedEx: construir desde DF original
-            if (self.mode or "").strip().lower() == "fedex":
+            # Vista Previa FedEx: construir desde DF original
+            mode_norm = (self.mode or "").strip().lower()
+            if mode_norm == "fedex":
                 self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
             else:
                 self.transformed_df = transformed_base
+
+            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
 
             self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             if self._ui_alive():
@@ -584,3 +673,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

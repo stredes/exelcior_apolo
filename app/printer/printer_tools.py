@@ -309,8 +309,21 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     out["COD RASTREO"] = txt_track
 
     if piezas_c:
-        p = pd.to_numeric(df[piezas_c], errors="coerce").fillna(0).astype(int)
-        p.loc[p <= 0] = 1
+        raw_piezas = df[piezas_c]
+        numeric = pd.to_numeric(raw_piezas, errors="coerce")
+
+        if numeric.isna().any():
+            extracted = (
+                raw_piezas.astype(str)
+                .str.replace(",", ".", regex=False)
+                .str.extract(r"(\d+\.?\d*)")[0]
+            )
+            fallback_numeric = pd.to_numeric(extracted, errors="coerce")
+            numeric = numeric.fillna(fallback_numeric)
+
+        numeric = numeric.fillna(0)
+        numeric = numeric.clip(lower=0)
+        p = numeric.round().astype(int)
     else:
         p = pd.Series(1, index=df.index, dtype=int)
     out["PIEZAS"]      = p

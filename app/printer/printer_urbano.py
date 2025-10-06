@@ -38,6 +38,28 @@ def _send_to_printer_compat(path: Path, printer_name: Optional[str]) -> None:
     enviar_a_impresora(path)
 
 
+def _estimate_total_piezas(df: pd.DataFrame) -> int:
+    """
+    Busca columnas candidatas y suma sus valores numéricos,
+    limpiando textos como '3 piezas' o '2,0'.
+    """
+    candidatos = ("PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
+    for nombre in candidatos:
+        if nombre in df.columns:
+            serie = pd.to_numeric(df[nombre], errors="coerce")
+            if serie.isna().any():
+                extraida = (
+                    df[nombre]
+                    .astype(str)
+                    .str.replace(",", ".", regex=False)
+                    .str.extract(r"(\d+\.?\d*)")[0]
+                )
+                serie = serie.fillna(pd.to_numeric(extraida, errors="coerce"))
+            serie = serie.fillna(0).clip(lower=0)
+            return int(serie.sum().round())
+    return int(len(df.index))
+
+
 def print_urbano(file_path, config, df: pd.DataFrame):
     """
     Genera un listado Urbano profesional:
@@ -55,10 +77,8 @@ def print_urbano(file_path, config, df: pd.DataFrame):
         # 1) Preparar datos (limpieza + totales)
         df_out, total_piezas = prepare_urbano_dataframe(df)
         if df_out is None or df_out.empty:
-            # Permisivo: imprime el DF original y estima total
-            log_evento("[Urbano] DF vacío tras preparación. Se imprimirá el DataFrame original.", "warning")
             df_out = df.copy()
-            total_piezas = int(df_out.select_dtypes(include="number").sum().sum()) or len(df_out)
+            total_piezas = _estimate_total_piezas(df_out)
 
         filas = len(df_out)
         log_evento(f"[Urbano] Filas a imprimir: {filas}. Total PIEZAS: {total_piezas}.", "info")
