@@ -1,14 +1,14 @@
 # Entorno virtual
 venv/
 *.env
-.venv
+.venv/
 
 # Archivos de configuración de la IDE
 .vscode/
 .idea/
 
 # Archivos de Python compilados
-*.pyc       
+*.pyc
 *.pyo
 *.pyd
 __pycache__/
@@ -28,16 +28,29 @@ Thumbs.db
 pip-wheel-metadata/
 *.egg-info/
 
-# Archivos de exportación generados
+# Archivos de exportacion generados
 *.pdf
 *.csv
 *.xlsx
 
-portable
+# Builds / instaladores
+dist/
+build/
+portable/
+installer/output/
+
+# Configuracion y datos locales
 user_config.json
-dist
-build
+config/user_config.json
+data/**/*.db
+data/**/*.sqlite
+data/**/*.bak
+logs/
+temp/
 
-# Archivos de configuración locales
+# Dependencias de terceros
+node_modules/
+package-lock.json
 
+# Archivos de configuracion locales
 

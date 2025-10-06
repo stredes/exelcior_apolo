@@ -49,3 +49,5 @@ tzdata==2025.2
 tzlocal==5.3.1
 urllib3==2.4.0
 xlrd==2.0.1
+
+                                        
