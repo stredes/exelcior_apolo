@@ -14,6 +14,7 @@ def _setup_eventos_logger():
     logger.setLevel(logging.INFO)
 
     if not logger.handlers:
+        # Handler para archivo rotativo
         handler = TimedRotatingFileHandler(
             log_file,
             when="midnight",
@@ -27,6 +28,11 @@ def _setup_eventos_logger():
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
+        # Handler para consola
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
     return logger
 
 
@@ -34,13 +40,17 @@ def _setup_eventos_logger():
 _eventos_logger = _setup_eventos_logger()
 
 # --- Función para registrar eventos funcionales ---
-def log_evento(mensaje: str, nivel: str = "info"):
+
+
+def log_evento(mensaje: str, nivel: str = "info", accion: str = None, exc: Exception = None):
     """
-    Registra un evento funcional de la aplicación en 'logs/eventos.log'.
+    Registra un evento funcional de la aplicación en 'logs/eventos.log' y en la terminal.
 
     Args:
         mensaje (str): Descripción del evento.
         nivel (str): Nivel del evento: info, warning, error, etc.
+        accion (str): Acción o contexto adicional (opcional).
+        exc (Exception): Excepción a registrar (opcional).
     """
     nivel = nivel.lower()
     log_func = {
@@ -51,7 +61,17 @@ def log_evento(mensaje: str, nivel: str = "info"):
         "critical": _eventos_logger.critical
     }.get(nivel, _eventos_logger.info)
 
-    log_func(mensaje)
+    mensaje_final = mensaje
+    if accion:
+        mensaje_final = f"[ACCION: {accion}] {mensaje_final}"
+    if exc:
+        import traceback
+        exc_info = traceback.format_exception(type(exc), exc, exc.__traceback__)
+        mensaje_final += f"\n[EXCEPCION] {''.join(exc_info)}"
+    try:
+        log_func(mensaje_final)
+    except Exception as e:
+        print(f"[ERROR LOG] No se pudo escribir en el log: {e}\nMensaje: {mensaje_final}")
 
 # ⚠️ Alias legado (se eliminará próximamente)
 capturar_log_bod1 = log_evento

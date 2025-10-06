@@ -153,10 +153,23 @@ class InventarioView(tk.Toplevel):
         top_frame = tk.Frame(self, bg="#F9FAFB")
         top_frame.pack(pady=10, fill="x")
 
-        tk.Label(top_frame, text="Buscar por Código o Ubicación:", bg="#F9FAFB").pack(side="left", padx=(10, 5))
-        self.entry_busqueda = tk.Entry(top_frame, width=40)
+        tk.Label(top_frame, text="Buscar por Código, Ubicación o fragmentos:", bg="#F9FAFB").pack(side="left", padx=(10, 5))
+        self.entry_busqueda = tk.Entry(top_frame, width=30)
         self.entry_busqueda.pack(side="left", padx=5)
         self.entry_busqueda.bind("<Return>", lambda e: self._filtrar())
+        self.entry_busqueda.bind("<KeyRelease>", lambda e: self._actualizar_sugerencias())
+
+        # Nuevo: filtrado por columna y fila dentro de la estantería
+        tk.Label(top_frame, text="Columna:", bg="#F9FAFB").pack(side="left", padx=(10, 2))
+        self.entry_columna = tk.Entry(top_frame, width=6)
+        self.entry_columna.pack(side="left", padx=2)
+        tk.Label(top_frame, text="Fila:", bg="#F9FAFB").pack(side="left", padx=(10, 2))
+        self.entry_fila = tk.Entry(top_frame, width=6)
+        self.entry_fila.pack(side="left", padx=2)
+
+        self.sugerencias_var = tk.StringVar()
+        self.sugerencias_label = tk.Label(top_frame, textvariable=self.sugerencias_var, bg="#F9FAFB", fg="#555", font=("Segoe UI", 9))
+        self.sugerencias_label.pack(side="left", padx=5)
 
         ttk.Button(top_frame, text="Buscar", command=self._filtrar).pack(side="left", padx=5)
         ttk.Button(top_frame, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=5)
@@ -177,6 +190,19 @@ class InventarioView(tk.Toplevel):
                 width = 130
             self.tree.column(col, width=width, anchor="center")
         self.tree.pack(padx=10, pady=10, fill="both", expand=True)
+
+    def _actualizar_sugerencias(self):
+        term_raw = self.entry_busqueda.get()
+        if not term_raw or self.df.empty:
+            self.sugerencias_var.set("")
+            return
+        terminos = [self._norm_text(t) for t in term_raw.replace(",", " ").split() if t.strip()]
+        ubicaciones = self.df["Ubicación"].dropna().unique()
+        sugeridas = [u for u in ubicaciones if all(t in self._norm_text(u) for t in terminos)]
+        if sugeridas:
+            self.sugerencias_var.set("Coincidencias: " + ", ".join(sugeridas[:8]) + (" ..." if len(sugeridas) > 8 else ""))
+        else:
+            self.sugerencias_var.set("Sin coincidencias")
 
     # ---------------------------- Carga Excel ----------------------------
 
@@ -243,29 +269,58 @@ class InventarioView(tk.Toplevel):
         return " ".join(s.split())
 
     def _filtrar(self):
-        termino = self._norm_text(self.entry_busqueda.get())
-        if not termino:
-            self.safe_messagebox("info", "Buscar", "Ingrese un término de búsqueda.")
+        term_raw = self.entry_busqueda.get()
+        termino = self._norm_text(term_raw)
+        columna = self._norm_text(self.entry_columna.get())
+        fila = self._norm_text(self.entry_fila.get())
+        if not termino and not columna and not fila:
+            self.safe_messagebox("info", "Buscar", "Ingrese un término, columna o fila para filtrar.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
             return
 
         df = self.df.copy()
-        m_cod = df["Código"].astype(str).map(self._norm_text).str.contains(termino, na=False)
-        m_ubi = df["Ubicación"].astype(str).map(self._norm_text).str.contains(termino, na=False)
+        terminos = [self._norm_text(t) for t in term_raw.replace(",", " ").split() if t.strip()]
 
-        if m_cod.any():
-            self.df_filtrado = df.loc[m_cod].reset_index(drop=True)
-            self.tipo_busqueda = "codigo"
-        elif m_ubi.any():
-            self.df_filtrado = df.loc[m_ubi].reset_index(drop=True)
-            self.tipo_busqueda = "ubicacion"
+        # Filtrado por ubicación: fragmentos, columna y fila
+        m_ubi = df["Ubicación"].astype(str).map(self._norm_text)
+        mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
+
+        # Filtrado por columna (ej: A, F, C, etc. en RE-A4-A1)
+        mask_col = pd.Series([True]*len(df))
+        if columna:
+            mask_col = m_ubi.apply(lambda val: any(f"-{columna.lower()}" in val or f" {columna.lower()}" in val for columna in [columna]))
+
+        # Filtrado por fila (ej: 1, 2, etc. en RE-A4-A1)
+        mask_fila = pd.Series([True]*len(df))
+        if fila:
+            mask_fila = m_ubi.apply(lambda val: any(f"{fila}" == frag[-1] for frag in val.split("-") if frag and frag[-1].isdigit()))
+
+        # También buscar por código y producto para mayor flexibilidad
+        m_cod = df["Código"].astype(str).map(self._norm_text)
+        mask_cod = m_cod.apply(lambda val: any(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
+        m_prod = df["Producto"].astype(str).map(self._norm_text)
+        mask_prod = m_prod.apply(lambda val: any(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
+
+        mask_total = mask_ubi & mask_col & mask_fila | mask_cod | mask_prod
+
+        if mask_total.any():
+            self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
+            if mask_ubi.any():
+                self.tipo_busqueda = "ubicacion"
+            elif mask_cod.any():
+                self.tipo_busqueda = "codigo"
+            elif mask_prod.any():
+                self.tipo_busqueda = "producto"
+            else:
+                self.tipo_busqueda = None
         else:
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
 
         self._actualizar_tree(self.df_filtrado)
+        self._actualizar_sugerencias()
 
     def _limpiar_busqueda(self):
         self.entry_busqueda.delete(0, "end")

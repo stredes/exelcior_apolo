@@ -61,6 +61,8 @@ class ExcelPrinterApp(tk.Tk):
         self.configure(bg="#F9FAFB")
 
         init_db()
+        from app.core.logger_eventos import log_evento
+        log_evento("Aplicación iniciada", nivel="info", accion="startup")
 
         # Estado de la app
         self.df = None                 # DF original cargado del Excel
@@ -69,7 +71,7 @@ class ExcelPrinterApp(tk.Tk):
         self.processing = False
         self.executor = ThreadPoolExecutor(max_workers=2)
         self._sidebar_buttons = []
-        self._preview_win: tk.Toplevel | None = None  # la maneja open_preview_crud
+        self._preview_win = None  # la maneja open_preview_crud
 
         # ✅ Carga de config robusta
         try:
@@ -249,6 +251,8 @@ class ExcelPrinterApp(tk.Tk):
 
     def _update_mode(self, modo_seleccionado: str):
         self.mode = modo_seleccionado
+        from app.core.logger_eventos import log_evento
+        log_evento(f"Modo cambiado a: {modo_seleccionado}", nivel="info", accion="cambio_modo")
 
     def _abrir_buscador_codigos_postales(self):
         from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
@@ -268,6 +272,7 @@ class ExcelPrinterApp(tk.Tk):
     # ---------------- Carga de archivos ----------------
 
     def _threaded_select_file(self):
+        from app.core.logger_eventos import log_evento
         if self.processing:
             return
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.csv")])
@@ -276,30 +281,31 @@ class ExcelPrinterApp(tk.Tk):
         valid, err = validate_file(path)
         if not valid:
             self.safe_messagebox("error", "Archivo no válido", err)
+            log_evento(f"Archivo no válido seleccionado: {path}", nivel="warning", accion="seleccion_archivo")
             return
         set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
+        log_evento(f"Archivo seleccionado: {path}", nivel="info", accion="seleccion_archivo")
         self.processing = True
         self._set_controls_enabled(False)
         future = self.executor.submit(process_file, path, self.config_columns, self.mode)
         future.add_done_callback(self._file_processed_callback)
 
     def _file_processed_callback(self, future):
+        from app.core.logger_eventos import log_evento
         try:
             df, transformed = future.result()
             if not self._ui_alive():
                 return
-            # Guarda el DF de origen y, por defecto, el transformado genérico
             self.df, self.transformed_df = df, transformed
-
-            # 🔽 Vista Previa FedEx: construir desde el DF original (NO desde transformed)
             if (self.mode or "").strip().lower() == "fedex" and self.df is not None:
                 self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
-
             save_file_history("n/a", self.mode)
             self._ui_set_status_preview_totals(self.transformed_df, self.mode)
+            log_evento("Archivo procesado correctamente", nivel="info", accion="procesamiento_archivo")
             self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.exception("Error al procesar archivo")
+            log_evento(f"Error al procesar archivo: {e}", nivel="error", accion="procesamiento_archivo", exc=e)
             if self._ui_alive():
                 self.safe_messagebox("error", "Error", str(e))
                 self.after(0, lambda: self._update_status("Error"))

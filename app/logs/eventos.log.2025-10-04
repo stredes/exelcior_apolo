@@ -1,0 +1,6 @@
+2025-10-04 23:18:22,986 - INFO - Inicializando base de datos...
+2025-10-04 23:18:22,988 - INFO - Tablas creadas o verificadas correctamente.
+2025-10-04 23:18:22,988 - INFO - [CONFIG] DEFAULT: /home/stredemers/workspace/exelcior_apolo/app/config/excel_printer_default.json
+2025-10-04 23:18:22,989 - INFO - [CONFIG] USER   : /home/stredemers/workspace/exelcior_apolo/app/config/user_config.json
+2025-10-04 23:18:22,989 - INFO - 📝 User config creado desde default en /home/stredemers/workspace/exelcior_apolo/app/config/user_config.json
+2025-10-04 23:18:22,989 - INFO - ✅ Config validada desde merged

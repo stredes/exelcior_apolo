@@ -335,49 +335,21 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 # ======================================================================
 
 def insertar_bloque_firma_ws(ws) -> None:
-    from openpyxl.styles import Alignment, Side, Border
-
-    ncols = ws.max_column or 2
-    right = max(2, min(ncols, 4))
-
-    ws.append([])
-
-    r1 = ws.max_row + 1
-    ws.cell(row=r1, column=1, value="Nombre quien recibe:")
-    ws.merge_cells(start_row=r1, start_column=2, end_row=r1, end_column=right)
-    ws.cell(row=r1, column=2, value="")
-
-    r2 = r1 + 1
-    ws.cell(row=r2, column=1, value="Firma quien recibe:")
-    ws.merge_cells(start_row=r2, start_column=2, end_row=r2, end_column=right)
-    ws.cell(row=r2, column=2, value="")
-
-    thin = Side(style="thin")
-    line_border = Border(top=thin, bottom=thin)
-    for r in (r1, r2):
-        for c in range(2, right + 1):
-            ws.cell(row=r, column=c).border = line_border
-
-    for r in (r1, r2):
-        for c in range(1, right + 1):
-            ws.cell(row=r, column=c).alignment = Alignment(horizontal="left", vertical="center")
+    # Usar el footer físico de la hoja para firmas
+    ws.oddFooter.left.text = "Nombre quien recibe: ______________________"
+    ws.oddFooter.center.text = "Firma quien recibe: ______________________"
+    ws.oddFooter.right.text = ""
+    ws.evenFooter.left.text = ws.oddFooter.left.text
+    ws.evenFooter.center.text = ws.oddFooter.center.text
+    ws.evenFooter.right.text = ws.oddFooter.right.text
 
 
 def agregar_footer_info_ws(ws, total_piezas: int) -> None:
-    from openpyxl.styles import Alignment, Font
+    # Usar el footer físico de la hoja para info de impresión
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     texto = f"Impresa el: {ts}  |  Total Piezas: {total_piezas}"
-
-    ws.append([])
-    r = ws.max_row + 1
-    ws.cell(row=r, column=1, value=texto)
-
-    end_col = max(2, ws.max_column)
-    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=end_col)
-
-    cell = ws.cell(row=r, column=1)
-    cell.font = Font(size=9, italic=True)
-    cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.oddFooter.right.text = texto
+    ws.evenFooter.right.text = texto
 
 
 def formatear_tabla_ws(ws) -> None:
