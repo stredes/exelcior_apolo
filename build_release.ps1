@@ -1,31 +1,34 @@
 <#
  build_release.ps1 (PowerShell 5.1 compatible)
- Empaquetado automatizado (sin icono):
-  - PyInstaller one-folder mediante .spec
-  - Firma de EXEs/DLLs (opcional) con signtool
+
+ Empaquetado automatizado:
+  - PyInstaller (one-folder) usando exelcior_apolo.spec
+  - Build opcional del módulo Vale de Consumo (vale_consumo\build_utf8.ps1)
+  - Copia de ValeConsumoBioplates dentro de dist\ExelciorApolo y dist\ExelciorApolo\vale_consumo
+  - Firma opcional de EXEs/DLLs con signtool
   - Instalador Inno Setup (ISCC)
-  - Firma del instalador (opcional)
-  - Checksums y reporte
+  - Firma opcional del instalador
+  - Checksums SHA256
 
  Ejemplo:
-  powershell -ExecutionPolicy Bypass -File .\build_release.ps1 `
-    -Version 1.4.0 `
-    -AppName "Exelcior Apolo" `
-    -ExeName "ExelciorApolo.exe" `
-    -CreateIssIfMissing -RecreateVersionFile `
-    -CertPfx "C:\certs\empresa_code_signing.pfx" `
-    -CertPassword (Read-Host "Password PFX" -AsSecureString)
+   powershell -ExecutionPolicy Bypass -File .\build_release.ps1 `
+     -Version 1.4.1 `
+     -AppName "Exelcior Apolo" `
+     -ExeName "ExelciorApolo.exe" `
+     -CreateIssIfMissing -RecreateVersionFile `
+     -CertPfx "C:\certs\empresa_code_signing.pfx" `
+     -CertPassword (Read-Host "Password PFX" -AsSecureString)
 #>
 
 [CmdletBinding()]
 param(
   # --- Metadatos de la app ---
-  [string]$Version = "1.4.0",
+  [string]$Version = "1.4.1",
   [string]$AppName = "Exelcior Apolo",
   [string]$ExeName = "ExelciorApolo.exe",
 
   # --- Rutas clave ---
-  [string]$SpecPath = "exelcior_apolo.spec",                # tu .spec sin icono
+  [string]$SpecPath = "exelcior_apolo.spec",                # .spec principal
   [string]$VersionFile = "assets\version\exelcior_apolo_version.txt",
   [string]$InnoScript = "installer\exelcior_apolo.iss",
 
@@ -101,7 +104,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path $VersionFile -Parent) | Ou
 New-Item -ItemType Directory -Force -Path (Split-Path $InnoScript -Parent) | Out-Null
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# ===================== Archivo de versión (opcional) =====================
+# ===================== Archivo de versión =====================
 
 function New-VersionInfoContent([string]$v){
   if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Versión inválida: $v. Use x.y.z" }
@@ -128,13 +131,14 @@ VSVersionInfo(
 )
 "@
 }
+
 if ($RecreateVersionFile -or -not (Test-Path -LiteralPath $VersionFile)) {
   Write-Info "Generando archivo de versión: $VersionFile"
   (New-VersionInfoContent $Version) | Out-File -LiteralPath $VersionFile -Encoding UTF8 -Force
 }
 Assert-File $VersionFile "Falta archivo de versión."
 
-# ===================== Inno Setup .iss (opcional) =====================
+# ===================== Inno Setup .iss =====================
 
 $appIdPath = "installer\AppId.txt"
 if (-not (Test-Path -LiteralPath $appIdPath)) {
@@ -210,17 +214,54 @@ if (-not $NoPipInstall) {
 
 # ===================== Build con PyInstaller =====================
 
+# Build opcional de Vale de Consumo (exe separado)
+$valeBuildScript = Join-Path $ScriptRoot 'vale_consumo\build_utf8.ps1'
+if (Test-Path -LiteralPath $valeBuildScript) {
+  Write-Info "Construyendo ValeConsumoBioplates (vale_consumo\build_utf8.ps1)..."
+  try {
+    & $valeBuildScript -Task package
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warn "build_utf8.ps1 devolvió código $LASTEXITCODE; se continuará sin empaquetar Vale de Consumo."
+    }
+  } catch {
+    Write-Warn "Error al ejecutar build_utf8.ps1: $($_.Exception.Message)"
+  }
+} else {
+  Write-Warn "No se encontró vale_consumo\build_utf8.ps1; se omitirá Vale de Consumo."
+}
+
 Write-Info "Ejecutando PyInstaller con spec: $SpecPath"
 & $PythonExe -m PyInstaller $SpecPath | Out-Host
 
 Assert-File $distDir "No se generó la carpeta dist esperada: $distDir"
 Assert-File (Join-Path $distDir $ExeName) "No se generó el ejecutable: $ExeName"
 
+# Copiar artefactos de Vale de Consumo al dist principal (para integración desde el menú)
+$valeDistRoot = Join-Path $ScriptRoot 'vale_consumo\dist'
+if (Test-Path -LiteralPath $valeDistRoot) {
+  $valeTarget = Join-Path $distDir 'vale_consumo'
+  New-Item -ItemType Directory -Force -Path $valeTarget | Out-Null
+  try {
+    # Copia todo el dist de vales a una subcarpeta
+    Copy-Item -LiteralPath (Join-Path $valeDistRoot '*') -Destination $valeTarget -Recurse -Force
+    # Copia el exe principal también junto al ejecutable principal de Exelcior
+    $valeExe = Join-Path $valeDistRoot 'ValeConsumoBioplates.exe'
+    if (Test-Path -LiteralPath $valeExe) {
+      Copy-Item -LiteralPath $valeExe -Destination (Join-Path $distDir 'ValeConsumoBioplates.exe') -Force
+    }
+    Write-Info "ValeConsumoBioplates copiado a: $valeTarget y al root de dist."
+  } catch {
+    Write-Warn "No se pudieron copiar los archivos de Vale de Consumo: $($_.Exception.Message)"
+  }
+} else {
+  Write-Warn "No se encontró vale_consumo\dist; el instalador no incluirá ValeConsumoBioplates."
+}
+
 # ===================== Firma de binarios (opcional) =====================
 
 function Convert-SecureStringToPlain([SecureString]$Sec){
   if (-not $Sec) { return "" }
-  # Conversión controlada (en memoria) – requerido por signtool /p
+  # Conversión controlada (en memoria), requerido por signtool /p
   return ([System.Net.NetworkCredential]::new("", $Sec)).Password
 }
 
@@ -298,8 +339,8 @@ $setHash = Get-FileHash -LiteralPath $setupName -Algorithm SHA256
 $hashFile = Join-Path $outDir ("checksums_{0}.txt" -f $Version)
 
 @(
-  "== Checksums $AppName v$Version =="
-  "EXE (dist): $($exeHash.Hash)  *$($exeHash.Path)"
+  "== Checksums $AppName v$Version ==",
+  "EXE (dist): $($exeHash.Hash)  *$($exeHash.Path)",
   "SETUP:      $($setHash.Hash)  *$($setHash.Path)"
 ) | Out-File -LiteralPath $hashFile -Encoding ascii -Force
 
@@ -313,3 +354,4 @@ Write-Host ("EXE:        {0}" -f (Resolve-Path (Join-Path $distDir $ExeName)))
 Write-Host ("Installer:  {0}" -f (Resolve-Path $setupName))
 Write-Host ("Checksums:  {0}" -f (Resolve-Path $hashFile))
 Write-Host "-----------------------------------------------"
+

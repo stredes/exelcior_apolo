@@ -3,6 +3,7 @@ import os
 import sys
 import logging
 import threading
+import subprocess
 from pathlib import Path
 import pandas as pd  # <-- necesario para to_numeric() en _ui_set_status_preview_totals
 
@@ -340,6 +341,48 @@ class ExcelPrinterApp(tk.Tk):
     def _abrir_sra_mary(self):
         SraMaryView(self)
 
+    def _abrir_vale_consumo(self):
+        """
+        Abre la app de Vale de Consumo (Bioplates) en una ventana separada.
+
+        - En desarrollo: lanza vale_consumo/run_app.py con el intérprete actual.
+        - En ejecutable PyInstaller: intenta abrir ValeConsumoBioplates.exe
+          ubicado junto a ExelciorApolo.exe o en una subcarpeta 'vale_consumo'.
+        """
+        try:
+            if getattr(sys, "frozen", False):
+                base_dir = Path(sys.executable).resolve().parent
+                candidates = [
+                    base_dir / "ValeConsumoBioplates.exe",
+                    base_dir / "vale_consumo" / "ValeConsumoBioplates.exe",
+                ]
+                for exe_path in candidates:
+                    if exe_path.exists():
+                        subprocess.Popen([str(exe_path)])
+                        return
+                self.safe_messagebox(
+                    "error",
+                    "Vale de Consumo",
+                    "No se encontró 'ValeConsumoBioplates.exe'.\n"
+                    "Copia el ejecutable de vales junto a ExelciorApolo.exe "
+                    "o dentro de una carpeta 'vale_consumo' y vuelve a intentarlo.",
+                )
+                return
+
+            script_path = (ROOT_DIR / "vale_consumo" / "run_app.py").resolve()
+            if not script_path.exists():
+                self.safe_messagebox(
+                    "error",
+                    "Vale de Consumo",
+                    "No se encontró 'vale_consumo/run_app.py' en la carpeta del proyecto.",
+                )
+                return
+            python = sys.executable or "python"
+            subprocess.Popen([python, str(script_path)])
+        except Exception as e:
+            logging.exception("Error lanzando Vale de Consumo")
+            self.safe_messagebox("error", "Vale de Consumo", f"No se pudo abrir la app de vales:\n{e}")
+
     def _mostrar_acerca_de(self):
         mensaje = (
             "Exelcior Apolo\n\nSistema integral de impresión, logística y trazabilidad "
@@ -624,6 +667,25 @@ class ExcelPrinterApp(tk.Tk):
         except Exception:
             pass
 
+# --- Extensión de sidebar: botón Vale de Consumo ---
+_ORIGINAL_SETUP_SIDEBAR = ExcelPrinterApp._setup_sidebar
+
+
+def _setup_sidebar_with_vale(self):
+    """Envuelve _setup_sidebar original para agregar el botón de Vale de Consumo."""
+    try:
+        _ORIGINAL_SETUP_SIDEBAR(self)
+    except Exception:
+        return
+    try:
+        if getattr(self, "sidebar", None) is not None:
+            self._add_sidebar_button(self.sidebar, "Vale de Consumo", self._abrir_vale_consumo)
+    except Exception:
+        pass
+
+
+ExcelPrinterApp._setup_sidebar = _setup_sidebar_with_vale
+
 
 def setup_logging():
     log_dir = (Path(__file__).resolve().parent.parent / "logs")
@@ -675,3 +737,49 @@ if __name__ == "__main__":
     main()
 
 
+def _setup_sidebar_with_vale2(self):
+    """
+    Envuelve _setup_sidebar original para:
+      - eliminar botones no deseados del menú
+      - añadir el botón de Vale de Consumo
+    """
+    try:
+        _ORIGINAL_SETUP_SIDEBAR(self)
+    except Exception:
+        return
+
+    sidebar = getattr(self, "sidebar", None)
+    if sidebar is None:
+        return
+
+    try:
+        # Eliminar botones que ya no se usan: Exportar PDF, Herramientas, Acerca de
+        for widget in list(sidebar.winfo_children()):
+            try:
+                text = str(widget.cget("text"))
+            except Exception:
+                continue
+            if any(label in text for label in ("Exportar PDF", "Herramientas", "Acerca de")):
+                try:
+                    widget.destroy()
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self, "_sidebar_buttons"):
+                        self._sidebar_buttons = [
+                            b for b in self._sidebar_buttons if b is not widget
+                        ]
+                except Exception:
+                    pass
+
+        # Añadir botón de Vale de Consumo al final del menú principal
+        try:
+            self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
+        except Exception:
+            pass
+    except Exception:
+        # No romper la app si algo falla al ajustar el sidebar
+        pass
+
+
+ExcelPrinterApp._setup_sidebar = _setup_sidebar_with_vale2
