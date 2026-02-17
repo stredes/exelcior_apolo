@@ -77,6 +77,7 @@ class ExcelPrinterApp(tk.Tk):
         self._preview_win = None  # la maneja open_preview_crud
         self.sidebar = None
         self._mode_buttons = {}
+        self._active_print_context = "report"
 
         # ✅ Carga de config robusta
         try:
@@ -98,7 +99,7 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_main_area()
         self._setup_status_bar()
         self.bind("<Configure>", self._on_root_resize)
-        self._apply_default_printer_for_report_mode()
+        self._switch_print_context("report")
 
         # Cierre limpio
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -418,7 +419,7 @@ class ExcelPrinterApp(tk.Tk):
         self.mode = modo_seleccionado
         self.mode_var.set(modo_seleccionado)
         self._refresh_mode_buttons()
-        self._apply_default_printer_for_report_mode()
+        self._switch_print_context("report")
         from app.core.logger_eventos import log_evento
         log_evento(f"Modo cambiado a: {modo_seleccionado}", nivel="info", accion="cambio_modo")
 
@@ -490,6 +491,24 @@ class ExcelPrinterApp(tk.Tk):
             or self.LABEL_DEFAULT_PRINTER
         )
         self._set_windows_default_printer(str(label_printer))
+
+    def _switch_print_context(self, context: str) -> None:
+        """
+        Cambia automáticamente la impresora default según el contexto activo:
+        - report: listados/fedex/urbano
+        - labels: editor/impresión de etiquetas
+        """
+        ctx = (context or "").strip().lower()
+        if ctx not in ("report", "labels"):
+            return
+        if ctx == self._active_print_context:
+            # Igual se reaplica para sincronizar si el usuario cambió impresoras fuera de la app.
+            pass
+        if ctx == "labels":
+            self._apply_default_printer_for_labels()
+        else:
+            self._apply_default_printer_for_report_mode()
+        self._active_print_context = ctx
 
     def _abrir_buscador_codigos_postales(self):
         from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
@@ -634,7 +653,7 @@ class ExcelPrinterApp(tk.Tk):
             return
         # Refuerzo: antes de imprimir reportes, aplicar siempre default de informes.
         if self.mode in ("listados", "fedex", "urbano"):
-            self._apply_default_printer_for_report_mode()
+            self._switch_print_context("report")
         self.processing = True
         self._set_controls_enabled(False)
         future = self.executor.submit(self._print_document)
@@ -699,10 +718,25 @@ class ExcelPrinterApp(tk.Tk):
 
     def _abrir_editor_etiquetas(self):
         try:
-            self._apply_default_printer_for_labels()
+            self._switch_print_context("labels")
             win = crear_editor_etiqueta(parent=self)
             if win is not None:
-                win.bind("<Destroy>", lambda _e: self._apply_default_printer_for_report_mode())
+                restored = {"done": False}
+
+                def _restore_report_printer_once() -> None:
+                    if restored["done"]:
+                        return
+                    restored["done"] = True
+                    self._switch_print_context("report")
+
+                def _on_close_labels():
+                    try:
+                        win.destroy()
+                    finally:
+                        _restore_report_printer_once()
+
+                win.protocol("WM_DELETE_WINDOW", _on_close_labels)
+                win.bind("<Destroy>", lambda e: _restore_report_printer_once() if e.widget is win else None)
         except Exception as e:
             self.safe_messagebox("error", "Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
 
