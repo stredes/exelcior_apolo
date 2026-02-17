@@ -33,9 +33,38 @@ from app.printer.printer_tools import prepare_fedex_dataframe
 
 logger = logging.getLogger(__name__)
 
-# Impresora fija para los 3 modos principales (solicitado por operación).
-FORCED_MAIN_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
+# Impresora fallback para los 3 modos principales (papel común).
+FALLBACK_MAIN_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
 FORCED_MAIN_MODES = {"listados", "fedex", "urbano"}
+
+
+def _get_report_printer(cfg: dict) -> str:
+    """
+    Resuelve la impresora de reportes (papel común) desde config:
+    prioridad alta -> baja:
+      1) report_printer_name / paper_printer_name
+      2) default_printer (legacy)
+      3) paths.default_printer (v2)
+      4) fallback hardcodeado
+    """
+    if not isinstance(cfg, dict):
+        return FALLBACK_MAIN_PRINTER
+
+    top_level = (
+        cfg.get("report_printer_name")
+        or cfg.get("paper_printer_name")
+        or cfg.get("default_printer")
+    )
+    if isinstance(top_level, str) and top_level.strip():
+        return top_level.strip()
+
+    paths_cfg = cfg.get("paths")
+    if isinstance(paths_cfg, dict):
+        p = paths_cfg.get("default_printer")
+        if isinstance(p, str) and p.strip():
+            return p.strip()
+
+    return FALLBACK_MAIN_PRINTER
 
 
 def _resolve_windows_printer_name(alias: str) -> str:
@@ -316,16 +345,17 @@ def print_document(
     cfg = config_columns if isinstance(config_columns, dict) else {}
     cfg_to_use = cfg
 
-    # Forzar cola física para Listados/FedEx/Urbano.
+    # Forzar cola física de papel para Listados/FedEx/Urbano.
     if mode_norm in FORCED_MAIN_MODES:
+        report_printer = _get_report_printer(cfg)
         cfg_to_use = dict(cfg)
-        cfg_to_use["printer_name"] = FORCED_MAIN_PRINTER
-        cfg_to_use["printer"] = FORCED_MAIN_PRINTER
-        cfg_to_use["impresora"] = FORCED_MAIN_PRINTER
-        logger.info(f"[print_document] Impresora forzada para '{mode_norm}': {FORCED_MAIN_PRINTER}")
+        cfg_to_use["printer_name"] = report_printer
+        cfg_to_use["printer"] = report_printer
+        cfg_to_use["impresora"] = report_printer
+        logger.info(f"[print_document] Impresora forzada para '{mode_norm}': {report_printer}")
 
     logger.info(f"[print_document] Ejecutando impresora de modo '{mode_norm}'")
     if mode_norm in FORCED_MAIN_MODES:
-        with _temporary_windows_default_printer(FORCED_MAIN_PRINTER):
+        with _temporary_windows_default_printer(_get_report_printer(cfg_to_use)):
             return fn(file_path, cfg_to_use, df)
     return fn(file_path, cfg_to_use, df)

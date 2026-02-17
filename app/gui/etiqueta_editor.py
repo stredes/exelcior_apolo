@@ -109,6 +109,40 @@ def obtener_impresoras_disponibles():
     return impresoras
 
 
+def _set_windows_default_printer(printer_alias: str) -> None:
+    if platform.system() != "Windows" or not (printer_alias or "").strip():
+        return
+    try:
+        import win32print
+
+        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        raw = win32print.EnumPrinters(flags)
+        names = []
+        for item in raw:
+            if isinstance(item, (tuple, list)) and len(item) >= 3:
+                names.append(str(item[2]).strip())
+            elif isinstance(item, dict) and item.get("pPrinterName"):
+                names.append(str(item.get("pPrinterName")).strip())
+
+        target = printer_alias.strip()
+        target_low = target.lower()
+        resolved = target
+        for n in names:
+            if n and n.lower() == target_low:
+                resolved = n
+                break
+        else:
+            for n in names:
+                if n and (target_low in n.lower() or n.lower() in target_low):
+                    resolved = n
+                    break
+
+        win32print.SetDefaultPrinter(resolved)
+    except Exception:
+        # No bloquear impresión de etiquetas por fallo al cambiar default.
+        pass
+
+
 def _cleanup_temp_files_later(paths, delay_seconds=180):
     """
     Limpia archivos temporales en diferido para evitar que Excel/soffice
@@ -127,7 +161,7 @@ def _cleanup_temp_files_later(paths, delay_seconds=180):
 
 def crear_editor_etiqueta(df_clientes=None, parent=None):
     config = cargar_config()
-    printer_name_default = config.get("printer_name", "")
+    printer_name_default = config.get("label_printer_name") or config.get("printer_name", "")
     clientes_path_guardado = config.get(CLIENTES_PATH_KEY, "")
     estado = {"df_clientes": df_clientes}
 
@@ -303,7 +337,9 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
                 return
 
             config["printer_name"] = printer_name
+            config["label_printer_name"] = printer_name
             guardar_config(config)
+            _set_windows_default_printer(printer_name)
 
             total_bultos = int(data["bultos"])
             if total_bultos > 10:

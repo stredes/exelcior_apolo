@@ -29,7 +29,7 @@ from app.config.config_dialog import ConfigDialog  # Configuración por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.config.config_manager import load_config
-from app.gui.etiqueta_editor import crear_editor_etiqueta
+from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_config as cargar_config_etiquetas
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
 
@@ -464,16 +464,31 @@ class ExcelPrinterApp(tk.Tk):
             logging.warning(f"[PrinterSwitch] No se pudo cambiar default a '{printer_alias}': {e}")
 
     def _apply_default_printer_for_report_mode(self) -> None:
-        # Los 3 modos de informe salen siempre por la Brother.
-        self._set_windows_default_printer(self.REPORT_DEFAULT_PRINTER)
+        # Reportes: usar impresora de papel desde config (fallback a constante).
+        report_printer = self.REPORT_DEFAULT_PRINTER
+        if isinstance(self.config_columns, dict):
+            report_printer = (
+                self.config_columns.get("report_printer_name")
+                or self.config_columns.get("paper_printer_name")
+                or self.config_columns.get("default_printer")
+                or (self.config_columns.get("paths", {}) or {}).get("default_printer")
+                or self.REPORT_DEFAULT_PRINTER
+            )
+        self._set_windows_default_printer(str(report_printer))
 
     def _apply_default_printer_for_labels(self) -> None:
-        # Etiquetas: prioriza lo guardado en config; fallback 'URBANO'.
+        # Etiquetas: usar la configuración del editor de etiquetas.
+        # (archivo excel_printer_config.json, donde se guarda la etiquetadora elegida)
+        label_cfg = {}
+        try:
+            label_cfg = cargar_config_etiquetas() or {}
+        except Exception:
+            label_cfg = {}
         label_printer = (
-            self.config_columns.get("printer_name")
-            if isinstance(self.config_columns, dict)
-            else None
-        ) or self.LABEL_DEFAULT_PRINTER
+            label_cfg.get("label_printer_name")
+            or label_cfg.get("printer_name")
+            or self.LABEL_DEFAULT_PRINTER
+        )
         self._set_windows_default_printer(str(label_printer))
 
     def _abrir_buscador_codigos_postales(self):
@@ -617,6 +632,9 @@ class ExcelPrinterApp(tk.Tk):
         if self.processing or self.transformed_df is None or self.transformed_df.empty:
             self.safe_messagebox("error", "Error", "Debe cargar un archivo válido primero.")
             return
+        # Refuerzo: antes de imprimir reportes, aplicar siempre default de informes.
+        if self.mode in ("listados", "fedex", "urbano"):
+            self._apply_default_printer_for_report_mode()
         self.processing = True
         self._set_controls_enabled(False)
         future = self.executor.submit(self._print_document)
