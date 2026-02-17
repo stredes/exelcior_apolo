@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 import importlib
+import platform
+import time
 from pathlib import Path
-from typing import Tuple, Optional, Callable, Dict
+from typing import Tuple, Optional, Callable, Dict, Any
+from contextlib import contextmanager
 
 import pandas as pd
 
@@ -30,6 +33,68 @@ from app.printer.printer_tools import prepare_fedex_dataframe
 
 logger = logging.getLogger(__name__)
 
+# Impresora fija para los 3 modos principales (solicitado por operación).
+FORCED_MAIN_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
+FORCED_MAIN_MODES = {"listados", "fedex", "urbano"}
+
+
+def _resolve_windows_printer_name(alias: str) -> str:
+    base = (alias or "").strip()
+    if not base or platform.system() != "Windows":
+        return base
+    try:
+        import win32print  # type: ignore
+
+        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        names = []
+        for item in win32print.EnumPrinters(flags):
+            try:
+                n = str(item[2]).strip()
+            except Exception:
+                continue
+            if n:
+                names.append(n)
+        low = base.lower()
+        for n in names:
+            if n.lower() == low:
+                return n
+        for n in names:
+            if low in n.lower() or n.lower() in low:
+                return n
+    except Exception:
+        pass
+    return base
+
+
+@contextmanager
+def _temporary_windows_default_printer(printer_name: str):
+    if platform.system() != "Windows" or not printer_name:
+        yield
+        return
+    old_default = None
+    try:
+        import win32print  # type: ignore
+
+        resolved = _resolve_windows_printer_name(printer_name)
+        old_default = win32print.GetDefaultPrinter()
+        win32print.SetDefaultPrinter(resolved)
+        logger.info(f"[print_document] Default temporal aplicada: {resolved}")
+        yield
+        # margen breve para que el spooler tome el trabajo antes de restaurar
+        time.sleep(3)
+    except Exception as e:
+        logger.warning(f"[print_document] No se pudo forzar default temporal: {e}")
+        yield
+    finally:
+        if old_default:
+            try:
+                import win32print  # type: ignore
+
+                win32print.SetDefaultPrinter(old_default)
+                logger.info(f"[print_document] Default restaurada: {old_default}")
+            except Exception:
+                pass
+
 # =============================================================================
 #                               VALIDACIÓN
 # =============================================================================
@@ -37,41 +102,6 @@ logger = logging.getLogger(__name__)
 def validate_file(path: str | Path) -> Tuple[bool, str]:
     """Valida archivo de entrada (existencia, extensión, apertura básica)."""
     return core_validate(str(path))
-
-
-# =============================================================================
-#                       CHEQUEO DE DEPENDENCIAS DE EXCEL
-# =============================================================================
-
-def _ensure_excel_engine(path: Path) -> None:
-    """
-    Verifica que exista el motor de lectura apropiado según la extensión:
-      - .xls  -> xlrd >= 2.0.1
-      - .xlsx -> openpyxl
-    Lanza un ValueError con mensaje claro si falta la dependencia.
-    """
-    suffix = path.suffix.lower()
-    if suffix == ".xls":
-        try:
-            import xlrd  # noqa: F401
-        except Exception:
-            raise ValueError(
-                "Missing optional dependency 'xlrd'. "
-                "Instala 'xlrd>=2.0.1' para leer archivos .xls "
-                "(ej.: pip install xlrd==2.0.1)."
-            )
-    elif suffix == ".xlsx":
-        try:
-            import openpyxl  # noqa: F401
-        except Exception:
-            raise ValueError(
-                "Missing optional dependency 'openpyxl'. "
-                "Instala 'openpyxl' para leer archivos .xlsx "
-                "(ej.: pip install openpyxl)."
-            )
-    else:
-        # Permitimos CSV u otros si el core los maneja, solo registramos
-        logger.info(f"[excel] Extensión no-xls/xlsx detectada: {suffix}. Se delega a core.load_excel.")
 
 
 # =============================================================================
@@ -87,6 +117,81 @@ def _normalize_mode(mode: Optional[str]) -> str:
         "inventario_ubic": "inventario_ubicacion",
     }
     return aliases.get(m, m)
+
+
+def _sanitize_preview_dataframe(df: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """
+    Limpia filas de resumen no deseadas para la vista previa por modo.
+    Actualmente elimina filas 'TOTAL' para urbano.
+    """
+    if df is None or df.empty:
+        return df
+
+    if _normalize_mode(mode) != "urbano":
+        return df
+
+    try:
+        mask_total = pd.Series(False, index=df.index)
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            col_values = df[col].astype(str).str.strip().str.upper()
+            mask_total = mask_total | (col_values == "TOTAL")
+        if mask_total.any():
+            return df.loc[~mask_total].reset_index(drop=True)
+    except Exception:
+        logger.exception("[preview] Error sanitizando filas TOTAL para urbano")
+    return df
+
+
+def build_preview_dataframe(df: pd.DataFrame, config_columns: dict, mode: str) -> pd.DataFrame:
+    """
+    Pipeline único de negocio para construir DataFrame de vista previa.
+    """
+    mode_norm = _normalize_mode(mode)
+    base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
+
+    if mode_norm == "fedex":
+        try:
+            # Fuente única: transformación base + consolidación FedEx
+            preview_df, _id_col, _total = prepare_fedex_dataframe(base_transformed)
+            if "BULTOS" in preview_df.columns:
+                preview_df["BULTOS"] = (
+                    pd.to_numeric(preview_df["BULTOS"], errors="coerce").fillna(0).astype(int)
+                )
+        except Exception:
+            logger.exception("[preview] FedEx: error en prepare_fedex_dataframe; usando base_transformed")
+            preview_df = base_transformed
+    else:
+        preview_df = base_transformed
+
+    return _sanitize_preview_dataframe(preview_df, mode_norm)
+
+
+def compute_preview_stats(df: Optional[pd.DataFrame], mode: str) -> Dict[str, Any]:
+    """
+    Calcula estadísticas de vista previa de forma uniforme para la UI.
+    """
+    stats: Dict[str, Any] = {
+        "rows": int(len(df) if isinstance(df, pd.DataFrame) else 0),
+        "metric_label": None,
+        "metric_value": None,
+    }
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return stats
+
+    mode_norm = _normalize_mode(mode)
+    if mode_norm == "fedex" and "BULTOS" in df.columns:
+        total = int(pd.to_numeric(df["BULTOS"], errors="coerce").fillna(0).sum())
+        stats["metric_label"] = "BULTOS"
+        stats["metric_value"] = total
+    elif mode_norm == "urbano" and "PIEZAS" in df.columns:
+        total = int(pd.to_numeric(df["PIEZAS"], errors="coerce").fillna(0).sum())
+        stats["metric_label"] = "PIEZAS"
+        stats["metric_value"] = total
+
+    return stats
 
 def process_file(
     path_or_df: str | Path | pd.DataFrame,
@@ -112,34 +217,9 @@ def process_file(
         else:
             path = Path(path_or_df) if not isinstance(path_or_df, Path) else path_or_df
             logger.info(f"[process_file] Cargando archivo: {path}")
-            _ensure_excel_engine(path)  # <- chequeo explícito de dependencia
             df = load_excel(path, config_columns, mode_norm)
 
-        # ---- Transformación genérica del core ----
-        base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
-
-        # ---- Transformación específica por modo (vista previa coherente con impresión) ----
-        if mode_norm == "fedex":
-            try:
-                df_preview, _id_col, _total = prepare_fedex_dataframe(base_transformed)
-                # Aseguramos tipo int en BULTOS si existe
-                if "BULTOS" in df_preview.columns:
-                    df_preview["BULTOS"] = (
-                        pd.to_numeric(df_preview["BULTOS"], errors="coerce")
-                          .fillna(0)
-                          .astype(int)
-                    )
-                logger.info(
-                    "[process_file] FedEx preview consolidada. Filas: %d | Total BULTOS: %d",
-                    len(df_preview),
-                    int(df_preview["BULTOS"].sum()) if "BULTOS" in df_preview.columns else 0,
-                )
-                transformed = df_preview
-            except Exception:
-                logger.exception("[process_file] FedEx preview: error en prepare_fedex_dataframe; usando base_transformed")
-                transformed = base_transformed
-        else:
-            transformed = base_transformed
+        transformed = build_preview_dataframe(df, config_columns, mode_norm)
 
         logger.info(f"[process_file] Transformación OK. Filas: src={len(df)}, out={len(transformed)}")
         return df, transformed
@@ -232,5 +312,20 @@ def print_document(
         mode_norm = _normalize_mode(mode)
         raise RuntimeError(f"No se encontró función de impresión para el modo: '{mode_norm}'")
 
-    logger.info(f"[print_document] Ejecutando impresora de modo '{_normalize_mode(mode)}'")
-    return fn(file_path, config_columns, df)
+    mode_norm = _normalize_mode(mode)
+    cfg = config_columns if isinstance(config_columns, dict) else {}
+    cfg_to_use = cfg
+
+    # Forzar cola física para Listados/FedEx/Urbano.
+    if mode_norm in FORCED_MAIN_MODES:
+        cfg_to_use = dict(cfg)
+        cfg_to_use["printer_name"] = FORCED_MAIN_PRINTER
+        cfg_to_use["printer"] = FORCED_MAIN_PRINTER
+        cfg_to_use["impresora"] = FORCED_MAIN_PRINTER
+        logger.info(f"[print_document] Impresora forzada para '{mode_norm}': {FORCED_MAIN_PRINTER}")
+
+    logger.info(f"[print_document] Ejecutando impresora de modo '{mode_norm}'")
+    if mode_norm in FORCED_MAIN_MODES:
+        with _temporary_windows_default_printer(FORCED_MAIN_PRINTER):
+            return fn(file_path, cfg_to_use, df)
+    return fn(file_path, cfg_to_use, df)

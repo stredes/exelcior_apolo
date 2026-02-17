@@ -5,7 +5,6 @@ import logging
 import threading
 import subprocess
 from pathlib import Path
-import pandas as pd  # <-- necesario para to_numeric() en _ui_set_status_preview_totals
 
 
 # Asegura que la raíz del proyecto esté en sys.path para evitar errores de importación
@@ -18,24 +17,24 @@ from tkinter import ttk, filedialog, messagebox
 from concurrent.futures import ThreadPoolExecutor
 
 # ✅ Lógica de negocio / servicios
-from app.services.file_service import validate_file, process_file, print_document
+from app.services.file_service import (
+    validate_file,
+    process_file,
+    print_document,
+    build_preview_dataframe,
+    compute_preview_stats,
+)
 from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog  # Configuración por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.config.config_manager import load_config
-from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_clientes
+from app.gui.etiqueta_editor import crear_editor_etiqueta
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
-from app.printer.exporter import export_to_pdf
-from app.gui.herramientas_gui import abrir_herramientas
-from app.core.excel_processor import load_excel, apply_transformation
 
 # 🔽 Vista previa + CRUD externalizada (ventana + widget)
 from app.gui.preview_crud import open_preview_crud
-
-# 🔽 Post-proceso FedEx (shaping/dedupe/total BULTOS)
-from app.printer.printer_tools import prepare_fedex_dataframe
 
 # --- helper para acceder a recursos en dev/pyinstaller ---
 def _resource_path(rel_path: str) -> Path:
@@ -55,10 +54,13 @@ def _has_display() -> bool:
 
 
 class ExcelPrinterApp(tk.Tk):
+    REPORT_DEFAULT_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
+    LABEL_DEFAULT_PRINTER = "URBANO"
+
     def __init__(self):
         super().__init__()
         self.title("Transformador Excel - Dashboard")
-        self.configure(bg="#F9FAFB")
+        self.configure(bg="#F3F6FB")
         self._apply_initial_geometry()
 
         init_db()
@@ -74,6 +76,7 @@ class ExcelPrinterApp(tk.Tk):
         self._sidebar_buttons = []
         self._preview_win = None  # la maneja open_preview_crud
         self.sidebar = None
+        self._mode_buttons = {}
 
         # ✅ Carga de config robusta
         try:
@@ -95,6 +98,7 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_main_area()
         self._setup_status_bar()
         self.bind("<Configure>", self._on_root_resize)
+        self._apply_default_printer_for_report_mode()
 
         # Cierre limpio
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -147,31 +151,6 @@ class ExcelPrinterApp(tk.Tk):
             except Exception:
                 pass
 
-    def _sanitize_preview_dataframe(self, df: pd.DataFrame | None, mode: str | None) -> pd.DataFrame | None:
-        """
-        Limpia filas de resumen (TOTAL) que no se desean en la vista previa,
-        actualmente aplicado para el modo Urbano.
-        """
-        if df is None or df.empty:
-            return df
-
-        mode_norm = (mode or "").strip().lower()
-        if mode_norm != "urbano":
-            return df
-
-        try:
-            mask_total = pd.Series(False, index=df.index)
-            for col in df.columns:
-                if pd.api.types.is_numeric_dtype(df[col]):
-                    continue
-                col_values = df[col].astype(str).str.strip().str.upper()
-                mask_total = mask_total | (col_values == "TOTAL")
-            if mask_total.any():
-                df = df.loc[~mask_total].reset_index(drop=True)
-        except Exception:
-            pass
-        return df
-
     def safe_messagebox(self, tipo: str, titulo: str, mensaje: str):
         """Muestra messagebox desde hilos de fondo sin romper Tk y tolera entorno sin DISPLAY."""
         if not self._ui_alive() or not _has_display():
@@ -201,72 +180,147 @@ class ExcelPrinterApp(tk.Tk):
 
     def _setup_styles(self):
         style = ttk.Style(self)
-        # Fallback de tema para Linux (algunas distros no tienen 'clam' por defecto)
         try:
-            style.theme_use('clam')
+            style.theme_use("clam")
         except Exception:
-            # Elige el primero disponible
             try:
                 style.theme_use(style.theme_names()[0])
             except Exception:
                 pass
 
-        style.configure("TButton", font=("Segoe UI", 11), padding=8)
-        style.configure("TLabel", font=("Segoe UI", 11))
-        style.configure("TCheckbutton", font=("Segoe UI", 11))
-        style.configure("TRadiobutton", font=("Segoe UI", 11))
+        style.configure("TButton", font=("Segoe UI Semibold", 10), padding=7)
+        style.configure("TLabel", font=("Segoe UI", 10), background="#F3F6FB")
+        style.configure("TCheckbutton", font=("Segoe UI", 10))
+        style.configure("TRadiobutton", font=("Segoe UI", 10))
+        style.configure(
+            "Sidebar.TButton",
+            font=("Segoe UI Semibold", 10),
+            padding=(12, 9),
+            borderwidth=0,
+            relief="flat",
+            foreground="#E5ECFF",
+            background="#1A2742",
+        )
+        style.map(
+            "Sidebar.TButton",
+            background=[("active", "#24365B"), ("disabled", "#111C34")],
+            foreground=[("active", "#FFFFFF"), ("disabled", "#6C7A9B")],
+        )
+        style.configure(
+            "SidebarExit.TButton",
+            font=("Segoe UI Semibold", 10),
+            padding=(12, 9),
+            borderwidth=0,
+            relief="flat",
+            foreground="#FFE4E6",
+            background="#8A2130",
+        )
+        style.map(
+            "SidebarExit.TButton",
+            background=[("active", "#A02A3B"), ("disabled", "#5F1723")],
+            foreground=[("active", "#FFFFFF"), ("disabled", "#D0AAB1")],
+        )
+        style.configure("Mode.TLabelframe", padding=14, background="#FFFFFF")
+        style.configure("Mode.TLabelframe.Label", font=("Segoe UI Semibold", 11), background="#FFFFFF")
+        style.configure("Status.TLabel", font=("Segoe UI", 10), padding=8, background="#0F172A", foreground="#E2E8F0")
+        style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 26), foreground="#0B1730", background="#FFFFFF")
+        style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#4B5C7A", background="#FFFFFF")
 
     def _add_sidebar_button(self, parent, text, cmd):
-        b = ttk.Button(parent, text=text, command=cmd)
-        b.pack(pady=10, fill="x", padx=10)
+        b = ttk.Button(parent, text=text, command=cmd, style="Sidebar.TButton")
+        b.pack(pady=6, fill="x", padx=12)
         self._sidebar_buttons.append(b)
         return b
 
     def _setup_sidebar(self):
         initial_width = getattr(self, "_initial_window_size", (1200, 800))[0]
         sidebar_width = max(220, int(initial_width * 0.18))
-        sidebar = tk.Frame(self, bg="#111827", width=sidebar_width)
+        sidebar = tk.Frame(self, bg="#0B1730", width=sidebar_width)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
         self.sidebar = sidebar
 
-        tk.Label(sidebar, text="Menú", bg="#111827", fg="white",
-                 font=("Segoe UI", 14, "bold")).pack(pady=20)
+        tk.Label(sidebar, text="Menu", bg="#0B1730", fg="#F8FAFC",
+                 font=("Segoe UI Semibold", 16)).pack(pady=(20, 6))
+        tk.Label(sidebar, text="Operaciones", bg="#0B1730", fg="#91A4CC",
+                 font=("Segoe UI", 9)).pack(pady=(0, 14))
 
-        self._add_sidebar_button(sidebar, "Seleccionar Excel 📂", self._threaded_select_file)
-        self._add_sidebar_button(sidebar, "Carga Automática 🚀", self._threaded_auto_load)
-        self._add_sidebar_button(sidebar, "Config. Modo ⚙️", self._open_config_menu)  # diálogo por MODO
-        self._add_sidebar_button(sidebar, "Exportar PDF 📄", lambda: export_to_pdf(self.transformed_df, self))
-        self._add_sidebar_button(sidebar, "Ver Logs 📋", self._view_logs)
-        self._add_sidebar_button(sidebar, "Herramientas 🛠️", lambda: abrir_herramientas(self, self.transformed_df))
-        self._add_sidebar_button(sidebar, "Etiquetas 🏷️", self._abrir_editor_etiquetas)
-        self._add_sidebar_button(sidebar, "Buscar Códigos Postales 🧽", self._abrir_buscador_codigos_postales)
-        self._add_sidebar_button(sidebar, "Sra Mary 👩‍💼", self._abrir_sra_mary)
-        self._add_sidebar_button(sidebar, "Inventario 📦", lambda: InventarioView(self))
+        self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
+        self._add_sidebar_button(sidebar, "Carga Automatica", self._threaded_auto_load)
+        self._add_sidebar_button(sidebar, "Configurar Modo", self._open_config_menu)
+        self._add_sidebar_button(sidebar, "Ver Logs", self._view_logs)
+        self._add_sidebar_button(sidebar, "Etiquetas", self._abrir_editor_etiquetas)
+        self._add_sidebar_button(sidebar, "Codigos Postales", self._abrir_buscador_codigos_postales)
+        self._add_sidebar_button(sidebar, "Sra Mary", self._abrir_sra_mary)
+        self._add_sidebar_button(sidebar, "Inventario", lambda: InventarioView(self))
+        self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
 
-        ttk.Button(sidebar, text="Acerca de 💼", command=self._mostrar_acerca_de).pack(pady=10, fill="x", padx=10)
-        ttk.Button(sidebar, text="Salir ❌", command=self._on_close).pack(side="bottom", pady=20, fill="x", padx=10)
+        footer = tk.Frame(sidebar, bg="#0B1730")
+        footer.pack(side="bottom", fill="x", padx=12, pady=(10, 14))
+        ttk.Separator(footer, orient="horizontal").pack(fill="x", pady=(0, 10))
+        tk.Button(
+            footer,
+            text="Salir",
+            command=self._on_close,
+            font=("Segoe UI Semibold", 10),
+            bg="#8A2130",
+            fg="#FFE4E6",
+            activebackground="#A02A3B",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            pady=8,
+        ).pack(fill="x")
 
     def _setup_main_area(self):
-        self.main_frame = tk.Frame(self, bg="#F9FAFB")
+        self.main_frame = tk.Frame(self, bg="#F3F6FB")
         self.main_frame.pack(side="left", fill="both", expand=True)
         self.main_frame.pack_propagate(False)
 
-        tk.Label(self.main_frame, text="Transformador Excel", bg="#F9FAFB", fg="#111827",
-                 font=("Segoe UI", 18, "bold")).pack(pady=20, padx=20, fill="x")
+        hero = tk.Frame(self.main_frame, bg="#FFFFFF", bd=1, relief="solid", highlightthickness=0)
+        hero.pack(fill="x", padx=24, pady=(24, 10))
 
-        mode_frame = ttk.LabelFrame(self.main_frame, text="Modo de Operación", padding=15)
-        mode_frame.pack(fill="x", padx=20, pady=10)
+        ttk.Label(hero, text="Transformador Excel", style="CardTitle.TLabel", anchor="center").pack(
+            pady=(18, 6), padx=20, fill="x"
+        )
+        ttk.Label(
+            hero,
+            text="Carga, transforma y envia reportes desde una sola interfaz.",
+            style="CardSub.TLabel",
+            anchor="center",
+        ).pack(pady=(0, 14), padx=20, fill="x")
+        mode_frame = ttk.LabelFrame(
+            hero,
+            text="Modo de Operacion",
+            padding=12,
+            style="Mode.TLabelframe",
+        )
+        mode_frame.pack(fill="x", padx=20, pady=(0, 18))
 
-        # Radiobuttons: exclusivo y claro
+        mode_strip = tk.Frame(mode_frame, bg="#FFFFFF")
+        mode_strip.pack(fill="x")
+
+        labels = {"listados": "Listados", "fedex": "Fedex", "urbano": "Urbano"}
         for modo in ("listados", "fedex", "urbano"):
-            ttk.Radiobutton(
-                mode_frame,
-                text=modo.capitalize(),
+            rb = tk.Radiobutton(
+                mode_strip,
+                text=labels[modo],
                 value=modo,
                 variable=self.mode_var,
-                command=lambda m=modo: self._update_mode(m)
-            ).pack(side=tk.LEFT, expand=True, fill="x", padx=10)
+                indicatoron=False,
+                relief="flat",
+                bd=0,
+                command=lambda m=modo: self._update_mode(m),
+                font=("Segoe UI Semibold", 10),
+                padx=14,
+                pady=8,
+                cursor="hand2",
+                selectcolor="#1E3A8A",
+            )
+            rb.pack(side=tk.LEFT, expand=True, fill="x", padx=6, pady=2)
+            self._mode_buttons[modo] = rb
+        self._refresh_mode_buttons()
 
         # -------- LOGO debajo del selector de modo --------
         try:
@@ -293,46 +347,134 @@ class ExcelPrinterApp(tk.Tk):
                 img = Image.open(logo_file)
                 img.thumbnail((180, 180), Image.LANCZOS)
                 self._logo_image = ImageTk.PhotoImage(img)  # guardar referencia
-                tk.Label(self.main_frame, image=self._logo_image, bg="#F9FAFB").pack(pady=18)
+                logo_card = tk.Frame(self.main_frame, bg="#FFFFFF", bd=1, relief="solid", highlightthickness=0)
+                logo_card.pack(pady=18, padx=24)
+                tk.Label(logo_card, image=self._logo_image, bg="#FFFFFF").pack(padx=20, pady=18)
             else:
-                tk.Label(self.main_frame, text="[Logo no encontrado]", bg="#F9FAFB", fg="#c00").pack(pady=18)
+                tk.Label(self.main_frame, text="[Logo no encontrado]", bg="#F3F6FB", fg="#c00").pack(pady=18)
         except Exception as e:
-            tk.Label(self.main_frame, text=f"[Error cargando logo: {e}]", bg="#F9FAFB", fg="#c00").pack(pady=18)
+            tk.Label(self.main_frame, text=f"[Error cargando logo: {e}]", bg="#F3F6FB", fg="#c00").pack(pady=18)
 
-        self._content_spacer = tk.Frame(self.main_frame, bg="#F9FAFB")
+        self._content_spacer = tk.Frame(self.main_frame, bg="#F3F6FB")
         self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
     def _setup_status_bar(self):
         self.status_var = tk.StringVar()
-        ttk.Label(self, textvariable=self.status_var, relief=tk.SUNKEN,
-                  anchor=tk.W, padding=5).pack(side=tk.BOTTOM, fill=tk.X)
+        status_frame = tk.Frame(self, bg="#0F172A")
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Label(status_frame, textvariable=self.status_var, anchor=tk.W, style="Status.TLabel").pack(
+            side=tk.LEFT, fill=tk.X, expand=True
+        )
+
+    def _refresh_mode_buttons(self):
+        active_mode = self.mode_var.get().strip().lower()
+        for mode, btn in self._mode_buttons.items():
+            is_active = mode == active_mode
+            btn.configure(
+                bg="#1E3A8A" if is_active else "#E8EDF8",
+                fg="#FFFFFF" if is_active else "#1A2B4F",
+                activebackground="#2747A6" if is_active else "#D9E3F6",
+                activeforeground="#FFFFFF" if is_active else "#1A2B4F",
+            )
 
     def _update_status(self, mensaje: str):
         if self._ui_alive():
             self.status_var.set(mensaje)
 
-    # NUEVO: pinta totales en barra según DF mostrado
-    def _ui_set_status_preview_totals(self, df: pd.DataFrame, mode: str):
+    def _ui_set_status_preview_totals(self, df, mode: str):
         try:
-            filas = int(len(df) if df is not None else 0)
-            mode_norm = (mode or "").strip().lower()
-            if mode_norm == "fedex" and df is not None and "BULTOS" in df.columns:
-                total_bultos = int(pd.to_numeric(df["BULTOS"], errors="coerce").fillna(0).sum())
-                self._update_status(f"Filas: {filas} | Total BULTOS: {total_bultos}")
-            elif mode_norm == "urbano" and df is not None and "PIEZAS" in df.columns:
-                total_piezas = int(pd.to_numeric(df["PIEZAS"], errors="coerce").fillna(0).sum())
-                self._update_status(f"Filas: {filas} | Total PIEZAS: {total_piezas}")
+            stats = compute_preview_stats(df, mode)
+            filas = int(stats.get("rows", 0))
+            metric_label = stats.get("metric_label")
+            metric_value = stats.get("metric_value")
+            if metric_label is not None and metric_value is not None:
+                self._update_status(f"Filas: {filas} | Total {metric_label}: {metric_value}")
             else:
                 self._update_status(f"Filas: {filas}")
         except Exception:
             self._update_status("")
 
+    def _publish_preview(self, df, transformed, history_path: str):
+        """Aplica resultado de procesamiento y refresca vista previa/UI de forma uniforme."""
+        self.df = df
+        self.transformed_df = transformed
+        save_file_history(history_path, self.mode)
+        self._ui_set_status_preview_totals(self.transformed_df, self.mode)
+        if self._ui_alive():
+            self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
+
+    def _close_preview_window(self):
+        try:
+            if self._preview_win is not None and self._preview_win.winfo_exists():
+                self._preview_win.destroy()
+        except Exception:
+            pass
+        finally:
+            self._preview_win = None
+
     # ---------------- Acciones de modo ----------------
 
     def _update_mode(self, modo_seleccionado: str):
         self.mode = modo_seleccionado
+        self.mode_var.set(modo_seleccionado)
+        self._refresh_mode_buttons()
+        self._apply_default_printer_for_report_mode()
         from app.core.logger_eventos import log_evento
         log_evento(f"Modo cambiado a: {modo_seleccionado}", nivel="info", accion="cambio_modo")
+
+    def _resolve_windows_printer_name(self, alias: str) -> str:
+        base = (alias or "").strip()
+        if not base or not sys.platform.startswith("win"):
+            return base
+        try:
+            import win32print  # type: ignore
+
+            flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+            names = []
+            for item in win32print.EnumPrinters(flags):
+                try:
+                    n = str(item[2]).strip()
+                except Exception:
+                    continue
+                if n:
+                    names.append(n)
+            low = base.lower()
+            for n in names:
+                if n.lower() == low:
+                    return n
+            for n in names:
+                if low in n.lower() or n.lower() in low:
+                    return n
+        except Exception:
+            pass
+        return base
+
+    def _set_windows_default_printer(self, printer_alias: str) -> None:
+        if not sys.platform.startswith("win"):
+            return
+        try:
+            import win32print  # type: ignore
+
+            resolved = self._resolve_windows_printer_name(printer_alias)
+            if not resolved:
+                return
+            win32print.SetDefaultPrinter(resolved)
+            logging.info(f"[PrinterSwitch] Default aplicada: {resolved}")
+        except Exception as e:
+            logging.warning(f"[PrinterSwitch] No se pudo cambiar default a '{printer_alias}': {e}")
+
+    def _apply_default_printer_for_report_mode(self) -> None:
+        # Los 3 modos de informe salen siempre por la Brother.
+        self._set_windows_default_printer(self.REPORT_DEFAULT_PRINTER)
+
+    def _apply_default_printer_for_labels(self) -> None:
+        # Etiquetas: prioriza lo guardado en config; fallback 'URBANO'.
+        label_printer = (
+            self.config_columns.get("printer_name")
+            if isinstance(self.config_columns, dict)
+            else None
+        ) or self.LABEL_DEFAULT_PRINTER
+        self._set_windows_default_printer(str(label_printer))
 
     def _abrir_buscador_codigos_postales(self):
         from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
@@ -383,14 +525,6 @@ class ExcelPrinterApp(tk.Tk):
             logging.exception("Error lanzando Vale de Consumo")
             self.safe_messagebox("error", "Vale de Consumo", f"No se pudo abrir la app de vales:\n{e}")
 
-    def _mostrar_acerca_de(self):
-        mensaje = (
-            "Exelcior Apolo\n\nSistema integral de impresión, logística y trazabilidad "
-            "para operaciones clínicas.\n\nDesarrollado por Gian Lucas y GCNJ.\nVersión 2025 — "
-            "Funciona en Windows y Linux."
-        )
-        self.safe_messagebox("info", "Acerca de", mensaje)
-
     # ---------------- Carga de archivos ----------------
 
     def _threaded_select_file(self):
@@ -418,17 +552,8 @@ class ExcelPrinterApp(tk.Tk):
             df, transformed = future.result()
             if not self._ui_alive():
                 return
-            self.df = df
-            mode_norm = (self.mode or "").strip().lower()
-            if mode_norm == "fedex" and self.df is not None:
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
-            else:
-                self.transformed_df = transformed
-            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
-            save_file_history("n/a", self.mode)
-            self._ui_set_status_preview_totals(self.transformed_df, self.mode)
+            self._publish_preview(df, transformed, history_path="n/a")
             log_evento("Archivo procesado correctamente", nivel="info", accion="procesamiento_archivo")
-            self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
         except Exception as e:
             logging.exception("Error al procesar archivo")
             log_evento(f"Error al procesar archivo: {e}", nivel="error", accion="procesamiento_archivo", exc=e)
@@ -478,22 +603,8 @@ class ExcelPrinterApp(tk.Tk):
         self._update_status("Procesando archivo...")
         capturar_log_bod1(f"Iniciando procesamiento: {path}", "info")
         try:
-            self.df = load_excel(path, self.config_columns, self.mode)
-            transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
-
-            # Vista Previa FedEx: construir desde DF original
-            mode_norm = (self.mode or "").strip().lower()
-            if mode_norm == "fedex":
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
-            else:
-                self.transformed_df = transformed_base
-
-            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
-
-            save_file_history(path, self.mode)
-            self._ui_set_status_preview_totals(self.transformed_df, self.mode)
-            if self._ui_alive():
-                self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
+            df, transformed = process_file(path, self.config_columns, self.mode)
+            self._publish_preview(df, transformed, history_path=path)
         except Exception as e:
             logging.error(f"Error procesando archivo: {e}")
             self.safe_messagebox("error", "Error", f"No se pudo procesar el archivo:\n{e}")
@@ -515,10 +626,11 @@ class ExcelPrinterApp(tk.Tk):
         try:
             future.result()
             if self._ui_alive():
-                self.safe_messagebox("info", "Listo", "Impresión completada.")
-                self._update_status("Listo")
+                self._close_preview_window()
+                self.safe_messagebox("info", "Listo", "Impresion completada.")
+                self._update_status("Impresion completada. Vista previa cerrada.")
         except Exception as e:
-            logging.exception("Error impresión")
+            logging.exception("Error impresion")
             if self._ui_alive():
                 self.safe_messagebox("error", "Error", str(e))
                 self._update_status("Error")
@@ -558,18 +670,7 @@ class ExcelPrinterApp(tk.Tk):
         self.wait_window(dialog)
         # Reaplicar reglas tras guardar para reflejarse en la vista previa
         try:
-            # Reaplica transformación base por si hay reglas para otros modos
-            transformed_base = apply_transformation(self.df, self.config_columns, self.mode)
-
-            # Vista Previa FedEx: construir desde DF original
-            mode_norm = (self.mode or "").strip().lower()
-            if mode_norm == "fedex":
-                self.transformed_df, _, _ = prepare_fedex_dataframe(self.df)
-            else:
-                self.transformed_df = transformed_base
-
-            self.transformed_df = self._sanitize_preview_dataframe(self.transformed_df, mode_norm)
-
+            self.transformed_df = build_preview_dataframe(self.df, self.config_columns, self.mode)
             self._ui_set_status_preview_totals(self.transformed_df, self.mode)
             if self._ui_alive():
                 self.after(0, lambda: open_preview_crud(self, self.transformed_df, self.mode, on_print=self._threaded_print))
@@ -580,33 +681,46 @@ class ExcelPrinterApp(tk.Tk):
 
     def _abrir_editor_etiquetas(self):
         try:
-            path = filedialog.askopenfilename(title="Selecciona archivo de etiquetas",
-                                              filetypes=[("Excel Files", "*.xlsx")])
-            if not path:
-                return
-            df_clientes = cargar_clientes(path)
-            crear_editor_etiqueta(df_clientes)
+            self._apply_default_printer_for_labels()
+            win = crear_editor_etiqueta(parent=self)
+            if win is not None:
+                win.bind("<Destroy>", lambda _e: self._apply_default_printer_for_report_mode())
         except Exception as e:
             self.safe_messagebox("error", "Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
 
     def _view_logs(self):
-        log_dir = Path(__file__).resolve().parent.parent / "logs"
-        # 🔧 Asegura que exista en Linux
-        try:
-            log_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        root_logs = Path(__file__).resolve().parent.parent / "logs"
+        legacy_logs = Path(__file__).resolve().parent / "logs"  # app/logs (ruta antigua)
+        cwd_logs = Path.cwd() / "logs"
+        cwd_legacy_logs = Path.cwd() / "app" / "logs"
+        search_dirs = (root_logs, legacy_logs, cwd_logs, cwd_legacy_logs)
+        for d in search_dirs:
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
 
-        if not log_dir.exists():
-            self.safe_messagebox("info", "Logs", "No hay logs para mostrar.")
-            return
+        candidatos = set()
+        for d in search_dirs:
+            candidatos.update(d.glob("*.log"))
+            candidatos.update(d.glob("*.log.*"))  # incluye logs rotados (TimedRotatingFileHandler)
 
-        logs = sorted(log_dir.glob("*.log"), reverse=True)
+        logs = sorted(
+            {p.resolve() for p in candidatos if p.is_file()},
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
         if not logs:
-            self.safe_messagebox("info", "Logs", "No hay logs para mostrar.")
+            self.safe_messagebox(
+                "info",
+                "Logs",
+                "No hay logs para mostrar.\nBuscado en:\n- "
+                + "\n- ".join(str(p) for p in search_dirs),
+            )
             return
 
-        archivo = logs[0]
+        # Prioriza el log más reciente con contenido para evitar abrir archivos vacíos.
+        archivo = next((p for p in logs if p.stat().st_size > 0), logs[0])
         win = tk.Toplevel(self)
         win.title(f"Visor de Logs - {archivo.name}")
         win.geometry("1000x600")
@@ -657,34 +771,11 @@ class ExcelPrinterApp(tk.Tk):
                 self.executor.shutdown(wait=False, cancel_futures=True)
         except Exception:
             pass
-        try:
-            if self._preview_win is not None and self._preview_win.winfo_exists():
-                self._preview_win.destroy()
-        except Exception:
-            pass
+        self._close_preview_window()
         try:
             self.destroy()
         except Exception:
             pass
-
-# --- Extensión de sidebar: botón Vale de Consumo ---
-_ORIGINAL_SETUP_SIDEBAR = ExcelPrinterApp._setup_sidebar
-
-
-def _setup_sidebar_with_vale(self):
-    """Envuelve _setup_sidebar original para agregar el botón de Vale de Consumo."""
-    try:
-        _ORIGINAL_SETUP_SIDEBAR(self)
-    except Exception:
-        return
-    try:
-        if getattr(self, "sidebar", None) is not None:
-            self._add_sidebar_button(self.sidebar, "Vale de Consumo", self._abrir_vale_consumo)
-    except Exception:
-        pass
-
-
-ExcelPrinterApp._setup_sidebar = _setup_sidebar_with_vale
 
 
 def setup_logging():
@@ -737,49 +828,3 @@ if __name__ == "__main__":
     main()
 
 
-def _setup_sidebar_with_vale2(self):
-    """
-    Envuelve _setup_sidebar original para:
-      - eliminar botones no deseados del menú
-      - añadir el botón de Vale de Consumo
-    """
-    try:
-        _ORIGINAL_SETUP_SIDEBAR(self)
-    except Exception:
-        return
-
-    sidebar = getattr(self, "sidebar", None)
-    if sidebar is None:
-        return
-
-    try:
-        # Eliminar botones que ya no se usan: Exportar PDF, Herramientas, Acerca de
-        for widget in list(sidebar.winfo_children()):
-            try:
-                text = str(widget.cget("text"))
-            except Exception:
-                continue
-            if any(label in text for label in ("Exportar PDF", "Herramientas", "Acerca de")):
-                try:
-                    widget.destroy()
-                except Exception:
-                    pass
-                try:
-                    if hasattr(self, "_sidebar_buttons"):
-                        self._sidebar_buttons = [
-                            b for b in self._sidebar_buttons if b is not widget
-                        ]
-                except Exception:
-                    pass
-
-        # Añadir botón de Vale de Consumo al final del menú principal
-        try:
-            self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
-        except Exception:
-            pass
-    except Exception:
-        # No romper la app si algo falla al ajustar el sidebar
-        pass
-
-
-ExcelPrinterApp._setup_sidebar = _setup_sidebar_with_vale2

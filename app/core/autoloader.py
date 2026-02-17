@@ -36,33 +36,51 @@ def set_carpeta_descarga_personalizada(ruta: Path, modo: str):
     logger.info(f"[Autoloader] Carpeta personalizada establecida para modo '{modo}': {ruta}")
 
 def get_carpeta_descarga_personalizada(modo: str) -> Path:
-    """Obtiene la carpeta personalizada para el modo o retorna ~/Descargas."""
+    """Obtiene la carpeta personalizada para el modo o retorna carpeta de descargas del sistema."""
     config = cargar_config_usuario()
     ruta_config = config.get("carpetas_por_modo", {}).get(modo)
     if ruta_config and Path(ruta_config).exists():
         return Path(ruta_config)
-    return Path.home() / "Descargas"
+    # Fallback robusto para Windows/ES/EN
+    candidatos = [
+        Path.home() / "Downloads",
+        Path.home() / "Descargas",
+        Path.home() / "OneDrive" / "Downloads",
+        Path.home() / "OneDrive" / "Descargas",
+    ]
+    for p in candidatos:
+        if p.exists():
+            return p
+    return Path.home() / "Downloads"
 
 # ------------------ Detección por nombre de archivo ------------------
 
 def is_urbano_pattern(filename: str) -> bool:
-    """Detecta si el nombre corresponde a un archivo Urbano (9 dígitos exactos)."""
-    return re.fullmatch(r"\d{9}", Path(filename).stem) is not None
+    """Detecta si el nombre corresponde a un archivo Urbano (8 dígitos exactos)."""
+    return re.fullmatch(r"\d{8}", Path(filename).stem) is not None
 
 def is_listado_pattern(filename: str) -> bool:
     """Detecta si el nombre corresponde a un archivo de listado con patrón esperado."""
-    return re.fullmatch(r"lista_doc_venta_\d{8}_\d{6}", Path(filename).stem) is not None
+    stem = Path(filename).stem.lower()
+    return (
+        re.fullmatch(r"lista_doc_venta_\d{8}_\d{6}", stem) is not None
+        or "lista_doc" in stem
+    )
 
 def is_fedex_pattern(filename: str) -> bool:
     """Detecta si el nombre corresponde a un archivo FedEx con patrón esperado."""
-    return re.fullmatch(r"shipment_report_\d{4}-\d{2}-\d{2}", Path(filename).stem.lower()) is not None
+    stem = Path(filename).stem.lower()
+    return (
+        re.fullmatch(r"shipment_report_\d{4}-\d{2}-\d{2}", stem) is not None
+        or "shipment" in stem
+    )
 
 def matches_mode(filename: str, mode: str) -> bool:
     """Verifica si el nombre del archivo coincide con el modo especificado."""
-    name = filename.lower()
+    name = Path(filename).stem.lower()
     return (
-        (mode == "fedex" and ("fedex" in name or is_fedex_pattern(filename))) or
-        (mode == "listados" and ("listado" in name or "venta" in name or is_listado_pattern(filename))) or
+        (mode == "fedex" and is_fedex_pattern(filename)) or
+        (mode == "listados" and is_listado_pattern(filename)) or
         (mode == "urbano" and is_urbano_pattern(filename))
     )
 

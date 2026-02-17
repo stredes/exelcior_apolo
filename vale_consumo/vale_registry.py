@@ -90,6 +90,7 @@ class ValeRegistry:
         self._save()
         return entry
 
+    # reserved: alta de vale sin preasignar número (API externa)
     def register_voucher(self, pdf_filename: str, json_filename: Optional[str], items_count: int) -> Dict[str, Any]:
         number = self.next_number()
         entry = {

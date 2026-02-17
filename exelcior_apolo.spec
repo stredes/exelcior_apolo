@@ -1,4 +1,4 @@
-# exelcior_apolo.spec — build one-folder (sin icono) con archivo de versión
+# exelcior_apolo.spec — build one-folder con icono y archivo de versión
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
@@ -7,9 +7,21 @@ from PyInstaller.utils.hooks import collect_submodules
 # archivo de versión incrustado en el ejecutable
 VERSION_FILE = "assets/version/exelcior_apolo_version.txt"
 
+# icono del ejecutable (primer candidato existente)
+ICON_FILE = None
+for icon_candidate in [
+    "data/image.ico",
+    "app/data/image.ico",
+    "assets/icon.ico",
+]:
+    if Path(icon_candidate).exists():
+        ICON_FILE = icon_candidate
+        break
+
 # módulos que PyInstaller debe rastrear aunque se carguen dinámicamente
 hiddenimports = [
     *collect_submodules("tkinter"),
+    *collect_submodules("sqlalchemy"),
     *collect_submodules("pandas"),
     *collect_submodules("openpyxl"),
     *collect_submodules("reportlab"),
@@ -25,6 +37,7 @@ block_cipher = None
 # Solo añadimos si existen para que no moleste en CI.
 datas = []
 for entry in [
+    "data",              # recursos en raíz (image.ico, db, etc.)
     "app/config",
     "app/core",
     "app/db",
@@ -69,7 +82,7 @@ exe = EXE(
     upx=True,
     console=False,              # GUI (Tkinter)
     version=VERSION_FILE,       # incrusta info de versión del exe
-    # icon=None                 # sin icono (puedes añadirlo si quieres)
+    icon=ICON_FILE,             # icono del ejecutable
 )
 
 coll = COLLECT(

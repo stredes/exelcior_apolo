@@ -3,39 +3,22 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from openpyxl import load_workbook
 
 from app.core.logger_eventos import log_evento
-from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
+from app.core.impression_tools import (
+    generar_excel_temporal,
+    enviar_a_impresora,
+    enviar_a_impresora_configurable,
+)
 from app.printer.printer_tools import (
     prepare_urbano_dataframe,
     insertar_bloque_firma_ws,
     agregar_footer_info_ws,
     formatear_tabla_ws,
 )
-
-# ---------------------------------------------------------------------
-# Enviar a impresora con compatibilidad de firma:
-# ver comentarios en printer_fedex.py
-# ---------------------------------------------------------------------
-def _send_to_printer_compat(path: Path, printer_name: Optional[str]) -> None:
-    try:
-        enviar_a_impresora(path, printer_name=printer_name)
-        return
-    except TypeError:
-        pass
-
-    try:
-        if printer_name is not None:
-            enviar_a_impresora(path, printer_name)
-            return
-    except TypeError:
-        pass
-
-    enviar_a_impresora(path)
 
 
 def _estimate_total_piezas(df: pd.DataFrame) -> int:
@@ -58,6 +41,14 @@ def _estimate_total_piezas(df: pd.DataFrame) -> int:
             serie = serie.fillna(0).clip(lower=0)
             return int(serie.sum().round())
     return int(len(df.index))
+
+
+def _enviar_a_impresora_unificada(path: Path, config) -> None:
+    cfg = config if isinstance(config, dict) else {}
+    if not any(k in cfg for k in ("printer_name", "printer", "impresora", "print_timeout_s")):
+        # Compatibilidad con tests y llamadas históricas.
+        return enviar_a_impresora(path)
+    return enviar_a_impresora_configurable(path, config=cfg, default_timeout_s=120)
 
 
 def print_urbano(file_path, config, df: pd.DataFrame):
@@ -102,9 +93,8 @@ def print_urbano(file_path, config, df: pd.DataFrame):
         finally:
             wb.close()
 
-        # 5) Enviar a impresora (compatibilidad de firma)
-        printer_name = (config or {}).get("printer_name")
-        _send_to_printer_compat(tmp_path, printer_name)
+        # 5) Enviar a impresora (adaptador único)
+        _enviar_a_impresora_unificada(tmp_path, config=config)
 
         log_evento("✅ Impresión de listado Urbano completada correctamente.", "info")
 

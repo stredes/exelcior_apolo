@@ -40,11 +40,11 @@ class PreviewCRUDFrame(ttk.Frame):
         if title:
             ttk.Label(toolbar, text=title, font=("Segoe UI", 12, "bold")).pack(side=tk.LEFT, padx=(0, 12))
 
-        ttk.Button(toolbar, text="➕ Agregar", command=self._add_row_dialog).pack(side=tk.LEFT, padx=4)
-        ttk.Button(toolbar, text="✏️ Editar", command=self._open_edit_dialog).pack(side=tk.LEFT, padx=4)
-        ttk.Button(toolbar, text="🗑️ Eliminar", command=self._delete_selected_rows).pack(side=tk.LEFT, padx=4)
-        ttk.Button(toolbar, text="↩️ Deshacer", command=self._undo_last).pack(side=tk.LEFT, padx=4)
-        ttk.Button(toolbar, text="💾 Guardar", command=self._emit_change).pack(side=tk.LEFT, padx=12)
+        ttk.Button(toolbar, text="Agregar", command=self._add_row_dialog).pack(side=tk.LEFT, padx=4)
+        ttk.Button(toolbar, text="Editar", command=self._open_edit_dialog).pack(side=tk.LEFT, padx=4)
+        ttk.Button(toolbar, text="Eliminar", command=self._delete_selected_rows).pack(side=tk.LEFT, padx=4)
+        ttk.Button(toolbar, text="Deshacer", command=self._undo_last).pack(side=tk.LEFT, padx=4)
+        ttk.Button(toolbar, text="Guardar", command=self._emit_change).pack(side=tk.LEFT, padx=12)
 
         self._info_lbl = ttk.Label(toolbar, text="")
         self._info_lbl.pack(side=tk.RIGHT, padx=6)
@@ -79,6 +79,7 @@ class PreviewCRUDFrame(ttk.Frame):
     def get_dataframe(self) -> pd.DataFrame:
         return self._df.copy(deep=True)
 
+    # reserved: permite refrescar la grilla sin recrear la ventana de preview
     def set_dataframe(self, df: pd.DataFrame):
         self._push_undo()
         self._df = df.copy(deep=True) if df is not None else pd.DataFrame()
@@ -281,7 +282,7 @@ def open_preview_crud(
 
     vista = tk.Toplevel(parent_app)
     parent_app._preview_win = vista
-    vista.title("Vista Previa (CRUD)")
+    vista.title("Vista Previa")
     vista.geometry("1100x700")
     vista.configure(bg="#F9FAFB")
 

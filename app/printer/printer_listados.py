@@ -10,7 +10,11 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from app.core.logger_eventos import log_evento
-from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
+from app.core.impression_tools import (
+    generar_excel_temporal,
+    enviar_a_impresora,
+    enviar_a_impresora_configurable,
+)
 
 __all__ = ["print_listados"]
 
@@ -32,6 +36,13 @@ def _aplicar_footer_listados(path_excel: Path, filas: int) -> None:
     wb.save(path_excel)
 
 
+def _enviar_a_impresora_unificada(path: Path, config) -> None:
+    cfg = config if isinstance(config, dict) else {}
+    if not any(k in cfg for k in ("printer_name", "printer", "impresora", "print_timeout_s")):
+        return enviar_a_impresora(path)
+    return enviar_a_impresora_configurable(path, config=cfg, default_timeout_s=120)
+
+
 def print_listados(file_path: Optional[Path], config: dict, df: pd.DataFrame) -> None:
     """
     Imprime un listado general con:
@@ -50,7 +61,7 @@ def print_listados(file_path: Optional[Path], config: dict, df: pd.DataFrame) ->
 
         _aplicar_footer_listados(xlsx_tmp, len(df.index))
 
-        enviar_a_impresora(xlsx_tmp)
+        _enviar_a_impresora_unificada(xlsx_tmp, config=config)
         log_evento("✅ Impresión de listado general completada correctamente.", "info")
 
     except Exception as error:

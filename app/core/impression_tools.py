@@ -11,6 +11,76 @@ from app.utils.utils import autoajustar_columnas
 from app.core.logger_eventos import log_evento
 
 
+def _windows_printer_names() -> list[str]:
+    if platform.system() != "Windows":
+        return []
+    try:
+        import win32print  # type: ignore
+        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        names = []
+        for item in win32print.EnumPrinters(flags):
+            try:
+                n = str(item[2]).strip()
+            except Exception:
+                continue
+            if n:
+                names.append(n)
+        return list(dict.fromkeys(names))
+    except Exception:
+        return []
+
+
+def _resolve_windows_printer_name(alias: str) -> str:
+    base = (alias or "").strip()
+    if not base or platform.system() != "Windows":
+        return base
+    names = _windows_printer_names()
+    if not names:
+        return base
+    low = base.lower()
+    for n in names:
+        if n.lower() == low:
+            return n
+    for n in names:
+        if low in n.lower() or n.lower() in low:
+            return n
+    return base
+
+
+def _excel_active_printer_candidates(printer_name: str) -> list[str]:
+    base = _resolve_windows_printer_name(printer_name)
+    if not base:
+        return []
+    candidates = [base]
+    try:
+        import win32print  # type: ignore
+        h = win32print.OpenPrinter(base)
+        info = win32print.GetPrinter(h, 2)
+        win32print.ClosePrinter(h)
+        port = str(info.get("pPortName", "")).strip()
+        if port:
+            candidates.extend([
+                f"{base} on {port}:",
+                f"{base} on {port}",
+                f"{base} en {port}:",
+                f"{base} en {port}",
+            ])
+    except Exception:
+        pass
+    return list(dict.fromkeys(candidates))
+
+
+def _set_excel_active_printer(excel_app, printer_name: str) -> bool:
+    for candidate in _excel_active_printer_candidates(printer_name):
+        try:
+            excel_app.ActivePrinter = candidate
+            log_evento(f"[print] ActivePrinter aplicado: {candidate}", "info")
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Listado") -> Path:
     """
     Genera un .xlsx temporal con:
@@ -132,6 +202,54 @@ def enviar_a_impresora(archivo: Path, impresora_linux: Optional[str] = "Default"
                 log_evento(f"No se pudo eliminar temporal: {archivo} ({ex})", "warning")
 
 
+def enviar_a_impresora_configurable(
+    archivo: Path,
+    config: Optional[dict] = None,
+    default_timeout_s: int = 120,
+) -> None:
+    """
+    Adaptador único para impresión desde módulos de negocio.
+    Lee impresora/timeout desde config y aplica compatibilidad de firmas.
+    """
+    cfg = config if isinstance(config, dict) else {}
+    printer_name = cfg.get("printer_name") or cfg.get("printer") or cfg.get("impresora")
+
+    timeout_s = default_timeout_s
+    if "print_timeout_s" in cfg:
+        try:
+            timeout_s = int(cfg.get("print_timeout_s"))
+        except Exception:
+            timeout_s = default_timeout_s
+    os.environ["EXCELCIOR_PRINT_TIMEOUT"] = str(timeout_s)
+
+    if printer_name:
+        os.environ["EXCELCIOR_PRINTER"] = str(printer_name)
+
+    log_evento(
+        f"[print] archivo='{Path(archivo).name}', printer='{printer_name or 'default-SO'}', timeout_s={timeout_s}",
+        "info",
+    )
+
+    if printer_name:
+        # 1) Firma estilo moderno (si existiera)
+        try:
+            return enviar_a_impresora(archivo, printer_name=printer_name)
+        except TypeError:
+            pass
+        # 2) Firma posicional del proyecto actual: (archivo, impresora_linux, cleanup)
+        try:
+            return enviar_a_impresora(archivo, printer_name)
+        except TypeError:
+            pass
+        # 3) Alias explícito de la firma actual
+        try:
+            return enviar_a_impresora(archivo, impresora_linux=printer_name)
+        except TypeError:
+            pass
+
+    return enviar_a_impresora(archivo)
+
+
 # ----------------- Helpers por SO -----------------
 
 def _imprimir_windows(xlsx_path: Path) -> None:
@@ -145,11 +263,13 @@ def _imprimir_windows(xlsx_path: Path) -> None:
     # 1) Excel COM
     try:
         import pythoncom
+        import win32print  # type: ignore
         from win32com.client import Dispatch  # pywin32
 
         pythoncom.CoInitialize()
         excel = None
         wb = None
+        old_default_printer = None
         try:
             excel = Dispatch("Excel.Application")
             excel.Visible = False
@@ -168,11 +288,28 @@ def _imprimir_windows(xlsx_path: Path) -> None:
             used.VerticalAlignment = -4108
             used.Columns.AutoFit()
 
+            forced_printer = os.environ.get("EXCELCIOR_PRINTER", "").strip()
+            if forced_printer:
+                resolved = _resolve_windows_printer_name(forced_printer)
+                if not _set_excel_active_printer(excel, resolved):
+                    try:
+                        old_default_printer = win32print.GetDefaultPrinter()
+                        win32print.SetDefaultPrinter(resolved)
+                        log_evento(f"[print] Default temporal (COM fallback): {resolved}", "warning")
+                    except Exception as e:
+                        log_evento(f"[print] No se pudo forzar default temporal: {e}", "warning")
+
             sh.PrintOut()
             wb.Close(SaveChanges=False)
             log_evento(f"Impresión enviada por Excel COM: {xlsx_path.name}", "info")
             return
         finally:
+            try:
+                if old_default_printer:
+                    win32print.SetDefaultPrinter(old_default_printer)
+                    log_evento(f"[print] Default restaurada: {old_default_printer}", "info")
+            except Exception:
+                pass
             try:
                 if wb:
                     wb.Close(SaveChanges=False)
@@ -378,3 +515,113 @@ def _imprimir_via_soffice_like(app_path: Path, xlsx_path: Path) -> None:
 
     except FileNotFoundError as e:
         raise RuntimeError(f"No se encontró ejecutable para impresión: {app_path}") from e
+
+
+def convert_xlsx_to_pdf(xlsx_path: Path, output_dir: Optional[Path] = None) -> Path:
+    """
+    Convierte un .xlsx a .pdf con LibreOffice (soffice) y devuelve la ruta del PDF.
+    """
+    import subprocess as sp
+    from shutil import which
+
+    src = Path(xlsx_path)
+    if not src.exists():
+        raise FileNotFoundError(f"No existe el archivo fuente para convertir: {src}")
+
+    outdir = Path(output_dir) if output_dir else src.parent
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    soffice = os.environ.get("EXCELCIOR_PRINT_APP", "").strip().strip('"')
+    if soffice:
+        soffice_path = Path(soffice)
+    else:
+        if platform.system() == "Windows":
+            found = _find_soffice_on_windows()
+            soffice_path = Path(found) if found else None
+        else:
+            found = which("soffice") or which("libreoffice")
+            soffice_path = Path(found) if found else None
+
+    if not soffice_path:
+        raise RuntimeError(
+            "No se encontró LibreOffice/soffice para convertir a PDF. "
+            "Define EXCELCIOR_PRINT_APP o instala LibreOffice."
+        )
+
+    timeout_s = int(os.environ.get("EXCELCIOR_PRINT_TIMEOUT", "60"))
+    cmd = [
+        str(soffice_path),
+        "--headless",
+        "--convert-to", "pdf",
+        "--outdir", str(outdir),
+        str(src.resolve()),
+    ]
+    log_evento(f"Convirtiendo XLSX a PDF con: {' '.join(cmd)}", "info")
+
+    creationflags = 0
+    startupinfo = None
+    if platform.system() == "Windows":
+        creationflags = 0x08000000  # CREATE_NO_WINDOW
+        startupinfo = sp.STARTUPINFO()
+        startupinfo.dwFlags |= sp.STARTF_USESHOWWINDOW
+
+    try:
+        proc = sp.Popen(
+            cmd,
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+            text=True,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
+        )
+        stdout, stderr = proc.communicate(timeout=timeout_s)
+    except sp.TimeoutExpired:
+        proc.kill()
+        raise RuntimeError(f"Tiempo de espera excedido ({timeout_s}s) al convertir a PDF.")
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Conversión a PDF falló ({proc.returncode}). "
+            f"stderr: {str(stderr).strip()[:300]}"
+        )
+
+    pdf_path = outdir / f"{src.stem}.pdf"
+    if not pdf_path.exists():
+        raise RuntimeError(
+            f"LibreOffice no generó el PDF esperado: {pdf_path}. "
+            f"stdout: {str(stdout).strip()[:200]}"
+        )
+
+    log_evento(f"PDF generado correctamente: {pdf_path}", "info")
+    return pdf_path
+
+
+def enviar_pdf_a_impresora(pdf_path: Path, cleanup: bool = False) -> None:
+    """
+    Envía un PDF a impresión usando mecanismos nativos por plataforma.
+    """
+    from subprocess import run, PIPE
+
+    pdf = Path(pdf_path)
+    if not pdf.exists():
+        raise FileNotFoundError(f"No existe el PDF a imprimir: {pdf}")
+
+    try:
+        if platform.system() == "Windows":
+            os.startfile(str(pdf), "print")
+            log_evento(f"PDF enviado a impresora (Windows shell): {pdf.name}", "info")
+        else:
+            cmd = ["lp", str(pdf.resolve())]
+            res = run(cmd, stdout=PIPE, stderr=PIPE, text=True)
+            if res.returncode != 0:
+                raise RuntimeError(f"'lp' devolvió {res.returncode}: {res.stderr.strip()}")
+            log_evento(f"PDF enviado a impresora (lp): {pdf.name}", "info")
+    except Exception as e:
+        log_evento(f"Error imprimiendo PDF: {e}", "error")
+        raise
+    finally:
+        if cleanup:
+            try:
+                pdf.unlink(missing_ok=True)
+            except Exception:
+                pass

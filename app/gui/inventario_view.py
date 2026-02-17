@@ -1,4 +1,4 @@
-# app/gui/inventario_view.py
+﻿# app/gui/inventario_view.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
@@ -16,46 +16,31 @@ from app.core.logger_eventos import capturar_log_bod1
 from app.printer import printer_inventario_codigo, printer_inventario_ubicacion
 
 
-# Columnas visibles y orden final en la grilla / impresión
+# Columnas visibles y orden final en la grilla / impresion
 VISIBLE_COLUMNS = [
     "Código", "Producto", "Bodega", "Ubicación",
     "N° Serie", "Lote", "Fecha Vencimiento", "Saldo Stock"
 ]
 
-# Sinónimos (normalizados a minúsculas y sin acentos) -> nombre objetivo
+# Sinonimos (normalizados a minusculas y sin acentos) -> nombre objetivo
 COL_SYNONYMS: Dict[str, str] = {
-    # Código
     "codigo": "Código",
     "código": "Código",
-
-    # Producto
     "producto": "Producto",
     "descripcion": "Producto",
     "descripción": "Producto",
-
-    # Bodega
     "bodega": "Bodega",
-
-    # Ubicación
     "ubicacion": "Ubicación",
     "ubicación": "Ubicación",
-
-    # N° Serie
     "n serie": "N° Serie",
     "n° serie": "N° Serie",
     "numero serie": "N° Serie",
     "número serie": "N° Serie",
     "num serie": "N° Serie",
-
-    # Lote
     "lote": "Lote",
-
-    # Fecha Vencimiento
     "fecha vencimiento": "Fecha Vencimiento",
     "fec venc": "Fecha Vencimiento",
     "vencimiento": "Fecha Vencimiento",
-
-    # Saldo Stock
     "saldo stock": "Saldo Stock",
     "saldo": "Saldo Stock",
     "stock": "Saldo Stock",
@@ -78,7 +63,6 @@ def _normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
             mapping[c] = COL_SYNONYMS[key]
     out = df.rename(columns=mapping)
 
-    # Si hay variantes con espacios/acentos mínimos que no mapeamos, intenta heurística
     def _try_pick(target: str, *candidates):
         if target in out.columns:
             return
@@ -94,32 +78,26 @@ def _normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
-    """Limpia tipos/NaN para UI y posterior impresión."""
+    """Limpia tipos/NaN para UI y posterior impresion."""
     df2 = df.copy()
 
-    # Asegurar columnas visibles
     faltantes = [c for c in VISIBLE_COLUMNS if c not in df2.columns]
     if faltantes:
         raise ValueError(f"Faltan columnas requeridas: {faltantes}")
 
-    # Texto seguro
     for c in ["Código", "Producto", "Bodega", "Ubicación", "N° Serie", "Lote"]:
         df2[c] = df2[c].astype(str).replace({"nan": "", "<NA>": ""}).fillna("").str.strip()
 
-    # Fecha a texto legible (no forzamos dtype datetime aquí para no romper UI)
     if "Fecha Vencimiento" in df2.columns:
-        # Intenta parsear; si no, deja tal cual
         dt = pd.to_datetime(df2["Fecha Vencimiento"], errors="coerce", dayfirst=True)
         df2["Fecha Vencimiento"] = np.where(
             dt.notna(),
             dt.dt.strftime("%d/%m/%Y"),
-            df2["Fecha Vencimiento"].astype(str).replace({"nan": ""}).fillna("")
+            df2["Fecha Vencimiento"].astype(str).replace({"nan": ""}).fillna(""),
         )
 
-    # Saldo Stock como entero >= 0
     df2["Saldo Stock"] = pd.to_numeric(df2["Saldo Stock"], errors="coerce").fillna(0).astype(int)
 
-    # Elimina filas totalmente vacías (en texto) y reordena columnas
     mask_any = df2[VISIBLE_COLUMNS].astype(str).apply(lambda s: s.str.strip() != "").any(axis=1)
     df2 = df2.loc[mask_any, VISIBLE_COLUMNS].reset_index(drop=True)
 
@@ -130,12 +108,16 @@ class InventarioView(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Inventario - Consulta")
-        self.geometry("1200x700")
-        self.config(bg="#F9FAFB")
+        self.geometry("1280x760")
+        self.minsize(1080, 640)
+        self.config(bg="#EEF2F8")
 
         self.df = pd.DataFrame()
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
+        self._archivo_actual = ""
+        self.status_var = tk.StringVar(value="Carga un archivo de inventario para comenzar.")
+        self.summary_var = tk.StringVar(value="Registros: 0")
 
         self._crear_widgets()
         self._cargar_o_pedir_archivo()
@@ -143,44 +125,81 @@ class InventarioView(tk.Toplevel):
     # ------------------------------- UI ---------------------------------
 
     def safe_messagebox(self, tipo, titulo, mensaje):
-        self.after(0, lambda: {
-            "info": messagebox.showinfo,
-            "error": messagebox.showerror,
-            "warning": messagebox.showwarning
-        }[tipo](titulo, mensaje))
+        self.after(
+            0,
+            lambda: {
+                "info": messagebox.showinfo,
+                "error": messagebox.showerror,
+                "warning": messagebox.showwarning,
+            }[tipo](titulo, mensaje),
+        )
 
     def _crear_widgets(self):
-        top_frame = tk.Frame(self, bg="#F9FAFB")
-        top_frame.pack(pady=10, fill="x")
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
 
-        tk.Label(top_frame, text="Buscar por Código, Ubicación o fragmentos:", bg="#F9FAFB").pack(side="left", padx=(10, 5))
-        self.entry_busqueda = tk.Entry(top_frame, width=30)
-        self.entry_busqueda.pack(side="left", padx=5)
+        style.configure("InvBg.TFrame", background="#EEF2F8")
+        style.configure("Card.TFrame", background="#FFFFFF")
+        style.configure("InvTitle.TLabel", font=("Segoe UI Semibold", 16), background="#EEF2F8", foreground="#0F1F3D")
+        style.configure("InvSub.TLabel", font=("Segoe UI", 10), background="#EEF2F8", foreground="#485A79")
+        style.configure("InvLabel.TLabel", font=("Segoe UI", 10), background="#FFFFFF", foreground="#263754")
+        style.configure("InvHint.TLabel", font=("Segoe UI", 9), background="#FFFFFF", foreground="#5B6C89")
+        style.configure("InvStatus.TLabel", font=("Segoe UI", 10), background="#0F172A", foreground="#E2E8F0", padding=8)
+        style.configure("Treeview", rowheight=28, font=("Segoe UI", 10))
+        style.configure("Treeview.Heading", font=("Segoe UI Semibold", 10))
+        style.map("Treeview", background=[("selected", "#C9D8FF")], foreground=[("selected", "#0F1F3D")])
+
+        shell = ttk.Frame(self, style="InvBg.TFrame", padding=14)
+        shell.pack(fill="both", expand=True)
+
+        ttk.Label(shell, text="Inventario", style="InvTitle.TLabel").pack(anchor="w")
+        ttk.Label(shell, text="Busqueda por codigo, ubicacion, columna y fila.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
+
+        top_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
+        top_card.pack(fill="x")
+
+        tk.Label(top_card, text="Buscar:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
+        self.entry_busqueda = tk.Entry(top_card, width=34, font=("Segoe UI", 10))
+        self.entry_busqueda.grid(row=0, column=1, padx=(6, 12), sticky="w")
         self.entry_busqueda.bind("<Return>", lambda e: self._filtrar())
         self.entry_busqueda.bind("<KeyRelease>", lambda e: self._actualizar_sugerencias())
 
-        # Nuevo: filtrado por columna y fila dentro de la estantería
-        tk.Label(top_frame, text="Columna:", bg="#F9FAFB").pack(side="left", padx=(10, 2))
-        self.entry_columna = tk.Entry(top_frame, width=6)
-        self.entry_columna.pack(side="left", padx=2)
-        tk.Label(top_frame, text="Fila:", bg="#F9FAFB").pack(side="left", padx=(10, 2))
-        self.entry_fila = tk.Entry(top_frame, width=6)
-        self.entry_fila.pack(side="left", padx=2)
+        tk.Label(top_card, text="Columna:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=2, sticky="w")
+        self.entry_columna = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
+        self.entry_columna.grid(row=0, column=3, padx=(6, 12), sticky="w")
+        self.entry_columna.bind("<Return>", lambda e: self._filtrar())
 
-        self.sugerencias_var = tk.StringVar()
-        self.sugerencias_label = tk.Label(top_frame, textvariable=self.sugerencias_var, bg="#F9FAFB", fg="#555", font=("Segoe UI", 9))
-        self.sugerencias_label.pack(side="left", padx=5)
+        tk.Label(top_card, text="Fila:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=4, sticky="w")
+        self.entry_fila = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
+        self.entry_fila.grid(row=0, column=5, padx=(6, 12), sticky="w")
+        self.entry_fila.bind("<Return>", lambda e: self._filtrar())
 
-        ttk.Button(top_frame, text="Buscar", command=self._filtrar).pack(side="left", padx=5)
-        ttk.Button(top_frame, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=5)
-        ttk.Button(top_frame, text="Buscar Archivo Excel", command=self._recargar_archivo).pack(side="left", padx=5)
-        ttk.Button(top_frame, text="🖨️ Imprimir Resultado", command=self._imprimir_resultado).pack(side="right", padx=10)
+        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=6, padx=(0, 6))
+        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=7, padx=(0, 6))
+        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=8, padx=(0, 6))
+        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=9)
+        top_card.columnconfigure(10, weight=1)
 
-        # Treeview
-        self.tree = ttk.Treeview(self, columns=VISIBLE_COLUMNS, show="headings", height=25)
+        info_row = ttk.Frame(top_card, style="Card.TFrame")
+        info_row.grid(row=1, column=0, columnspan=11, sticky="ew", pady=(10, 0))
+        ttk.Label(info_row, textvariable=self.summary_var, style="InvLabel.TLabel").pack(side="left")
+        ttk.Label(info_row, textvariable=self.status_var, style="InvHint.TLabel").pack(side="left", padx=(16, 0))
+
+        self.sugerencias_var = tk.StringVar(value="")
+        ttk.Label(shell, textvariable=self.sugerencias_var, style="InvSub.TLabel").pack(anchor="w", padx=2, pady=(8, 4))
+
+        table_card = ttk.Frame(shell, style="Card.TFrame", padding=8)
+        table_card.pack(fill="both", expand=True, pady=(0, 8))
+
+        tree_container = ttk.Frame(table_card, style="Card.TFrame")
+        tree_container.pack(fill="both", expand=True)
+
+        self.tree = ttk.Treeview(tree_container, columns=VISIBLE_COLUMNS, show="headings", height=25)
         for col in VISIBLE_COLUMNS:
             self.tree.heading(col, text=col)
-            # Ajustes de ancho sugeridos
             width = 140
             if col in ("Producto",):
                 width = 280
@@ -189,7 +208,20 @@ class InventarioView(tk.Toplevel):
             elif col in ("Fecha Vencimiento", "Saldo Stock"):
                 width = 130
             self.tree.column(col, width=width, anchor="center")
-        self.tree.pack(padx=10, pady=10, fill="both", expand=True)
+
+        yscroll = ttk.Scrollbar(tree_container, orient="vertical", command=self.tree.yview)
+        xscroll = ttk.Scrollbar(tree_container, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        yscroll.grid(row=0, column=1, sticky="ns")
+        xscroll.grid(row=1, column=0, sticky="ew")
+        tree_container.rowconfigure(0, weight=1)
+        tree_container.columnconfigure(0, weight=1)
+
+        status_bar = ttk.Frame(shell, style="InvBg.TFrame")
+        status_bar.pack(fill="x")
+        ttk.Label(status_bar, textvariable=self.summary_var, style="InvStatus.TLabel").pack(fill="x")
 
     def _actualizar_sugerencias(self):
         term_raw = self.entry_busqueda.get()
@@ -200,7 +232,8 @@ class InventarioView(tk.Toplevel):
         ubicaciones = self.df["Ubicación"].dropna().unique()
         sugeridas = [u for u in ubicaciones if all(t in self._norm_text(u) for t in terminos)]
         if sugeridas:
-            self.sugerencias_var.set("Coincidencias: " + ", ".join(sugeridas[:8]) + (" ..." if len(sugeridas) > 8 else ""))
+            suf = " ..." if len(sugeridas) > 8 else ""
+            self.sugerencias_var.set("Coincidencias: " + ", ".join(sugeridas[:8]) + suf)
         else:
             self.sugerencias_var.set("Sin coincidencias")
 
@@ -220,7 +253,7 @@ class InventarioView(tk.Toplevel):
     def _buscar_y_cargar_archivo(self):
         ruta_archivo = filedialog.askopenfilename(
             title="Selecciona el archivo de inventario",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")],
         )
         if ruta_archivo:
             guardar_ultimo_path(ruta_archivo, clave="archivo_inventario")
@@ -237,10 +270,10 @@ class InventarioView(tk.Toplevel):
                 except ImportError:
                     raise RuntimeError(
                         "Missing optional dependency 'xlrd'. Instala xlrd >= 2.0.1 para abrir archivos .xls "
-                        "o guarda el archivo como .xlsx e inténtalo nuevamente."
+                        "o guarda el archivo como .xlsx e intentalo nuevamente."
                     )
             else:
-                raise ValueError("Extensión de archivo no soportada. Usa .xlsx o .xls")
+                raise ValueError("Extension de archivo no soportada. Usa .xlsx o .xls")
 
             df = _normalize_headers(df)
             df = _clean_for_view(df)
@@ -248,7 +281,10 @@ class InventarioView(tk.Toplevel):
             self.df = df
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
+            self._archivo_actual = path.name
             self._actualizar_tree(self.df)
+            self.status_var.set(f"Archivo cargado: {path.name}")
+            self.entry_busqueda.focus_set()
 
             capturar_log_bod1(f"[Inventario] Archivo cargado: {path}", "info")
             self.safe_messagebox("info", "Inventario", f"Archivo cargado correctamente: {path.name}")
@@ -259,9 +295,11 @@ class InventarioView(tk.Toplevel):
             self.df = pd.DataFrame()
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
+            self._archivo_actual = ""
+            self.status_var.set("No se pudo cargar el archivo.")
             self._actualizar_tree(self.df)
 
-    # ----------------------------- Búsqueda ------------------------------
+    # ----------------------------- Busqueda ------------------------------
 
     def _norm_text(self, s: str) -> str:
         s = str(s or "").strip().lower()
@@ -273,8 +311,9 @@ class InventarioView(tk.Toplevel):
         termino = self._norm_text(term_raw)
         columna = self._norm_text(self.entry_columna.get())
         fila = self._norm_text(self.entry_fila.get())
+
         if not termino and not columna and not fila:
-            self.safe_messagebox("info", "Buscar", "Ingrese un término, columna o fila para filtrar.")
+            self.safe_messagebox("info", "Buscar", "Ingrese un termino, columna o fila para filtrar.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -283,31 +322,44 @@ class InventarioView(tk.Toplevel):
         df = self.df.copy()
         terminos = [self._norm_text(t) for t in term_raw.replace(",", " ").split() if t.strip()]
 
-        # Filtrado por ubicación: fragmentos, columna y fila
         m_ubi = df["Ubicación"].astype(str).map(self._norm_text)
-        mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
-
-        # Filtrado por columna (ej: A, F, C, etc. en RE-A4-A1)
-        mask_col = pd.Series([True]*len(df))
-        if columna:
-            mask_col = m_ubi.apply(lambda val: any(f"-{columna.lower()}" in val or f" {columna.lower()}" in val for columna in [columna]))
-
-        # Filtrado por fila (ej: 1, 2, etc. en RE-A4-A1)
-        mask_fila = pd.Series([True]*len(df))
-        if fila:
-            mask_fila = m_ubi.apply(lambda val: any(f"{fila}" == frag[-1] for frag in val.split("-") if frag and frag[-1].isdigit()))
-
-        # También buscar por código y producto para mayor flexibilidad
         m_cod = df["Código"].astype(str).map(self._norm_text)
-        mask_cod = m_cod.apply(lambda val: any(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
         m_prod = df["Producto"].astype(str).map(self._norm_text)
-        mask_prod = m_prod.apply(lambda val: any(term in val for term in terminos)) if terminos else pd.Series([True]*len(df))
 
-        mask_total = mask_ubi & mask_col & mask_fila | mask_cod | mask_prod
+        if terminos:
+            mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos))
+            mask_cod = m_cod.apply(lambda val: all(term in val for term in terminos))
+            mask_prod = m_prod.apply(lambda val: all(term in val for term in terminos))
+            mask_texto = mask_ubi | mask_cod | mask_prod
+        else:
+            mask_ubi = pd.Series([False] * len(df), index=df.index)
+            mask_cod = pd.Series([False] * len(df), index=df.index)
+            mask_prod = pd.Series([False] * len(df), index=df.index)
+            mask_texto = pd.Series([True] * len(df), index=df.index)
+
+        mask_col = pd.Series([True] * len(df), index=df.index)
+        if columna:
+            token_col = columna.lower()
+            mask_col = m_ubi.apply(
+                lambda val: (
+                    f"-{token_col}" in val
+                    or f" {token_col}" in val
+                    or val.startswith(token_col)
+                )
+            )
+
+        mask_fila = pd.Series([True] * len(df), index=df.index)
+        if fila:
+            token_fila = fila.strip()
+            mask_fila = m_ubi.apply(
+                lambda val: any(token_fila == frag[-1] for frag in val.split("-") if frag and frag[-1].isdigit())
+            )
+
+        mask_total = mask_texto & mask_col & mask_fila
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
-            if mask_ubi.any():
+            if columna or fila or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
@@ -315,17 +367,23 @@ class InventarioView(tk.Toplevel):
                 self.tipo_busqueda = "producto"
             else:
                 self.tipo_busqueda = None
+            self.status_var.set(f"Filtro aplicado. Resultados: {len(self.df_filtrado)}")
         else:
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
+            self.status_var.set("Sin resultados para el filtro aplicado.")
 
         self._actualizar_tree(self.df_filtrado)
         self._actualizar_sugerencias()
 
     def _limpiar_busqueda(self):
         self.entry_busqueda.delete(0, "end")
+        self.entry_columna.delete(0, "end")
+        self.entry_fila.delete(0, "end")
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
+        self.sugerencias_var.set("")
+        self.status_var.set("Filtros limpiados.")
         self._actualizar_tree(self.df)
 
     # --------------------------- Actualizar UI ---------------------------
@@ -333,14 +391,21 @@ class InventarioView(tk.Toplevel):
     def _actualizar_tree(self, df: pd.DataFrame):
         self.tree.delete(*self.tree.get_children())
         if df is None or df.empty:
+            self.summary_var.set("Registros: 0")
             return
-        for row in df[VISIBLE_COLUMNS].itertuples(index=False):
-            self.tree.insert("", "end", values=row)
+
+        for i, row in enumerate(df[VISIBLE_COLUMNS].itertuples(index=False)):
+            tag = "even" if i % 2 == 0 else "odd"
+            self.tree.insert("", "end", values=row, tags=(tag,))
+
+        self.tree.tag_configure("even", background="#FFFFFF")
+        self.tree.tag_configure("odd", background="#F6F8FD")
+        origen = self._archivo_actual or "sin archivo"
+        self.summary_var.set(f"Registros: {len(df)} | Fuente: {origen}")
 
     # ------------------------------ Print -------------------------------
 
     def _imprimir_resultado(self):
-        # Usa el filtrado si existe; si no, imprime todo el dataset ya limpio
         df_to_print = self.df_filtrado if not self.df_filtrado.empty else self.df
         if df_to_print.empty:
             self.safe_messagebox("warning", "Sin datos", "No hay datos para imprimir.")
@@ -348,12 +413,11 @@ class InventarioView(tk.Toplevel):
 
         try:
             capturar_log_bod1(
-                f"[Inventario] Impresión solicitada (tipo={self.tipo_busqueda or 'completo'}) "
+                f"[Inventario] Impresion solicitada (tipo={self.tipo_busqueda or 'completo'}) "
                 f"con {len(df_to_print)} registros.",
-                "info"
+                "info",
             )
 
-            # Deriva a la impresora adecuada según el tipo de búsqueda (o por defecto por código)
             if self.tipo_busqueda == "ubicacion":
                 printer_inventario_ubicacion.print_inventario_ubicacion(df=df_to_print)
             else:

@@ -5,7 +5,8 @@ from logging.handlers import TimedRotatingFileHandler
 # --- Configuración del logger de eventos funcionales ---
 def _setup_eventos_logger():
     # Calcula la ruta base del proyecto
-    base_dir = Path(__file__).resolve().parent.parent
+    # __file__ = app/core/logger_eventos.py -> parents[2] = raíz del proyecto
+    base_dir = Path(__file__).resolve().parents[2]
     logs_dir = base_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 

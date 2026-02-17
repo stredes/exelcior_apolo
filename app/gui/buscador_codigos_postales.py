@@ -278,6 +278,12 @@ class BuscadorCodigosPostales(tk.Toplevel):
                         df_norm = self._rename_soft(df_try)
                         if self._tiene_columnas_target(df_norm):
                             return df_norm.loc[:, list(self.COLS_TARGET)]
+                        # Caso frecuente: la primera fila trae los encabezados reales
+                        df_promoted = self._promover_fila_a_encabezado(df_try)
+                        if df_promoted is not None:
+                            df_promoted = self._rename_soft(df_promoted)
+                            if self._tiene_columnas_target(df_promoted):
+                                return df_promoted.loc[:, list(self.COLS_TARGET)]
                     except Exception as e:
                         capturar_log_bod1(f"[CP] respaldo header={header_row} fallo: {e}", "warning")
         except Exception as e:
@@ -353,6 +359,20 @@ class BuscadorCodigosPostales(tk.Toplevel):
                 df[c] = df[c].astype(str).str.strip()
 
         return df
+
+    def _promover_fila_a_encabezado(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
+        """Promueve la primera fila como encabezado si el DataFrame no trae nombres útiles."""
+        if df is None or df.empty:
+            return None
+        try:
+            first_row = df.iloc[0].fillna("").astype(str).str.strip()
+            if first_row.eq("").all():
+                return None
+            promoted = df.iloc[1:].copy().reset_index(drop=True)
+            promoted.columns = first_row.tolist()
+            return promoted
+        except Exception:
+            return None
 
     def _normalizar_columnas(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._rename_soft(df)

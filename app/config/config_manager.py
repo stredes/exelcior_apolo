@@ -78,7 +78,14 @@ _MINIMAL_DEFAULT_V2: Dict[str, Any] = {
             "sumar": ["numberOfPackages"],
             "mantener_formato": ["masterTrackingNumber", "pieceTrackingNumber", "trackingNumber"],
             "formato_texto": [],
-            "conservar": [],
+            "conservar": [
+                "shipDate",
+                "reference",
+                "masterTrackingNumber",
+                "recipientContactName",
+                "recipientCity",
+                "numberOfPackages",
+            ],
             "start_row": 0,
             "vista_previa_fuente": 10
         },
@@ -359,10 +366,12 @@ def get_effective_mode_rules(mode: str, cfg: Optional[Dict[str, Any]] = None) ->
 def get_start_row(mode: str, cfg: Optional[Dict[str, Any]] = None) -> int:
     return get_effective_mode_rules(mode, cfg).get("start_row", 0)
 
+# reserved: helper público para integraciones externas/futuras
 def get_paths(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     cfg = cfg or load_config()
     return _deep_merge(_MINIMAL_DEFAULT_V2["paths"], _ensure_dict(cfg.get("paths", {})))
 
+# reserved: helper público para integraciones externas/futuras
 def set_paths(cfg: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
     cfg.setdefault("paths", {})
     for k, v in kwargs.items():
@@ -402,13 +411,3 @@ def guardar_ultimo_path(path_str: str, clave: str = "last_opened_file") -> None:
 def repair_user_config() -> None:
     ensure_defaults()
     log_evento("🛠️ repair_user_config: no-op (gestionado en load_config).", "info")
-
-def restore_user_config_from_defaults() -> None:
-    ensure_defaults()
-    try:
-        env_path, user_path, _ = get_config_paths()
-        target = env_path if env_path else user_path
-        _write_json_atomic(target, _MINIMAL_DEFAULT_V2)
-        log_evento(f"🔄 User config restaurado a defaults v2 en {target}", "warning")
-    except Exception as e:
-        log_evento(f"❌ Error restaurando user config: {e}", "error")

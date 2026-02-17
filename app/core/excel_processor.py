@@ -114,6 +114,28 @@ def validate_file(file_path: str) -> Tuple[bool, str]:
     return True, ""
 
 
+def _ensure_engine_dependency(ext: str) -> None:
+    """
+    Verifica dependencias mínimas por extensión antes de leer.
+    """
+    if ext == ".xls":
+        try:
+            import xlrd  # noqa: F401
+        except Exception as exc:
+            raise ValueError(
+                "Missing optional dependency 'xlrd'. "
+                "Instala 'xlrd>=2.0.1' para leer archivos .xls."
+            ) from exc
+    elif ext == ".xlsx":
+        try:
+            import openpyxl  # noqa: F401
+        except Exception as exc:
+            raise ValueError(
+                "Missing optional dependency 'openpyxl'. "
+                "Instala 'openpyxl' para leer archivos .xlsx."
+            ) from exc
+
+
 # ==========================
 # Carga de Excel con config
 # ==========================
@@ -125,10 +147,11 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
     """
     path = Path(file_path)
     ext = path.suffix.lower()
+    _ensure_engine_dependency(ext)
 
     engine = {
         ".xlsx": "openpyxl",
-        ".xls": "openpyxl",  # usa xlrd si necesitas para .xls antiguos
+        ".xls": "xlrd",
         ".csv": None,
     }.get(ext)
 
@@ -259,7 +282,13 @@ def apply_transformation(df: pd.DataFrame, config: dict, mode: str) -> pd.DataFr
                     continue
                 if col == label_col:
                     continue
-                df2.at[total_idx, col] = ""
+                # Evita TypeError en pandas >=2.2 al asignar "" en columnas numéricas/datetime.
+                if pd.api.types.is_numeric_dtype(df2[col]):
+                    df2.at[total_idx, col] = pd.NA
+                elif pd.api.types.is_datetime64_any_dtype(df2[col]):
+                    df2.at[total_idx, col] = pd.NaT
+                else:
+                    df2.at[total_idx, col] = ""
             if label_col is not None:
                 df2.at[total_idx, label_col] = "TOTAL"
         log_evento(f"[XFORM] Fila de sumatoria creada: {suma}", "info")

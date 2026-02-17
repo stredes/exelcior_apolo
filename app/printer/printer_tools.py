@@ -279,7 +279,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
 # ------------------------- URBANO -------------------------
 
 def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
-    cols_final = ["GUIA", "CLIENTE", "LOCALIDAD", "PIEZAS", "COD RASTREO"]
+    cols_final = ["GUIA", "CLIENTE", "LOCALIDAD", "CIUDAD", "PIEZAS", "COD RASTREO"]
     if df is None or df.empty:
         return pd.DataFrame(columns=cols_final), 0
 
@@ -293,7 +293,8 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 
     guia_col  = pick("GUIA", "guia", "Guia")
     cli_col   = pick("CLIENTE", "cliente", "Cliente")
-    loc_col   = pick("LOCALIDAD", "localidad", "Localidad", "CIUDAD", "ciudad")
+    loc_col   = pick("LOCALIDAD", "localidad", "Localidad")
+    city_col  = pick("CIUDAD", "ciudad", "Ciudad")
     piezas_c  = pick("PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
     rastreo_c = pick("COD RASTREO", "COD_RASTREO", "codRastreo", "TRACKING", "tracking")
 
@@ -301,11 +302,13 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     txt_guia  = _clean_text_series(df[guia_col])  if guia_col  else pd.Series("", index=df.index, dtype="string")
     txt_cli   = _clean_text_series(df[cli_col])   if cli_col   else pd.Series("", index=df.index, dtype="string")
     txt_loc   = _clean_text_series(df[loc_col])   if loc_col   else pd.Series("", index=df.index, dtype="string")
+    txt_city  = _clean_text_series(df[city_col])  if city_col  else txt_loc.copy()
     txt_track = _clean_text_series(df[rastreo_c]) if rastreo_c else pd.Series("", index=df.index, dtype="string")
 
     out["GUIA"]        = txt_guia
     out["CLIENTE"]     = txt_cli
     out["LOCALIDAD"]   = txt_loc
+    out["CIUDAD"]      = txt_city
     out["COD RASTREO"] = txt_track
 
     if piezas_c:
@@ -328,11 +331,11 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
         p = pd.Series(1, index=df.index, dtype=int)
     out["PIEZAS"]      = p
 
-    has_any_text = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() != "", axis=0).any(axis=1)
-    contains_total = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(
+    has_any_text = out[["GUIA", "CLIENTE", "LOCALIDAD", "CIUDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() != "", axis=0).any(axis=1)
+    contains_total = out[["GUIA", "CLIENTE", "LOCALIDAD", "CIUDAD", "COD RASTREO"]].apply(
         lambda s: s.str.contains(r"\btotal\b", case=False, regex=True, na=False), axis=0
     ).any(axis=1)
-    all_text_empty = out[["GUIA", "CLIENTE", "LOCALIDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() == "", axis=0).all(axis=1)
+    all_text_empty = out[["GUIA", "CLIENTE", "LOCALIDAD", "CIUDAD", "COD RASTREO"]].apply(lambda s: s.str.strip() == "", axis=0).all(axis=1)
 
     mask_valid = has_any_text & (~contains_total) & (~all_text_empty)
     out = out.loc[mask_valid].reset_index(drop=True)
@@ -354,7 +357,7 @@ def insertar_bloque_firma_ws(ws, total_piezas: Optional[int] = None) -> None:
     Nombre: ___________
     Firma:  ___________                           total: 28
     """
-    from openpyxl.styles import Alignment, Font
+    from openpyxl.styles import Alignment, Font, Border, Side
 
     # Detecta la última fila con contenido
     max_row = ws.max_row
@@ -366,13 +369,21 @@ def insertar_bloque_firma_ws(ws, total_piezas: Optional[int] = None) -> None:
     # Fuente base
     font_text = Font(name="Segoe UI", size=11)
 
-    # Bloque de firma a la izquierda
-    ws.cell(row=start_row, column=1, value="Nombre:").font = font_text
-    ws.cell(row=start_row + 1, column=1, value="Firma:").font = font_text
+    # Bloque de firma a la izquierda (compatibilidad con tests y formato histórico)
+    ws.cell(row=start_row, column=1, value="Nombre quien recibe:").font = font_text
+    ws.cell(row=start_row + 1, column=1, value="Firma quien recibe:").font = font_text
 
-    # Línea de firma con guiones
-    ws.cell(row=start_row, column=2, value="_____________________").font = font_text
-    ws.cell(row=start_row + 1, column=2, value="_____________________").font = font_text
+    # Línea de firma con celdas fusionadas y borde inferior
+    end_col = max(3, min(max_col, 6))
+    ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=end_col)
+    ws.merge_cells(start_row=start_row + 1, start_column=2, end_row=start_row + 1, end_column=end_col)
+
+    thin = Side(style="thin")
+    line_border = Border(bottom=thin)
+    for row in (start_row, start_row + 1):
+        for col in range(2, end_col + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.border = line_border
 
     # Total a la derecha (alineado última columna)
     if total_piezas is not None:
@@ -380,16 +391,11 @@ def insertar_bloque_firma_ws(ws, total_piezas: Optional[int] = None) -> None:
             total_val = int(total_piezas)
         except (TypeError, ValueError):
             total_val = total_piezas
-        c_total = ws.cell(row=start_row + 1, column=max_col, value=f"TOTAL: ({total_val})")
+        # Evita escribir en celdas fusionadas (MergedCell) de la fila de firma.
+        total_row = start_row + 2
+        c_total = ws.cell(row=total_row, column=max_col, value=f"TOTAL: ({total_val})")
         c_total.font = Font(name="Segoe UI", size=11, bold=True)
         c_total.alignment = Alignment(horizontal="right", vertical="center")
-
-    # Ajuste visual opcional (para evitar bordes de tabla previos)
-    for i in range(start_row - 2, start_row + 3):
-        for c in range(1, max_col + 1):
-            if not ws.cell(row=i, column=c).value:
-                ws.cell(row=i, column=c, value="")
-
 
 def agregar_footer_info_ws(ws, total_piezas: int) -> None:
     """
@@ -442,7 +448,7 @@ def formatear_tabla_ws(ws) -> None:
         headers.append(str(ws.cell(row=header_row, column=c).value or "").strip())
 
     is_fedex = headers[:6] == ["Tracking Number", "Fecha", "Referencia", "Ciudad", "Receptor", "BULTOS"]
-    is_urbano = headers[:5] == ["GUIA", "CLIENTE", "LOCALIDAD", "PIEZAS", "COD RASTREO"]
+    is_urbano = headers[:6] == ["GUIA", "CLIENTE", "LOCALIDAD", "CIUDAD", "PIEZAS", "COD RASTREO"]
 
     for c in range(1, max_col + 1):
         cell = ws.cell(row=header_row, column=c)
@@ -467,7 +473,7 @@ def formatear_tabla_ws(ws) -> None:
     if is_fedex:
         min_widths = [22, 12, 18, 18, 22, 8]
     elif is_urbano:
-        min_widths = [18, 22, 18, 8, 22]
+        min_widths = [18, 22, 18, 18, 8, 22]
     else:
         min_widths = [16] * max_col
 

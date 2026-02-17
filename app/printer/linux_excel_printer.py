@@ -4,6 +4,7 @@ from openpyxl.styles import Font, Alignment, Border, Side
 from datetime import datetime
 import subprocess
 
+# reserved: backend Linux alternativo si se separa impresión por SO
 def print_excel_linux(filepath: Path, mode: str):
     if not filepath.exists():
         raise FileNotFoundError(f"Archivo no encontrado: {filepath}")

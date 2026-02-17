@@ -10,7 +10,11 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from app.core.logger_eventos import log_evento
-from app.core.impression_tools import generar_excel_temporal, enviar_a_impresora
+from app.core.impression_tools import (
+    generar_excel_temporal,
+    enviar_a_impresora,
+    enviar_a_impresora_configurable,
+)
 from app.printer.printer_tools import (
     prepare_fedex_dataframe,        # limpieza/dedup principal (si existe tracking)
     insertar_bloque_firma_ws,
@@ -103,7 +107,7 @@ def _fallback_permisivo(df: pd.DataFrame) -> Tuple[pd.DataFrame, Optional[str], 
     Modo permisivo: no tocamos el DF (más que clonar) y calculamos total de piezas
     con la heurística robusta (que evita inflar por duplicados si hay tracking).
     """
-    df_out = (df or pd.DataFrame()).copy()
+    df_out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
     total_piezas = _heur_total_piezas(df_out)
     return df_out, None, total_piezas
 
@@ -111,75 +115,15 @@ def _fallback_permisivo(df: pd.DataFrame) -> Tuple[pd.DataFrame, Optional[str], 
 #             Envío a impresora (resuelve impresora/timeout/logs)
 # =============================================================================
 
-def _get_effective_printer_name(config: Optional[dict]) -> Optional[str]:
-    """
-    Orden de precedencia:
-      1) config["printer_name"] | config["printer"] | config["impresora"]
-      2) EXCELCIOR_PRINTER (env)  -> será usada por impression_tools si no pasas nada
-      3) Impresora por defecto del SO (la resuelve impression_tools)
-    """
-    if isinstance(config, dict):
-        return config.get("printer_name") or config.get("printer") or config.get("impresora")
-    return None
-
-def _get_effective_timeout_s(config: Optional[dict]) -> int:
-    """
-    Timeout efectivo para impresión. Prioriza:
-      - config["print_timeout_s"]
-      - EXCELCIOR_PRINT_TIMEOUT (env)
-      - 120 por defecto
-    """
-    if isinstance(config, dict) and "print_timeout_s" in config:
-        try:
-            return int(config["print_timeout_s"])
-        except Exception:
-            pass
-    try:
-        return int(os.environ.get("EXCELCIOR_PRINT_TIMEOUT", "120"))
-    except Exception:
-        return 120
-
 def _enviar_a_impresora_flexible(path: Path, config: Optional[dict]) -> None:
     """
-    Llama a enviar_a_impresora tolerando distintas firmas:
-      - enviar_a_impresora(path, printer_name=...)
-      - enviar_a_impresora(path, printer=...)
-      - enviar_a_impresora(path, <printer_name_posicional>)
-      - enviar_a_impresora(path)
-    Además: loguea impresora/timeout y propaga EXCELCIOR_PRINT_TIMEOUT.
+    Adaptador de compatibilidad para no romper llamadas existentes.
     """
-    printer_name = _get_effective_printer_name(config)
-    timeout_s = _get_effective_timeout_s(config)
-
-    # Log diagnóstico de impresión
-    log_evento(
-        f"[FedEx] Enviando a impresora. Archivo='{path.name}', "
-        f"printer='{printer_name or 'default-SO'}', timeout_s={timeout_s}",
-        "info"
-    )
-
-    # Propaga timeout para la capa soffice.exe
-    os.environ["EXCELCIOR_PRINT_TIMEOUT"] = str(timeout_s)
-
-    # 1) keyword 'printer_name'
-    if printer_name:
-        try:
-            return enviar_a_impresora(path, printer_name=printer_name)
-        except TypeError:
-            pass
-        # 2) keyword 'printer'
-        try:
-            return enviar_a_impresora(path, printer=printer_name)
-        except TypeError:
-            pass
-        # 3) posicional
-        try:
-            return enviar_a_impresora(path, printer_name)
-        except TypeError:
-            pass
-
-    # 4) sin parámetro (impresora predeterminada del SO)
-    return enviar_a_impresora(path)
+    cfg = config if isinstance(config, dict) else {}
+    if not any(k in cfg for k in ("printer_name", "printer", "impresora", "print_timeout_s")):
+        # Compatibilidad con tests y llamadas históricas.
+        return enviar_a_impresora(path)
+    return enviar_a_impresora_configurable(path, config=config, default_timeout_s=120)
 
 # =============================================================================
 #                              Flujo principal
@@ -271,7 +215,7 @@ def print_fedex(file_path: Path, config: Optional[Dict[str, Any]], df: pd.DataFr
             try:
                 pdf_path = convert_xlsx_to_pdf(tmp_path)  # usa soffice --convert-to pdf
                 log_evento(f"🧾 PDF generado para fallback: {pdf_path}", "info")
-                _enviar_a_impresora_flexible(pdf_path, config)
+                enviar_pdf_a_impresora(pdf_path)
                 log_evento("✅ Impresión de listado FedEx (PDF fallback) completada correctamente.", "info")
                 return
             except Exception as e_pdf:

@@ -197,24 +197,3 @@ class ConfigSystemDialog(tk.Toplevel):
             if hasattr(self._parent, "safe_messagebox"):
                 self._parent.safe_messagebox("error", "Error", f"No se pudo guardar:\n{e}")
 
-
-# ------------------- Helper público -------------------
-
-def open_system_config(parent: tk.Tk, on_saved: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
-    """
-    Carga config efectiva y defaults desde config_manager, luego abre el diálogo modal.
-    """
-    try:
-        from app.config.config_manager import load_config, DEFAULT_CFG_PATH, _MINIMAL_DEFAULT
-        cfg = load_config()
-        try:
-            default_text = DEFAULT_CFG_PATH.read_text(encoding="utf-8") # Carga el default.json
-            default_cfg = json.loads(default_text) # Carga el default.json
-            if not isinstance(default_cfg, dict): # Asegura que sea dict
-                default_cfg = dict(_MINIMAL_DEFAULT) # Asegura que sea dict
-        except Exception: # Si falla la carga del default, usamos el mínimo
-            default_cfg = dict(_MINIMAL_DEFAULT) # Fallback a valores mínimos
-    except Exception:   # Si falla la carga, usamos dicts vacíos
-        cfg, default_cfg = {}, {}
-
-    ConfigSystemDialog(parent, cfg or {}, default_cfg or {}, on_save=on_saved)
