@@ -5,6 +5,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import threading
 import unicodedata
+import zipfile
+import xml.etree.ElementTree as ET
 import pandas as pd
 from pathlib import Path
 from typing import Dict, Iterable, Optional
@@ -46,11 +48,22 @@ class BuscadorCodigosPostales(tk.Toplevel):
         "código postal": "CÓDIGO POSTAL",
         "c\u00f3digo postal": "CÓDIGO POSTAL",
         "cod postal": "CÓDIGO POSTAL",
+        "codigo ubigeo": "CÓDIGO POSTAL",
+        "ubigeo": "CÓDIGO POSTAL",
         "cp": "CÓDIGO POSTAL",
     }
 
     # Orden de headers preferidos
     PREFERRED_HEADER_ROWS = [1, 2, 0, 3, 4, 5]
+
+    @staticmethod
+    def _excel_engine_for_path(path: Path) -> str:
+        ext = path.suffix.lower()
+        if ext == ".ods":
+            return "odf"
+        if ext == ".xls":
+            return "xlrd"
+        return "openpyxl"
 
     def __init__(self, parent: tk.Misc):
         super().__init__(parent)
@@ -185,7 +198,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
         # Caso 3: primera vez -> pedir archivo y guardar
         ruta_sel = filedialog.askopenfilename(
             title="Selecciona el archivo de Códigos Postales",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+            filetypes=[
+                ("Hojas de calculo", "*.xlsx *.xls *.ods"),
+                ("Excel", "*.xlsx *.xls"),
+                ("OpenDocument", "*.ods"),
+            ]
         )
         if not ruta_sel:
             self._error("No se seleccionó archivo de Códigos Postales.")
@@ -205,9 +222,24 @@ class BuscadorCodigosPostales(tk.Toplevel):
     def _cargar_en_background(self, ruta: str) -> None:
         try:
             df = self._leer_y_normalizar_excel(Path(ruta))
-            df = df.dropna(how="all").dropna(subset=["CÓDIGO POSTAL"])
+            df = df.dropna(how="all")
             for c in ("REGIÓN", "COMUNA", "CÓDIGO POSTAL"):
                 df[c] = df[c].astype(str).str.strip()
+                df[c] = df[c].replace({"nan": "", "None": "", "<NA>": ""})
+
+            # Forzar código postal numérico y limpiar filas incompletas.
+            df["CÓDIGO POSTAL"] = (
+                df["CÓDIGO POSTAL"]
+                .astype(str)
+                .str.replace(r"[^0-9]", "", regex=True)
+                .str.strip()
+            )
+            df = df[
+                (df["REGIÓN"] != "")
+                & (df["COMUNA"] != "")
+                & (df["CÓDIGO POSTAL"] != "")
+            ]
+            df = df.drop_duplicates(subset=["REGIÓN", "COMUNA", "CÓDIGO POSTAL"])
 
             self.df = df.reset_index(drop=True)
             # Reafirma la ruta usada (por si vino de Cambiar archivo…)
@@ -228,13 +260,24 @@ class BuscadorCodigosPostales(tk.Toplevel):
         Preferente: header=1 (fila 2 visible) + usecols A:D con renombrado seguro.
         Respaldos: header en [2,0,3,4,5], sin encabezado + heurística, inferencia.
         """
+        engine = self._excel_engine_for_path(path)
+
+        if path.suffix.lower() == ".ods":
+            try:
+                df_ods = self._leer_ods_via_content_xml(path)
+                df_ods = self._rename_soft(df_ods)
+                if self._tiene_columnas_target(df_ods):
+                    return df_ods.loc[:, list(self.COLS_TARGET)]
+            except Exception as e:
+                capturar_log_bod1(f"[CP] Fallback ODS XML falló: {e}", "warning")
+
         # Prepara lista de hojas por defecto
         sheet_names = [0]
 
         # 0) INTENTO PREFERENTE: header=1, A:D
         try:
             try:
-                xls = pd.ExcelFile(path, engine="openpyxl")
+                xls = pd.ExcelFile(path, engine=engine)
                 sheet_names = xls.sheet_names or [0]
             except Exception:
                 sheet_names = [0]
@@ -247,7 +290,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
                         header=1,            # fila 2 visible
                         usecols="A:D",       # A..D esperado
                         dtype=str,
-                        engine="openpyxl",
+                        engine=engine,
                     )
                     capturar_log_bod1(f"[CP] preferente header=1 A:D -> cols={list(df.columns)} shape={df.shape}", "info")
 
@@ -265,7 +308,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         # 1) RESPALDO: headers en orden preferido
         try:
             try:
-                xls = pd.ExcelFile(path, engine="openpyxl")
+                xls = pd.ExcelFile(path, engine=engine)
                 sheet_names = xls.sheet_names or [0]
             except Exception:
                 sheet_names = [0]
@@ -273,7 +316,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
             for sheet in sheet_names:
                 for header_row in self.PREFERRED_HEADER_ROWS:
                     try:
-                        df_try = pd.read_excel(path, sheet_name=sheet, header=header_row, dtype=str, engine="openpyxl")
+                        df_try = pd.read_excel(path, sheet_name=sheet, header=header_row, dtype=str, engine=engine)
                         capturar_log_bod1(f"[CP] respaldo header={header_row} -> cols={list(df_try.columns)} shape={df_try.shape}", "info")
                         df_norm = self._rename_soft(df_try)
                         if self._tiene_columnas_target(df_norm):
@@ -292,11 +335,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
         # 2) RESPALDO: sin encabezado + heurística
         for sheet in sheet_names:
             try:
-                df_no_header = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine="openpyxl")
+                df_no_header = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine=engine)
                 capturar_log_bod1(f"[CP] sin header -> shape={df_no_header.shape}", "info")
 
                 if not df_no_header.empty and self._fila_parece_encabezado(df_no_header.iloc[0]):
-                    df_try = pd.read_excel(path, sheet_name=sheet, header=0, dtype=str, engine="openpyxl")
+                    df_try = pd.read_excel(path, sheet_name=sheet, header=0, dtype=str, engine=engine)
                     df_norm = self._rename_soft(df_try)
                     if self._tiene_columnas_target(df_norm):
                         return df_norm.loc[:, list(self.COLS_TARGET)]
@@ -312,12 +355,15 @@ class BuscadorCodigosPostales(tk.Toplevel):
         # 3) RESPALDO: inferencia por contenido
         for sheet in sheet_names:
             try:
-                df_any = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine="openpyxl")
+                df_any = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine=engine)
                 df_infer = self._inferir_por_contenido(df_any)
                 if self._tiene_columnas_target(df_infer):
                     return df_infer.loc[:, list(self.COLS_TARGET)]
             except Exception as e:
                 capturar_log_bod1(f"[CP] inferencia fallo: {e}", "warning")
+
+        if path.suffix.lower() == ".ods":
+            raise ValueError("No se pudo leer el archivo .ods. Instala odfpy: pip install odfpy")
 
         raise ValueError(
             "No se pudieron detectar las columnas. Asegúrate de que el archivo contenga "
@@ -351,7 +397,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
                     df.rename(columns={col: "COMUNA"}, inplace=True)
                 elif "region" in k:
                     df.rename(columns={col: "REGIÓN"}, inplace=True)
-                elif ("codigo" in k and "postal" in k) or k == "cp":
+                elif ("codigo" in k and "postal" in k) or ("ubigeo" in k) or k == "cp":
                     df.rename(columns={col: "CÓDIGO POSTAL"}, inplace=True)
 
         for c in ("REGIÓN", "COMUNA", "CÓDIGO POSTAL"):
@@ -381,7 +427,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         return all(c in df.columns for c in self.COLS_TARGET)
 
     def _fila_parece_encabezado(self, fila0: pd.Series) -> bool:
-        keys = {"region", "región", "comuna", "comuna/localidad", "codigo postal", "código postal", "cp"}
+        keys = {"region", "región", "comuna", "comuna/localidad", "codigo postal", "código postal", "codigo ubigeo", "ubigeo", "cp"}
         vals = set(self._norm_text(v) for v in fila0.values)
         return any(k in vals for k in keys)
 
@@ -435,6 +481,53 @@ class BuscadorCodigosPostales(tk.Toplevel):
         })
         return self._rename_soft(out)
 
+    def _leer_ods_via_content_xml(self, path: Path) -> pd.DataFrame:
+        ns = {
+            "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+            "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+        }
+
+        def cell_text(cell) -> str:
+            vals = []
+            for p in cell.findall(".//text:p", ns):
+                t = "".join(p.itertext()).strip()
+                if t:
+                    vals.append(t)
+            return " ".join(vals)
+
+        with zipfile.ZipFile(path, "r") as zf:
+            root = ET.fromstring(zf.read("content.xml"))
+
+        rows = None
+        for t in root.findall(".//table:table", ns):
+            tmp_rows = []
+            for tr in t.findall("table:table-row", ns):
+                rep_rows = int(
+                    tr.get("{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-rows-repeated", "1")
+                )
+                row = []
+                for tc in tr.findall("table:table-cell", ns):
+                    rep_cols = int(
+                        tc.get("{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-columns-repeated", "1")
+                    )
+                    txt = cell_text(tc)
+                    row.extend([txt] * rep_cols)
+                while row and row[-1] == "":
+                    row.pop()
+                for _ in range(rep_rows):
+                    tmp_rows.append(list(row))
+            if any(any(str(c).strip() for c in r) for r in tmp_rows):
+                rows = tmp_rows
+                break
+
+        if not rows:
+            raise ValueError("ODS sin filas de datos")
+
+        max_cols = max((len(r) for r in rows), default=0)
+        rows = [r + [""] * (max_cols - len(r)) for r in rows]
+        headers = [str(v).strip() if str(v).strip() else f"col_{i+1}" for i, v in enumerate(rows[1])]
+        return pd.DataFrame(rows[2:], columns=headers)
+
     # ----------------------------- Búsqueda (UI) -----------------------------
 
     def _on_search_changed(self, _evt=None) -> None:
@@ -460,8 +553,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
         def norm_series(s: Iterable) -> pd.Series:
             return pd.Series([self._norm_text(str(x)) for x in s])
 
-        mask = norm_series(df["COMUNA"]).str.contains(termino, na=False) | \
-               norm_series(df["REGIÓN"]).str.contains(termino, na=False)
+        mask = (
+            norm_series(df["COMUNA"]).str.contains(termino, na=False)
+            | norm_series(df["REGIÓN"]).str.contains(termino, na=False)
+            | norm_series(df["CÓDIGO POSTAL"]).str.contains(termino, na=False)
+        )
 
         filtrado = df.loc[mask]
         self._poblar_tree(filtrado)
@@ -528,7 +624,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
     def _cambiar_archivo(self) -> None:
         ruta = filedialog.askopenfilename(
             title="Selecciona el archivo de Códigos Postales",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+            filetypes=[
+                ("Hojas de calculo", "*.xlsx *.xls *.ods"),
+                ("Excel", "*.xlsx *.xls"),
+                ("OpenDocument", "*.ods"),
+            ]
         )
         if not ruta:
             return

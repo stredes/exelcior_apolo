@@ -467,6 +467,12 @@ class ExcelPrinterApp(tk.Tk):
     def _apply_default_printer_for_report_mode(self) -> None:
         # Reportes: usar impresora de papel desde config (fallback a constante).
         report_printer = self.REPORT_DEFAULT_PRINTER
+        try:
+            latest_cfg = load_config()
+            if isinstance(latest_cfg, dict):
+                self.config_columns = latest_cfg
+        except Exception:
+            pass
         if isinstance(self.config_columns, dict):
             report_printer = (
                 self.config_columns.get("report_printer_name")

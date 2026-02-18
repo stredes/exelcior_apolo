@@ -107,5 +107,6 @@
         }
     },
     "printer_name": "ZDesigner GC420d",
-    "clientes_proveedores_path": "C:/Users/Bodega_1/Downloads/Clientes_y_proveedores_20260217_092552.xlsx"
+    "clientes_proveedores_path": "C:/Users/Bodega_1/Downloads/Clientes_y_proveedores_20260217_092552.xlsx",
+    "label_printer_name": "ZDesigner GC420d"
 }

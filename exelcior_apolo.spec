@@ -20,6 +20,7 @@ for icon_candidate in [
 
 # módulos que PyInstaller debe rastrear aunque se carguen dinámicamente
 hiddenimports = [
+    "sqlalchemy",
     *collect_submodules("tkinter"),
     *collect_submodules("sqlalchemy"),
     *collect_submodules("pandas"),

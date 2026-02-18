@@ -6,6 +6,7 @@ import logging
 import importlib
 import platform
 import time
+import os
 from pathlib import Path
 from typing import Tuple, Optional, Callable, Dict, Any
 from contextlib import contextmanager
@@ -101,20 +102,27 @@ def _temporary_windows_default_printer(printer_name: str):
         yield
         return
     old_default = None
+    switched = False
     try:
         import win32print  # type: ignore
 
         resolved = _resolve_windows_printer_name(printer_name)
         old_default = win32print.GetDefaultPrinter()
-        win32print.SetDefaultPrinter(resolved)
-        logger.info(f"[print_document] Default temporal aplicada: {resolved}")
-        yield
-        # margen breve para que el spooler tome el trabajo antes de restaurar
-        time.sleep(3)
+        if resolved:
+            win32print.SetDefaultPrinter(resolved)
+            switched = True
+            logger.info(f"[print_document] Default temporal aplicada: {resolved}")
     except Exception as e:
         logger.warning(f"[print_document] No se pudo forzar default temporal: {e}")
+    try:
         yield
+    except Exception as e:
+        logger.warning(f"[print_document] Error dentro de bloque de impresión: {e}")
+        raise
     finally:
+        if switched:
+            # margen breve para que el spooler tome el trabajo antes de restaurar
+            time.sleep(3)
         if old_default:
             try:
                 import win32print  # type: ignore
@@ -123,6 +131,28 @@ def _temporary_windows_default_printer(printer_name: str):
                 logger.info(f"[print_document] Default restaurada: {old_default}")
             except Exception:
                 pass
+
+
+@contextmanager
+def _temporary_forced_printer_env(printer_name: str):
+    """
+    Fuerza EXCELCIOR_PRINTER solo durante el bloque para evitar arrastre
+    entre etiquetas y reportes.
+    """
+    old_val = None
+    had_old = "EXCELCIOR_PRINTER" in os.environ
+    try:
+        if had_old:
+            old_val = os.environ.get("EXCELCIOR_PRINTER")
+        if printer_name:
+            os.environ["EXCELCIOR_PRINTER"] = str(printer_name)
+        yield
+    finally:
+        env = os.environ
+        if had_old:
+            env["EXCELCIOR_PRINTER"] = old_val if old_val is not None else ""
+        else:
+            env.pop("EXCELCIOR_PRINTER", None)
 
 # =============================================================================
 #                               VALIDACIÓN
@@ -356,6 +386,8 @@ def print_document(
 
     logger.info(f"[print_document] Ejecutando impresora de modo '{mode_norm}'")
     if mode_norm in FORCED_MAIN_MODES:
-        with _temporary_windows_default_printer(_get_report_printer(cfg_to_use)):
-            return fn(file_path, cfg_to_use, df)
+        forced = _get_report_printer(cfg_to_use)
+        with _temporary_forced_printer_env(forced):
+            with _temporary_windows_default_printer(forced):
+                return fn(file_path, cfg_to_use, df)
     return fn(file_path, cfg_to_use, df)

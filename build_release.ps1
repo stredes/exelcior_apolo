@@ -289,9 +289,21 @@ $runtimeDeps = @(
   @{ Module = "sqlalchemy"; Pip = "SQLAlchemy" },
   @{ Module = "pandas"; Pip = "pandas" },
   @{ Module = "openpyxl"; Pip = "openpyxl" },
+  @{ Module = "odf"; Pip = "odfpy" },
   @{ Module = "reportlab"; Pip = "reportlab" },
   @{ Module = "PIL"; Pip = "pillow" }
 )
+
+# Impresión Windows (Excel COM / printto) depende de pywin32.
+$isWindowsHost = $env:OS -eq "Windows_NT"
+if ($isWindowsHost) {
+  $runtimeDeps += @(
+    @{ Module = "pythoncom"; Pip = "pywin32" },
+    @{ Module = "win32print"; Pip = "pywin32" },
+    @{ Module = "win32api"; Pip = "pywin32" },
+    @{ Module = "win32com.client"; Pip = "pywin32" }
+  )
+}
 foreach ($dep in $runtimeDeps) {
   Install-PythonPackageIfMissing -pythonExe $PythonExe -moduleName $dep.Module -pipName $dep.Pip
 }
@@ -324,6 +336,8 @@ Assert-LastExitCode "PyInstaller"
 
 Assert-File $distDir "No se generÃ³ la carpeta dist esperada: $distDir"
 Assert-File (Join-Path $distDir $ExeName) "No se generÃ³ el ejecutable: $ExeName"
+$sqlalchemyDistPath = Join-Path $distDir "_internal\sqlalchemy"
+Assert-File $sqlalchemyDistPath "Build inválido: no se incluyó SQLAlchemy en el paquete. Revisa el entorno Python usado para PyInstaller."
 
 # Copiar artefactos de Vale de Consumo al dist principal (para integraciÃ³n desde el menÃº)
 $valeDistRoot = Join-Path $ScriptRoot 'vale_consumo\dist'

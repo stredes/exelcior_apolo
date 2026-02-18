@@ -339,8 +339,9 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         ws = wb.active
         ws.title = "Etiqueta"
 
-        # Estilo base
-        thin = Side(style="thin", color="D1D5DB")
+        # Estilo base (bordes visibles en impresión)
+        thin = Side(style="thin", color="000000")
+        medium = Side(style="medium", color="000000")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         label_fill = PatternFill(fill_type="solid", fgColor="F3F4F6")
         # Ajuste visual: fuente y alturas mayores para ocupar mejor la etiqueta 10x14.
@@ -396,10 +397,17 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         footer.border = border
         ws.row_dimensions[9].height = 24
 
-        # Bordes completos para toda el Ã¡rea imprimible.
-        for row in ws.iter_rows(min_row=1, max_row=9, min_col=1, max_col=2):
-            for cell in row:
-                cell.border = border
+        # Bordes completos para toda el área imprimible, con contorno exterior reforzado.
+        min_r, max_r, min_c, max_c = 1, 9, 1, 2
+        for r in range(min_r, max_r + 1):
+            for c in range(min_c, max_c + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.border = Border(
+                    left=medium if c == min_c else thin,
+                    right=medium if c == max_c else thin,
+                    top=medium if r == min_r else thin,
+                    bottom=medium if r == max_r else thin,
+                )
 
         # Config de pagina 10x14 cm
         try:

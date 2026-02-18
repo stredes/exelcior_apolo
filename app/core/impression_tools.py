@@ -54,24 +54,61 @@ def _excel_active_printer_candidates(printer_name: str) -> list[str]:
     candidates = [base]
     try:
         import win32print  # type: ignore
-        h = win32print.OpenPrinter(base)
-        info = win32print.GetPrinter(h, 2)
-        win32print.ClosePrinter(h)
-        port = str(info.get("pPortName", "")).strip()
-        if port:
-            candidates.extend([
-                f"{base} on {port}:",
-                f"{base} on {port}",
-                f"{base} en {port}:",
-                f"{base} en {port}",
-            ])
+        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        for item in win32print.EnumPrinters(flags):
+            try:
+                pname = str(item[2]).strip()
+            except Exception:
+                continue
+            if not pname:
+                continue
+            low_base = base.lower()
+            low_p = pname.lower()
+            if low_base != low_p and low_base not in low_p and low_p not in low_base:
+                continue
+
+            candidates.append(pname)
+            try:
+                h = win32print.OpenPrinter(pname)
+                info = win32print.GetPrinter(h, 2)
+                win32print.ClosePrinter(h)
+                port = str(info.get("pPortName", "")).strip()
+            except Exception:
+                port = ""
+            if port:
+                candidates.extend([
+                    f"{pname} on {port}:",
+                    f"{pname} on {port}",
+                    f"{pname} en {port}:",
+                    f"{pname} en {port}",
+                ])
     except Exception:
         pass
     return list(dict.fromkeys(candidates))
 
 
 def _set_excel_active_printer(excel_app, printer_name: str) -> bool:
-    for candidate in _excel_active_printer_candidates(printer_name):
+    candidates = _excel_active_printer_candidates(printer_name)
+    # Excel suele mantener un sufijo de puerto en ActivePrinter; lo reutilizamos.
+    try:
+        current_ap = str(excel_app.ActivePrinter or "").strip()
+        low = current_ap.lower()
+        suffixes = []
+        for sep in (" on ", " en "):
+            idx = low.rfind(sep)
+            if idx != -1 and current_ap.endswith(":"):
+                suffixes.append(current_ap[idx:])
+        if suffixes:
+            expanded = []
+            for c in candidates:
+                expanded.append(c)
+                for sfx in suffixes:
+                    expanded.append(f"{c}{sfx}")
+            candidates = expanded
+    except Exception:
+        pass
+
+    for candidate in list(dict.fromkeys(candidates)):
         try:
             excel_app.ActivePrinter = candidate
             log_evento(f"[print] ActivePrinter aplicado: {candidate}", "info")
@@ -79,6 +116,23 @@ def _set_excel_active_printer(excel_app, printer_name: str) -> bool:
         except Exception:
             continue
     return False
+
+
+def _imprimir_windows_printto(xlsx_path: Path, printer_name: str) -> bool:
+    """
+    Intenta enrutar explícitamente a una impresora en Windows sin LibreOffice.
+    """
+    target = _resolve_windows_printer_name(printer_name)
+    if not target:
+        return False
+    try:
+        import win32api  # type: ignore
+        win32api.ShellExecute(0, "printto", str(xlsx_path), f'"{target}"', ".", 0)
+        log_evento(f"Impresión por printto: {xlsx_path.name} -> {target}", "info")
+        return True
+    except Exception as e:
+        log_evento(f"[print] printto falló para '{target}': {e}", "warning")
+        return False
 
 
 def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Listado") -> Path:
@@ -168,13 +222,12 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
 def enviar_a_impresora(archivo: Path, impresora_linux: Optional[str] = "Default", cleanup: bool = False) -> None:
     """
     Envía el .xlsx a la impresora por defecto del sistema.
-    - Windows:   Excel COM; si falla, LibreOffice (soffice) con timeout.
+    - Windows:   Excel COM; si falla usa mecanismos nativos de Windows.
     - Linux:     LibreOffice headless (--pt <impresora>), fallback a 'lp'.
     - macOS:     'lp'.
 
     Vars entorno:
-      - EXCELCIOR_PRINT_APP    -> ruta completa a soffice.exe (opcional)
-      - EXCELCIOR_PRINTER      -> nombre impresora (con soffice)
+      - EXCELCIOR_PRINTER      -> nombre impresora destino (Windows/Linux)
       - EXCELCIOR_PRINT_TIMEOUT-> segundos de timeout (int, default 25)
     """
     if not archivo or not Path(archivo).exists():
@@ -256,9 +309,7 @@ def _imprimir_windows(xlsx_path: Path) -> None:
     """
     Windows: intenta en orden:
       1) Excel COM (si Excel está instalado y registrado)
-      2) Ejecutable EXCELCIOR_PRINT_APP (si apunta a soffice.exe)
-      3) LibreOffice (soffice.exe) autodescubierto (PATH / Program Files / Registro)
-      4) ShellExecute 'print' como último recurso
+      2) ShellExecute 'print' como último recurso (sin LibreOffice)
     """
     # 1) Excel COM
     try:
@@ -291,13 +342,24 @@ def _imprimir_windows(xlsx_path: Path) -> None:
             forced_printer = os.environ.get("EXCELCIOR_PRINTER", "").strip()
             if forced_printer:
                 resolved = _resolve_windows_printer_name(forced_printer)
-                if not _set_excel_active_printer(excel, resolved):
+                try:
+                    old_default_printer = win32print.GetDefaultPrinter()
+                except Exception:
+                    old_default_printer = None
+                if old_default_printer and old_default_printer.strip().lower() != resolved.strip().lower():
                     try:
-                        old_default_printer = win32print.GetDefaultPrinter()
                         win32print.SetDefaultPrinter(resolved)
-                        log_evento(f"[print] Default temporal (COM fallback): {resolved}", "warning")
+                        log_evento(f"[print] Default temporal (COM): {resolved}", "info")
                     except Exception as e:
                         log_evento(f"[print] No se pudo forzar default temporal: {e}", "warning")
+                if not _set_excel_active_printer(excel, resolved):
+                    raise RuntimeError(
+                        f"No se pudo aplicar ActivePrinter explicito para '{resolved}' en Excel COM."
+                    )
+                try:
+                    log_evento(f"[print] ActivePrinter final COM: {excel.ActivePrinter}", "info")
+                except Exception:
+                    pass
 
             sh.PrintOut()
             wb.Close(SaveChanges=False)
@@ -327,29 +389,23 @@ def _imprimir_windows(xlsx_path: Path) -> None:
     except Exception as com_err:
         log_evento(f"Excel COM no disponible o falló: {com_err}", "warning")
 
-    # 2) Ejecutable forzado (soffice)
-    forced = os.environ.get("EXCELCIOR_PRINT_APP", "").strip().strip('"')
-    if forced:
-        log_evento(f"Usando ejecutable configurado EXCELCIOR_PRINT_APP: {forced}", "info")
-        _imprimir_via_soffice_like(Path(forced), xlsx_path)
-        return
+    # Si hay impresora forzada y COM no pudo respetarla, no intentar rutas ambiguas.
+    forced_printer = os.environ.get("EXCELCIOR_PRINTER", "").strip()
+    if forced_printer:
+        if _imprimir_windows_printto(xlsx_path, forced_printer):
+            return
+        raise RuntimeError(
+            f"No se pudo imprimir por Excel COM respetando la impresora forzada '{forced_printer}'."
+        )
 
-    # 3) Buscar soffice en sistema
-    soffice = _find_soffice_on_windows()
-    if soffice:
-        log_evento(f"LibreOffice detectado: {soffice}", "info")
-        _imprimir_via_soffice_like(Path(soffice), xlsx_path)
-        return
-
-    # 4) Último recurso: asociación de Windows
+    # Último recurso: asociación de Windows
     try:
         os.startfile(str(xlsx_path), "print")
         log_evento(f"Impresión enviada por asociación de Windows: {xlsx_path.name}", "info")
         return
     except Exception as e:
         raise RuntimeError(
-            "No se pudo imprimir: Excel COM no disponible y no se halló LibreOffice (soffice). "
-            "Instala Microsoft Excel o LibreOffice, o define EXCELCIOR_PRINT_APP con la ruta a soffice.exe."
+            "No se pudo imprimir: Excel COM no disponible y falló la asociación de Windows."
         ) from e
 
 
