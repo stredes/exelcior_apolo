@@ -65,6 +65,14 @@ function Get-CommandPath([string]$name){
   if ($cmd) { return $cmd.Path } else { return $null }
 }
 
+function Get-PythonExeForVersion([string]$pyVer){
+  try {
+    $out = (& py -$pyVer -c "import sys; print(sys.executable)" 2>$null | Select-Object -First 1).Trim()
+    if ($out -and (Test-Path -LiteralPath $out)) { return $out }
+  } catch {}
+  return $null
+}
+
 function Assert-File([string]$path, [string]$hint=""){
   if (-not (Test-Path -LiteralPath $path)) {
     throw "No se encontró: $path. $hint"
@@ -123,7 +131,20 @@ if ($PythonVersion) {
   Write-Info "Python version: $PythonVersion"
   try {
     if ([version]("$PythonVersion.0") -ge [version]"3.13.0") {
-      Write-Warn "Python $PythonVersion puede no tener ruedas precompiladas para algunas dependencias (ej. numpy). Recomendado: usar .venv con Python 3.11/3.12."
+      Write-Warn "Python $PythonVersion puede no tener ruedas precompiladas para algunas dependencias (ej. numpy)."
+      if (-not $PSBoundParameters.ContainsKey('PythonExe')) {
+        $py312 = Get-PythonExeForVersion "3.12"
+        $py311 = Get-PythonExeForVersion "3.11"
+        $fallback = if ($py312) { $py312 } elseif ($py311) { $py311 } else { $null }
+        if ($fallback) {
+          Write-Warn "Cambiando automáticamente a Python compatible: $fallback"
+          $PythonExe = $fallback
+          $PythonVersion = (& $PythonExe -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2>$null | Select-Object -First 1).Trim()
+          Write-Info "Python final para build: $PythonExe (v$PythonVersion)"
+        } else {
+          Write-Warn "No se encontró Python 3.12/3.11 en el sistema. Si falla numpy, instala Python 3.12 y vuelve a ejecutar."
+        }
+      }
     }
   } catch {
     # sin-op: solo advertencia informativa

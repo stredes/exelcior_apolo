@@ -188,7 +188,9 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
     # Heurística por longitud de cadena; padding y límites razonables.
     PAD = 2          # “aire” lateral
     MIN_W = 10       # ancho mínimo (excel units aprox)
-    MAX_W = 100      # ancho máximo por columna
+    # Evita desbordes horizontales que terminan en una 2da hoja.
+    sheet_key = (sheet_name or "").strip().lower()
+    MAX_W = 32 if sheet_key in {"listado", "urbano", "fedex"} else 60
     for col_idx in range(1, ncols + 1):
         header = ws.cell(row=2, column=col_idx).value
         max_len = len(str(header)) if header is not None else 0
@@ -209,6 +211,8 @@ def generar_excel_temporal(df: pd.DataFrame, titulo: str, sheet_name: str = "Lis
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
+    if hasattr(ws, "sheet_properties") and hasattr(ws.sheet_properties, "pageSetUpPr"):
+        ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[attr-defined]
     ws.page_margins = PageMargins(left=0.3, right=0.3, top=0.5, bottom=0.5)
 
     # --- Guardar temporal

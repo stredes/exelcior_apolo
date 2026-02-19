@@ -303,7 +303,8 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     txt_cli   = _clean_text_series(df[cli_col])   if cli_col   else pd.Series("", index=df.index, dtype="string")
     txt_loc   = _clean_text_series(df[loc_col])   if loc_col   else pd.Series("", index=df.index, dtype="string")
     txt_city  = _clean_text_series(df[city_col])  if city_col  else txt_loc.copy()
-    txt_track = _clean_text_series(df[rastreo_c]) if rastreo_c else pd.Series("", index=df.index, dtype="string")
+    # Evita imprimir rastreos como 61396.0; los normaliza a entero-texto.
+    txt_track = _stringify_tracking(df[rastreo_c]) if rastreo_c else pd.Series("", index=df.index, dtype="string")
 
     out["GUIA"]        = txt_guia
     out["CLIENTE"]     = txt_cli
@@ -484,3 +485,29 @@ def formatear_tabla_ws(ws) -> None:
         cur = ws.column_dimensions[col_letter].width
         if cur is None or cur < w:
             ws.column_dimensions[col_letter].width = w
+
+    # Limita anchos máximos para evitar corte horizontal en 2 hojas.
+    if is_urbano:
+        max_widths = [16, 24, 16, 16, 8, 14]
+    elif is_fedex:
+        max_widths = [18, 12, 16, 16, 20, 8]
+    else:
+        max_widths = [28] * max_col
+
+    for i, wmax in enumerate(max_widths, start=1):
+        if i > max_col:
+            break
+        col_letter = get_column_letter(i)
+        cur = ws.column_dimensions[col_letter].width
+        if cur is not None and cur > wmax:
+            ws.column_dimensions[col_letter].width = wmax
+
+    # Refuerza impresión a 1 página de ancho.
+    try:
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        if hasattr(ws, "sheet_properties") and hasattr(ws.sheet_properties, "pageSetUpPr"):
+            ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[attr-defined]
+    except Exception:
+        pass

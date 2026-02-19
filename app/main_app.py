@@ -579,7 +579,10 @@ class ExcelPrinterApp(tk.Tk):
             self.safe_messagebox("error", "Archivo no válido", err)
             log_evento(f"Archivo no válido seleccionado: {path}", nivel="warning", accion="seleccion_archivo")
             return
-        set_carpeta_descarga_personalizada(Path(path).parent, self.mode)
+        # Primera carga manual: usa la misma carpeta base para todos los modos principales.
+        base_folder = Path(path).parent
+        for m in ("listados", "fedex", "urbano"):
+            set_carpeta_descarga_personalizada(base_folder, m)
         log_evento(f"Archivo seleccionado: {path}", nivel="info", accion="seleccion_archivo")
         self.processing = True
         self._set_controls_enabled(False)
