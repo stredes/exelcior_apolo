@@ -31,6 +31,8 @@ function Save-State([string]$status, [string]$errorMessage = '') {
 }
 
 try {
+  Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())
+
   if (Test-Path -LiteralPath $logPath) {
     Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
   }

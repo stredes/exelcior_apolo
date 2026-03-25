@@ -428,6 +428,7 @@ try {
             "-File",
             str(helper_path),
         ],
+        cwd=str(temp_root),
         close_fds=True,
     )
 
