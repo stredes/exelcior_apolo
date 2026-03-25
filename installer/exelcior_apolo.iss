@@ -51,3 +51,4 @@ Filename: "{app}\{#AppExeName}"; Flags: nowait postinstall skipifsilent
 
 
 
+

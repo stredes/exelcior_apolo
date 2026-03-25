@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import threading
-import time
 import uuid
-import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -167,11 +165,13 @@ def launch_portable_update(zip_path: Path) -> None:
     extract_dir = temp_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
     extract_dir.mkdir(parents=True, exist_ok=True)
     helper_path = temp_root / "apply_portable_update.ps1"
+    log_path = temp_root / "portable_update_last.log"
     update_config = {
         "zip_path": str(zip_path),
         "extract_dir": str(extract_dir),
         "install_dir": str(install_dir),
         "exe_name": exe_path.name,
+        "current_pid": os.getpid(),
         "desktop_names": [
             "Exelcior Apolo.lnk",
             "ExelciorApolo.lnk",
@@ -179,90 +179,145 @@ def launch_portable_update(zip_path: Path) -> None:
     }
     config_path = temp_root / f"portable_update_{uuid.uuid4().hex}.json"
     config_path.write_text(json.dumps(update_config, ensure_ascii=False, indent=2), encoding="utf-8")
-
     helper_script = r"""
-import json
-import shutil
-import subprocess
-import sys
-import tempfile
-import time
-import zipfile
-from pathlib import Path
+$ErrorActionPreference = 'Stop'
+$cfg = Get-Content -LiteralPath '__CONFIG_PATH__' -Raw | ConvertFrom-Json
+$zipPath = [string]$cfg.zip_path
+$extractDir = [string]$cfg.extract_dir
+$installDir = [string]$cfg.install_dir
+$exeName = [string]$cfg.exe_name
+$currentPid = [int]$cfg.current_pid
+$desktopNames = @($cfg.desktop_names)
+$parentDir = Split-Path -Parent $installDir
+$backupDir = Join-Path $parentDir ((Split-Path -Leaf $installDir) + '_backup')
+$stagingDir = Join-Path $parentDir ((Split-Path -Leaf $installDir) + '_staging')
+$logPath = '__LOG_PATH__'
 
-config_path = Path(sys.argv[1])
-cfg = json.loads(config_path.read_text(encoding="utf-8"))
-zip_path = Path(cfg["zip_path"])
-extract_dir = Path(cfg["extract_dir"])
-install_dir = Path(cfg["install_dir"])
-exe_name = cfg["exe_name"]
-desktop_names = cfg.get("desktop_names", [])
+function Write-Log([string]$message) {
+  $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+  Add-Content -LiteralPath $logPath -Value "[$timestamp] $message" -Encoding UTF8
+}
 
-time.sleep(2)
-if extract_dir.exists():
-    shutil.rmtree(extract_dir, ignore_errors=True)
-extract_dir.mkdir(parents=True, exist_ok=True)
+try {
+  if (Test-Path -LiteralPath $logPath) {
+    Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+  }
 
-with zipfile.ZipFile(zip_path, "r") as zf:
-    zf.extractall(extract_dir)
+  Write-Log 'Inicio de parche portable.'
+  Write-Log "ZIP: $zipPath"
+  Write-Log "InstallDir: $installDir"
+  Write-Log "PID actual: $currentPid"
 
-package_dir = extract_dir / "ExelciorApolo"
-if not package_dir.exists():
-    dirs = [p for p in extract_dir.iterdir() if p.is_dir()]
-    if len(dirs) == 1:
-        package_dir = dirs[0]
-if not package_dir.exists():
-    raise RuntimeError("No se encontro la carpeta ExelciorApolo dentro del paquete portable.")
+  for ($i = 0; $i -lt 120; $i++) {
+    $proc = Get-Process -Id $currentPid -ErrorAction SilentlyContinue
+    if (-not $proc) {
+      Write-Log 'Proceso principal liberado.'
+      break
+    }
+    Start-Sleep -Milliseconds 500
+  }
 
-new_exe = package_dir / exe_name
-if not new_exe.exists():
-    raise RuntimeError(f"No se encontro el ejecutable esperado en el paquete: {new_exe}")
+  if (Get-Process -Id $currentPid -ErrorAction SilentlyContinue) {
+    throw "La aplicaci?n principal no se cerr? a tiempo. PID: $currentPid"
+  }
 
-backup_dir = install_dir.parent / f"{install_dir.name}_backup"
-staging_dir = install_dir.parent / f"{install_dir.name}_staging"
-if backup_dir.exists():
-    shutil.rmtree(backup_dir, ignore_errors=True)
-if staging_dir.exists():
-    shutil.rmtree(staging_dir, ignore_errors=True)
+  if (Test-Path -LiteralPath $extractDir) {
+    Write-Log 'Limpiando extractDir anterior.'
+    Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if (Test-Path -LiteralPath $stagingDir) {
+    Write-Log 'Limpiando stagingDir anterior.'
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
-shutil.copytree(package_dir, staging_dir)
-if not (staging_dir / exe_name).exists():
-    raise RuntimeError("El paquete staged no contiene el ejecutable principal.")
+  Write-Log 'Expandiendo ZIP portable.'
+  Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
 
-if install_dir.exists():
-    install_dir.rename(backup_dir)
-staging_dir.rename(install_dir)
-shutil.rmtree(backup_dir, ignore_errors=True)
+  $packageDir = Join-Path $extractDir 'ExelciorApolo'
+  if (-not (Test-Path -LiteralPath $packageDir)) {
+    $dirs = @(Get-ChildItem -LiteralPath $extractDir -Directory)
+    if ($dirs.Count -eq 1) {
+      $packageDir = $dirs[0].FullName
+    }
+  }
+  if (-not (Test-Path -LiteralPath $packageDir)) {
+    throw 'No se encontr? la carpeta ExelciorApolo dentro del paquete portable.'
+  }
 
-desktop_dir = Path.home() / "Desktop"
-target_exe = install_dir / exe_name
-if desktop_dir.exists():
-    for shortcut_name in desktop_names:
-        shortcut_path = desktop_dir / shortcut_name
-        if shortcut_path.exists():
-            shortcut_path.unlink(missing_ok=True)
-    ps_script = (
-        "$WshShell = New-Object -ComObject WScript.Shell;"
-        f"$Shortcut = $WshShell.CreateShortcut('{str((desktop_dir / desktop_names[0]).resolve()).replace(\"'\", \"''\")}');"
-        f"$Shortcut.TargetPath = '{str(target_exe).replace(\"'\", \"''\")}';"
-        f"$Shortcut.WorkingDirectory = '{str(install_dir).replace(\"'\", \"''\")}';"
-        f"$Shortcut.IconLocation = '{str(target_exe).replace(\"'\", \"''\")},0';"
-        "$Shortcut.Save();"
-    )
-    subprocess.run(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-        check=False,
-        creationflags=0x08000000,
-    )
+  Write-Log 'Copiando paquete expandido a staging.'
+  Copy-Item -LiteralPath $packageDir -Destination $stagingDir -Recurse -Force
+  $newExe = Join-Path $stagingDir $exeName
+  if (-not (Test-Path -LiteralPath $newExe)) {
+    throw "No se encontr? el ejecutable esperado en el paquete: $newExe"
+  }
+  Write-Log "Ejecutable validado en staging: $newExe"
 
-subprocess.Popen([str(target_exe)], cwd=str(install_dir))
+  if (Test-Path -LiteralPath $backupDir) {
+    Write-Log 'Eliminando backup anterior.'
+    Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if (Test-Path -LiteralPath $installDir) {
+    Write-Log 'Moviendo instalaci?n actual a backup.'
+    Move-Item -LiteralPath $installDir -Destination $backupDir -Force
+  }
+  Write-Log 'Moviendo staging a instalaci?n final.'
+  Move-Item -LiteralPath $stagingDir -Destination $installDir -Force
+
+  $targetExe = Join-Path $installDir $exeName
+  if (-not (Test-Path -LiteralPath $targetExe)) {
+    if (Test-Path -LiteralPath $installDir) {
+      Remove-Item -LiteralPath $installDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $backupDir) {
+      Move-Item -LiteralPath $backupDir -Destination $installDir -Force
+    }
+    throw "La actualizaci?n no dej? un ejecutable v?lido en: $targetExe"
+  }
+  Write-Log "Instalaci?n final v?lida: $targetExe"
+
+  $desktopDir = [Environment]::GetFolderPath('Desktop')
+  if ($desktopDir -and (Test-Path -LiteralPath $desktopDir)) {
+    Write-Log 'Recreando acceso directo de escritorio.'
+    foreach ($shortcutName in $desktopNames) {
+      $shortcutPath = Join-Path $desktopDir $shortcutName
+      if (Test-Path -LiteralPath $shortcutPath) {
+        Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
+      }
+    }
+
+    $shortcutPath = Join-Path $desktopDir $desktopNames[0]
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+    $Shortcut.TargetPath = $targetExe
+    $Shortcut.WorkingDirectory = $installDir
+    $Shortcut.IconLocation = "$targetExe,0"
+    $Shortcut.Save()
+  }
+
+  if (Test-Path -LiteralPath $backupDir) {
+    Write-Log 'Eliminando backup antiguo.'
+    Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  Write-Log 'Relanzando ejecutable actualizado.'
+  Start-Process -FilePath $targetExe -WorkingDirectory $installDir
+} catch {
+  Write-Log "Fallo de parche portable: $($_.Exception.Message)"
+  throw
+}
 """
+    helper_script = helper_script.replace("__CONFIG_PATH__", str(config_path).replace('\\', '\\\\'))
+    helper_script = helper_script.replace("__LOG_PATH__", str(log_path).replace('\\', '\\\\'))
     helper_path.write_text(helper_script.strip(), encoding="utf-8")
     subprocess.Popen(
         [
-            sys.executable,
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
             str(helper_path),
-            str(config_path),
         ],
         close_fds=True,
     )

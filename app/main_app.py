@@ -147,11 +147,11 @@ class ExcelPrinterApp(tk.Tk):
             screen_w, screen_h = 1366, 768
 
         min_w, min_h = 960, 640
-        width = max(min_w, int(screen_w * 0.76))
+        width = max(min_w, int(screen_w * 0.82))
         height = max(min_h, int(screen_h * 0.82))
 
         # Evita ventanas excesivamente anchas que dejan mucho espacio muerto
-        width = min(width, 1440)
+        width = min(width, 1560)
 
         width = min(width, screen_w)
         height = min(height, screen_h)
@@ -180,8 +180,9 @@ class ExcelPrinterApp(tk.Tk):
         content_wrap = getattr(self, "_content_wrap", None)
         if content_wrap is not None:
             try:
-                available = max(760, event.width - (self.sidebar.winfo_width() if self.sidebar is not None else 260) - 48)
-                target = min(available, 1280)
+                sidebar_width = self.sidebar.winfo_width() if self.sidebar is not None else 260
+                available = max(900, event.width - sidebar_width - 28)
+                target = min(available, 1460)
                 content_wrap.configure(width=target)
             except Exception:
                 pass
@@ -340,13 +341,14 @@ class ExcelPrinterApp(tk.Tk):
         shell = tk.Frame(self.main_frame, bg="#E7ECF3")
         shell.pack(fill="both", expand=True)
         shell.grid_columnconfigure(0, weight=1)
+        shell.grid_rowconfigure(0, weight=1)
 
         content_wrap = tk.Frame(shell, bg="#E7ECF3")
-        content_wrap.grid(row=0, column=0, sticky="n", padx=24)
+        content_wrap.grid(row=0, column=0, sticky="nsew", padx=14)
         self._content_wrap = content_wrap
 
         hero = tk.Frame(content_wrap, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
-        hero.pack(fill="x", padx=24, pady=(24, 12))
+        hero.pack(fill="x", padx=12, pady=(18, 10))
 
         ttk.Label(hero, text="Exelcior Apolo  |  Actualizacion Visible", style="CardTitle.TLabel", anchor="center").pack(
             pady=(22, 6), padx=24, fill="x"
@@ -356,7 +358,7 @@ class ExcelPrinterApp(tk.Tk):
             text="Esta version incluye cambios visuales de prueba para confirmar que el sistema de actualizacion está funcionando.",
             style="CardSub.TLabel",
             anchor="center",
-        ).pack(pady=(0, 12), padx=24, fill="x")
+        ).pack(pady=(0, 12), padx=16, fill="x")
         ttk.Label(hero, text="BUILD DE PRUEBA DE ACTUALIZACION", style="HeroBadge.TLabel", anchor="center").pack(
             pady=(0, 18), ipadx=12, ipady=4
         )
@@ -366,7 +368,7 @@ class ExcelPrinterApp(tk.Tk):
             padding=12,
             style="Mode.TLabelframe",
         )
-        mode_frame.pack(fill="x", padx=20, pady=(0, 18))
+        mode_frame.pack(fill="x", padx=16, pady=(0, 18))
 
         mode_strip = tk.Frame(mode_frame, bg="#FFFFFF")
         mode_strip.pack(fill="x")
@@ -393,7 +395,7 @@ class ExcelPrinterApp(tk.Tk):
         self._refresh_mode_buttons()
 
         summary_row = tk.Frame(content_wrap, bg="#E7ECF3")
-        summary_row.pack(fill="x", padx=24, pady=(0, 12))
+        summary_row.pack(fill="x", padx=12, pady=(0, 10))
         self._build_metric_card(
             summary_row,
             "Operacion activa",
@@ -417,13 +419,13 @@ class ExcelPrinterApp(tk.Tk):
         ).pack(side="left", fill="both", expand=True, padx=(8, 0))
 
         showcase = tk.Frame(content_wrap, bg="#E7ECF3")
-        showcase.pack(fill="both", expand=True, padx=24, pady=(0, 16))
-        showcase.columnconfigure(0, weight=2)
+        showcase.pack(fill="both", expand=True, padx=12, pady=(0, 14))
+        showcase.columnconfigure(0, weight=3)
         showcase.columnconfigure(1, weight=1)
         showcase.rowconfigure(0, weight=1)
 
         visual_panel = tk.Frame(showcase, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
-        visual_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        visual_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         side_panel = tk.Frame(showcase, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
         side_panel.grid(row=0, column=1, sticky="nsew")
 
@@ -474,7 +476,7 @@ class ExcelPrinterApp(tk.Tk):
         self._build_info_row(side_panel, "Estado en vivo", self.status_var).pack(fill="x", padx=20, pady=6)
 
         self._content_spacer = tk.Frame(content_wrap, bg="#E7ECF3")
-        self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        self._content_spacer.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
     def _setup_status_bar(self):
         status_frame = tk.Frame(self, bg="#102033")
