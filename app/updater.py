@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional
 GITHUB_REPO = "stredes/exelcior_apolo"
 GITHUB_API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 SETUP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_Setup\.exe$", re.IGNORECASE)
+PORTABLE_ZIP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_(Portable|portable)\.zip$", re.IGNORECASE)
 REQUEST_TIMEOUT = 12
 
 
@@ -82,6 +83,7 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
 
     assets = payload.get("assets") or []
     setup_asset = None
+    portable_asset = None
     for asset in assets:
         if not isinstance(asset, dict):
             continue
@@ -90,22 +92,26 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
         if name and url and SETUP_ASSET_PATTERN.search(name):
             setup_asset = {"name": name, "url": url}
             break
+        if name and url and PORTABLE_ZIP_ASSET_PATTERN.search(name):
+            portable_asset = {"name": name, "url": url}
 
-    if not setup_asset:
+    selected_asset = setup_asset or portable_asset
+    if not selected_asset:
         return None
 
     return {
         "version": version,
         "tag_name": tag_name,
-        "asset_name": setup_asset["name"],
-        "asset_url": setup_asset["url"],
+        "asset_name": selected_asset["name"],
+        "asset_url": selected_asset["url"],
+        "asset_kind": "setup" if setup_asset else "portable_zip",
         "html_url": str(payload.get("html_url") or ""),
         "published_at": str(payload.get("published_at") or ""),
         "body": str(payload.get("body") or ""),
     }
 
 
-def download_installer(asset_url: str, asset_name: str) -> Path:
+def download_release_asset(asset_url: str, asset_name: str) -> Path:
     requests = _get_requests()
     target_dir = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -134,6 +140,59 @@ def launch_installer(installer_path: Path) -> None:
     raise RuntimeError("La instalacion automatica solo esta soportada en Windows.")
 
 
+def launch_portable_update(zip_path: Path) -> None:
+    if not zip_path.exists():
+        raise FileNotFoundError(f"No se encontro el paquete portable descargado: {zip_path}")
+    if not getattr(sys, "frozen", False):
+        raise RuntimeError("La actualizacion portable solo esta soportada en la app empaquetada.")
+    if not sys.platform.startswith("win"):
+        raise RuntimeError("La actualizacion portable solo esta soportada en Windows.")
+
+    install_dir = Path(sys.executable).resolve().parent
+    temp_root = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
+    extract_dir = temp_root / f"extract_{zip_path.stem}"
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    helper_path = temp_root / "apply_portable_update.ps1"
+
+    script = f"""
+$ErrorActionPreference = 'Stop'
+$zipPath = '{str(zip_path).replace("'", "''")}'
+$extractDir = '{str(extract_dir).replace("'", "''")}'
+$installDir = '{str(install_dir).replace("'", "''")}'
+$exeName = '{Path(sys.executable).name}'
+Start-Sleep -Seconds 2
+if (Test-Path -LiteralPath $extractDir) {{
+  Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+}}
+New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+$packageDir = Join-Path $extractDir 'ExelciorApolo'
+if (-not (Test-Path -LiteralPath $packageDir)) {{
+  $dirs = Get-ChildItem -LiteralPath $extractDir -Directory
+  if ($dirs.Count -eq 1) {{
+    $packageDir = $dirs[0].FullName
+  }}
+}}
+if (-not (Test-Path -LiteralPath $packageDir)) {{
+  throw 'No se encontró la carpeta del paquete portable extraído.'
+}}
+robocopy $packageDir $installDir /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+Start-Process -FilePath (Join-Path $installDir $exeName)
+"""
+    helper_path.write_text(script.strip(), encoding="utf-8")
+    subprocess.Popen(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(helper_path),
+        ],
+        close_fds=True,
+    )
+
+
 def start_update_download(
     release_info: Dict[str, str],
     on_ready,
@@ -141,11 +200,11 @@ def start_update_download(
 ) -> threading.Thread:
     def worker() -> None:
         try:
-            installer_path = download_installer(
+            asset_path = download_release_asset(
                 asset_url=release_info["asset_url"],
                 asset_name=release_info["asset_name"],
             )
-            on_ready(installer_path)
+            on_ready(asset_path)
         except Exception as exc:
             logging.exception("Fallo la descarga del instalador")
             on_error(exc)

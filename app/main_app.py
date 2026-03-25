@@ -38,6 +38,7 @@ from app.updater import (
     get_local_version,
     is_newer_version,
     launch_installer,
+    launch_portable_update,
     parse_release_info,
     start_update_download,
 )
@@ -537,13 +538,15 @@ class ExcelPrinterApp(tk.Tk):
             self.safe_messagebox("info", "Actualizacion", "No hay una actualizacion disponible en este momento.")
             return
         current_version = get_local_version()
+        asset_kind = release_info.get("asset_kind", "setup")
+        asset_label = "instalador oficial" if asset_kind == "setup" else "paquete portable"
         wants_update = messagebox.askyesno(
             "Actualizacion disponible",
             (
                 f"Hay una nueva version disponible.\n\n"
                 f"Version actual: {current_version}\n"
                 f"Ultima version: {release_info['version']}\n\n"
-                f"Se descargara el instalador oficial desde GitHub Releases."
+                f"Se descargara el {asset_label} desde GitHub Releases."
             ),
             parent=self,
         )
@@ -561,7 +564,10 @@ class ExcelPrinterApp(tk.Tk):
 
     def _finish_update_download(self, installer_path: Path) -> None:
         try:
-            launch_installer(installer_path)
+            if self._update_release_info and self._update_release_info.get("asset_kind") == "portable_zip":
+                launch_portable_update(installer_path)
+            else:
+                launch_installer(installer_path)
             self._update_status("Instalador lanzado. Cerrando aplicacion...")
             self.after(500, self._on_close)
         except Exception as exc:

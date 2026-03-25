@@ -764,11 +764,22 @@ if (-not $SkipSignInstaller -and $CanBuildInstaller -and $setupName) {
 Write-Info "Generando checksums SHA256..."
 $exeHash = Get-FileHash -LiteralPath (Join-Path $distDir $ExeName) -Algorithm SHA256
 $hashFile = Join-Path $outDir ("checksums_{0}.txt" -f $Version)
+$portableZip = Join-Path $outDir ("ExelciorApolo_{0}_Portable.zip" -f $Version)
+
+if (Test-Path -LiteralPath $portableZip) {
+  Remove-Item -LiteralPath $portableZip -Force
+}
+Write-Info "Generando paquete portable ZIP..."
+Compress-Archive -Path (Join-Path $distDir '*') -DestinationPath $portableZip -Force
 
 $hashLines = @(
   "== Checksums $AppName v$Version ==",
   "EXE (dist): $($exeHash.Hash)  *$($exeHash.Path)"
 )
+if (Test-Path -LiteralPath $portableZip) {
+  $zipHash = Get-FileHash -LiteralPath $portableZip -Algorithm SHA256
+  $hashLines += "PORTABLE:   $($zipHash.Hash)  *$($zipHash.Path)"
+}
 if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName)) {
   $setHash = Get-FileHash -LiteralPath $setupName -Algorithm SHA256
   $hashLines += "SETUP:      $($setHash.Hash)  *$($setHash.Path)"
@@ -821,6 +832,9 @@ if (-not $SkipGitHubPublish) {
   } else {
     Write-Warn "No hay instalador para subir al release."
   }
+  if (Test-Path -LiteralPath $portableZip) {
+    Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $portableZip
+  }
   Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $hashFile
   Write-OK "Publicación en GitHub completada."
 }
@@ -838,6 +852,9 @@ if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName))
   Write-Host ("Installer:  {0}" -f "OMITIDO")
 }
 Write-Host ("Checksums:  {0}" -f (Resolve-Path $hashFile))
+if (Test-Path -LiteralPath $portableZip) {
+  Write-Host ("Portable:   {0}" -f (Resolve-Path $portableZip))
+}
 if ($publishedRelease -and $publishedRelease.html_url) {
   Write-Host ("Release:    {0}" -f $publishedRelease.html_url)
 }
