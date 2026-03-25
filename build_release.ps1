@@ -320,10 +320,14 @@ function Send-ReleaseAsset([string]$repo, [string]$token, $release, [string]$fil
   Assert-File $filePath "Asset faltante para GitHub Release."
   $assetName = Split-Path -Leaf $filePath
   Remove-ExistingReleaseAsset -repo $repo -token $token -release $release -assetName $assetName
-  $uploadUrl = [string]$release.upload_url
-  if (-not $uploadUrl) { throw "La release no devolvió upload_url." }
-  $uploadUrl = $uploadUrl -replace '\{\?name,label\}$', ''
-  $uploadUrl = "$uploadUrl?name=$([System.Uri]::EscapeDataString($assetName))"
+  $repo = ([string]$repo).Trim() -replace '\\', '/' -replace '\s+', ''
+  $releaseId = ([string]$release.id).Trim()
+  if (-not $releaseId) { throw "La release no devolvió un id válido." }
+  if ($repo -notmatch '^[^/]+/[^/]+$') {
+    throw "Repositorio GitHub inválido para upload: '$repo'"
+  }
+  $assetNameEncoded = [System.Uri]::EscapeDataString($assetName)
+  $uploadUrl = [System.Uri]::new("https://uploads.github.com/repos/$repo/releases/$releaseId/assets?name=$assetNameEncoded")
 
   $headers = @{
     Authorization = "Bearer $token"
