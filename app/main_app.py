@@ -353,18 +353,15 @@ class ExcelPrinterApp(tk.Tk):
         hero = tk.Frame(content_wrap, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
         hero.pack(fill="x", padx=12, pady=(18, 10))
 
-        ttk.Label(hero, text="Exelcior Apolo  |  Actualizacion Visible", style="CardTitle.TLabel", anchor="center").pack(
+        ttk.Label(hero, text="Exelcior Apolo", style="CardTitle.TLabel", anchor="center").pack(
             pady=(22, 6), padx=24, fill="x"
         )
         ttk.Label(
             hero,
-            text="Esta version incluye cambios visuales de prueba para confirmar que el sistema de actualizacion está funcionando.",
+            text="Centro operativo para carga, impresion y administracion de actualizaciones.",
             style="CardSub.TLabel",
             anchor="center",
-        ).pack(pady=(0, 12), padx=16, fill="x")
-        ttk.Label(hero, text="BUILD DE PRUEBA DE ACTUALIZACION", style="HeroBadge.TLabel", anchor="center").pack(
-            pady=(0, 18), ipadx=12, ipady=4
-        )
+        ).pack(pady=(0, 18), padx=16, fill="x")
         mode_frame = ttk.LabelFrame(
             hero,
             text="Modo de Operacion",
