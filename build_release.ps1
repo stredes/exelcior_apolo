@@ -770,7 +770,7 @@ if (Test-Path -LiteralPath $portableZip) {
   Remove-Item -LiteralPath $portableZip -Force
 }
 Write-Info "Generando paquete portable ZIP..."
-Compress-Archive -Path (Join-Path $distDir '*') -DestinationPath $portableZip -Force
+Compress-Archive -Path $distDir -DestinationPath $portableZip -Force
 
 $hashLines = @(
   "== Checksums $AppName v$Version ==",

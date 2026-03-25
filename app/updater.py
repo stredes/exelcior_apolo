@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import time
+import uuid
+import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 GITHUB_REPO = "stredes/exelcior_apolo"
 GITHUB_API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
@@ -111,7 +115,11 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
     }
 
 
-def download_release_asset(asset_url: str, asset_name: str) -> Path:
+def download_release_asset(
+    asset_url: str,
+    asset_name: str,
+    on_progress: Optional[Callable[[int, int], None]] = None,
+) -> Path:
     requests = _get_requests()
     target_dir = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -119,10 +127,15 @@ def download_release_asset(asset_url: str, asset_name: str) -> Path:
 
     with requests.get(asset_url, stream=True, timeout=60) as response:
         response.raise_for_status()
+        total_bytes = int(response.headers.get("Content-Length") or 0)
+        downloaded = 0
         with target_path.open("wb") as fh:
             for chunk in response.iter_content(chunk_size=1024 * 256):
                 if chunk:
                     fh.write(chunk)
+                    downloaded += len(chunk)
+                    if on_progress is not None:
+                        on_progress(downloaded, total_bytes)
     return target_path
 
 
@@ -148,46 +161,108 @@ def launch_portable_update(zip_path: Path) -> None:
     if not sys.platform.startswith("win"):
         raise RuntimeError("La actualizacion portable solo esta soportada en Windows.")
 
-    install_dir = Path(sys.executable).resolve().parent
+    exe_path = Path(sys.executable).resolve()
+    install_dir = exe_path.parent
     temp_root = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
-    extract_dir = temp_root / f"extract_{zip_path.stem}"
+    extract_dir = temp_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
     extract_dir.mkdir(parents=True, exist_ok=True)
     helper_path = temp_root / "apply_portable_update.ps1"
+    update_config = {
+        "zip_path": str(zip_path),
+        "extract_dir": str(extract_dir),
+        "install_dir": str(install_dir),
+        "exe_name": exe_path.name,
+        "desktop_names": [
+            "Exelcior Apolo.lnk",
+            "ExelciorApolo.lnk",
+        ],
+    }
+    config_path = temp_root / f"portable_update_{uuid.uuid4().hex}.json"
+    config_path.write_text(json.dumps(update_config, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    script = f"""
-$ErrorActionPreference = 'Stop'
-$zipPath = '{str(zip_path).replace("'", "''")}'
-$extractDir = '{str(extract_dir).replace("'", "''")}'
-$installDir = '{str(install_dir).replace("'", "''")}'
-$exeName = '{Path(sys.executable).name}'
-Start-Sleep -Seconds 2
-if (Test-Path -LiteralPath $extractDir) {{
-  Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-}}
-New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
-$packageDir = Join-Path $extractDir 'ExelciorApolo'
-if (-not (Test-Path -LiteralPath $packageDir)) {{
-  $dirs = Get-ChildItem -LiteralPath $extractDir -Directory
-  if ($dirs.Count -eq 1) {{
-    $packageDir = $dirs[0].FullName
-  }}
-}}
-if (-not (Test-Path -LiteralPath $packageDir)) {{
-  throw 'No se encontró la carpeta del paquete portable extraído.'
-}}
-robocopy $packageDir $installDir /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-Start-Process -FilePath (Join-Path $installDir $exeName)
+    helper_script = r"""
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import zipfile
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+cfg = json.loads(config_path.read_text(encoding="utf-8"))
+zip_path = Path(cfg["zip_path"])
+extract_dir = Path(cfg["extract_dir"])
+install_dir = Path(cfg["install_dir"])
+exe_name = cfg["exe_name"]
+desktop_names = cfg.get("desktop_names", [])
+
+time.sleep(2)
+if extract_dir.exists():
+    shutil.rmtree(extract_dir, ignore_errors=True)
+extract_dir.mkdir(parents=True, exist_ok=True)
+
+with zipfile.ZipFile(zip_path, "r") as zf:
+    zf.extractall(extract_dir)
+
+package_dir = extract_dir / "ExelciorApolo"
+if not package_dir.exists():
+    dirs = [p for p in extract_dir.iterdir() if p.is_dir()]
+    if len(dirs) == 1:
+        package_dir = dirs[0]
+if not package_dir.exists():
+    raise RuntimeError("No se encontro la carpeta ExelciorApolo dentro del paquete portable.")
+
+new_exe = package_dir / exe_name
+if not new_exe.exists():
+    raise RuntimeError(f"No se encontro el ejecutable esperado en el paquete: {new_exe}")
+
+backup_dir = install_dir.parent / f"{install_dir.name}_backup"
+staging_dir = install_dir.parent / f"{install_dir.name}_staging"
+if backup_dir.exists():
+    shutil.rmtree(backup_dir, ignore_errors=True)
+if staging_dir.exists():
+    shutil.rmtree(staging_dir, ignore_errors=True)
+
+shutil.copytree(package_dir, staging_dir)
+if not (staging_dir / exe_name).exists():
+    raise RuntimeError("El paquete staged no contiene el ejecutable principal.")
+
+if install_dir.exists():
+    install_dir.rename(backup_dir)
+staging_dir.rename(install_dir)
+shutil.rmtree(backup_dir, ignore_errors=True)
+
+desktop_dir = Path.home() / "Desktop"
+target_exe = install_dir / exe_name
+if desktop_dir.exists():
+    for shortcut_name in desktop_names:
+        shortcut_path = desktop_dir / shortcut_name
+        if shortcut_path.exists():
+            shortcut_path.unlink(missing_ok=True)
+    ps_script = (
+        "$WshShell = New-Object -ComObject WScript.Shell;"
+        f"$Shortcut = $WshShell.CreateShortcut('{str((desktop_dir / desktop_names[0]).resolve()).replace(\"'\", \"''\")}');"
+        f"$Shortcut.TargetPath = '{str(target_exe).replace(\"'\", \"''\")}';"
+        f"$Shortcut.WorkingDirectory = '{str(install_dir).replace(\"'\", \"''\")}';"
+        f"$Shortcut.IconLocation = '{str(target_exe).replace(\"'\", \"''\")},0';"
+        "$Shortcut.Save();"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+        check=False,
+        creationflags=0x08000000,
+    )
+
+subprocess.Popen([str(target_exe)], cwd=str(install_dir))
 """
-    helper_path.write_text(script.strip(), encoding="utf-8")
+    helper_path.write_text(helper_script.strip(), encoding="utf-8")
     subprocess.Popen(
         [
-            "powershell",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
+            sys.executable,
             str(helper_path),
+            str(config_path),
         ],
         close_fds=True,
     )
@@ -197,12 +272,14 @@ def start_update_download(
     release_info: Dict[str, str],
     on_ready,
     on_error,
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> threading.Thread:
     def worker() -> None:
         try:
             asset_path = download_release_asset(
                 asset_url=release_info["asset_url"],
                 asset_name=release_info["asset_name"],
+                on_progress=on_progress,
             )
             on_ready(asset_path)
         except Exception as exc:

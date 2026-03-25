@@ -92,6 +92,9 @@ class ExcelPrinterApp(tk.Tk):
         self._update_download_thread = None
         self._update_button = None
         self._update_available = False
+        self._update_progress_win = None
+        self._update_progress_var = tk.DoubleVar(value=0.0)
+        self._update_progress_label_var = tk.StringVar(value="Preparando descarga...")
         self.current_version = get_local_version()
         self.status_var = tk.StringVar(value="Release visual nueva activa. Sistema listo para operar.")
         self.version_var = tk.StringVar(value=f"Version instalada: {self.current_version}")
@@ -556,14 +559,20 @@ class ExcelPrinterApp(tk.Tk):
             self._update_button.configure(state=tk.DISABLED, text="Descargando actualizacion...")
         self.update_badge_var.set(f"Descargando version {release_info['version']}")
         self._update_status(f"Descargando actualizacion {release_info['version']}...")
+        self._show_update_progress()
         self._update_download_thread = start_update_download(
             release_info=release_info,
             on_ready=lambda installer_path: self.after(0, lambda: self._finish_update_download(installer_path)),
             on_error=lambda exc: self.after(0, lambda: self._handle_update_error(exc)),
+            on_progress=lambda downloaded, total: self.after(
+                0,
+                lambda d=downloaded, t=total: self._update_download_progress(d, t),
+            ),
         )
 
     def _finish_update_download(self, installer_path: Path) -> None:
         try:
+            self._close_update_progress()
             if self._update_release_info and self._update_release_info.get("asset_kind") == "portable_zip":
                 launch_portable_update(installer_path)
             else:
@@ -575,6 +584,7 @@ class ExcelPrinterApp(tk.Tk):
 
     def _handle_update_error(self, exc: Exception) -> None:
         logging.exception("Error durante la actualizacion")
+        self._close_update_progress()
         self._update_status("No se pudo completar la actualizacion.")
         if self._update_button is not None and self._update_available and self._update_release_info:
             self._update_button.configure(
@@ -588,6 +598,66 @@ class ExcelPrinterApp(tk.Tk):
             "Actualizacion",
             f"No se pudo descargar o iniciar la actualizacion:\n{exc}",
         )
+
+    def _show_update_progress(self) -> None:
+        if not self._ui_alive():
+            return
+        self._close_update_progress()
+        win = tk.Toplevel(self)
+        win.title("Descargando actualizacion")
+        win.geometry("420x130")
+        win.resizable(False, False)
+        win.transient(self)
+        win.configure(bg="#FFFFFF")
+        win.grab_set()
+
+        wrapper = tk.Frame(win, bg="#FFFFFF", padx=18, pady=18)
+        wrapper.pack(fill="both", expand=True)
+        tk.Label(
+            wrapper,
+            text="Actualizando Exelcior Apolo",
+            bg="#FFFFFF",
+            fg="#17324D",
+            font=("Segoe UI Semibold", 11),
+        ).pack(anchor="w")
+        tk.Label(
+            wrapper,
+            textvariable=self._update_progress_label_var,
+            bg="#FFFFFF",
+            fg="#5B6B7C",
+            font=("Segoe UI", 9),
+        ).pack(anchor="w", pady=(8, 8))
+        pb = ttk.Progressbar(wrapper, orient="horizontal", mode="determinate", maximum=100, variable=self._update_progress_var)
+        pb.pack(fill="x")
+
+        self._update_progress_var.set(0.0)
+        self._update_progress_label_var.set("Iniciando descarga...")
+        self._update_progress_win = win
+
+    def _update_download_progress(self, downloaded: int, total: int) -> None:
+        if self._update_progress_win is None:
+            return
+        if total > 0:
+            percent = max(0.0, min(100.0, (downloaded / total) * 100.0))
+            self._update_progress_var.set(percent)
+            self._update_progress_label_var.set(
+                f"Descargado {downloaded // 1024} KB de {total // 1024} KB ({percent:.0f}%)"
+            )
+        else:
+            # Sin Content-Length: usamos una barra indeterminada simulada.
+            current = self._update_progress_var.get()
+            self._update_progress_var.set((current + 5) % 100)
+            self._update_progress_label_var.set(f"Descargando... {downloaded // 1024} KB")
+
+    def _close_update_progress(self) -> None:
+        try:
+            if self._update_progress_win is not None and self._update_progress_win.winfo_exists():
+                self._update_progress_win.grab_release()
+                self._update_progress_win.destroy()
+        except Exception:
+            pass
+        finally:
+            self._update_progress_win = None
 
     def _ui_set_status_preview_totals(self, df, mode: str):
         try:
@@ -1064,6 +1134,7 @@ class ExcelPrinterApp(tk.Tk):
                 self.executor.shutdown(wait=False, cancel_futures=True)
         except Exception:
             pass
+        self._close_update_progress()
         self._close_preview_window()
         try:
             self.destroy()
