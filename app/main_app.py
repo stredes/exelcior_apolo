@@ -1,4 +1,4 @@
-# app/main_app.py
+﻿# app/main_app.py
 import os
 import sys
 import logging
@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 
-# Asegura que la raíz del proyecto esté en sys.path para evitar errores de importación
+# Asegura que la raÃ­z del proyecto estÃ© en sys.path para evitar errores de importaciÃ³n
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from concurrent.futures import ThreadPoolExecutor
 
-# ✅ Lógica de negocio / servicios
+# âœ… LÃ³gica de negocio / servicios
 from app.services.file_service import (
     validate_file,
     process_file,
@@ -25,7 +25,7 @@ from app.services.file_service import (
     compute_preview_stats,
 )
 from app.db.database import init_db, save_file_history, save_print_history
-from app.config.config_dialog import ConfigDialog  # Configuración por MODO
+from app.config.config_dialog import ConfigDialog  # ConfiguraciÃ³n por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
 from app.config.config_manager import load_config
@@ -42,24 +42,24 @@ from app.updater import (
     start_update_download,
 )
 
-# 🔽 Vista previa + CRUD externalizada (ventana + widget)
+# ðŸ”½ Vista previa + CRUD externalizada (ventana + widget)
 from app.gui.preview_crud import open_preview_crud
 
 # --- helper para acceder a recursos en dev/pyinstaller ---
 def _resource_path(rel_path: str) -> Path:
     """
-    Devuelve una ruta válida tanto en desarrollo como en ejecutable PyInstaller.
-    Usa sys._MEIPASS cuando está empacado.
+    Devuelve una ruta vÃ¡lida tanto en desarrollo como en ejecutable PyInstaller.
+    Usa sys._MEIPASS cuando estÃ¡ empacado.
     """
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
     return (base / rel_path).resolve()
 
 
 def _has_display() -> bool:
-    """En Linux/Unix, verifica si hay un servidor gráfico disponible."""
+    """En Linux/Unix, verifica si hay un servidor grÃ¡fico disponible."""
     if sys.platform.startswith("linux") or sys.platform == "darwin":
         return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
-    return True  # Windows normalmente tiene subsistema gráfico
+    return True  # Windows normalmente tiene subsistema grÃ¡fico
 
 
 class ExcelPrinterApp(tk.Tk):
@@ -68,13 +68,13 @@ class ExcelPrinterApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("Transformador Excel - Dashboard")
+        self.title("Exelcior Apolo | Centro de Despacho")
         self.configure(bg="#E7ECF3")
         self._apply_initial_geometry()
 
         init_db()
         from app.core.logger_eventos import log_evento
-        log_evento("Aplicación iniciada", nivel="info", accion="startup")
+        log_evento("AplicaciÃ³n iniciada", nivel="info", accion="startup")
 
         # Estado de la app
         self.df = None                 # DF original cargado del Excel
@@ -92,24 +92,24 @@ class ExcelPrinterApp(tk.Tk):
         self._update_button = None
         self._update_available = False
         self.current_version = get_local_version()
-        self.status_var = tk.StringVar(value="Aplicacion lista. Esperando acciones del operador.")
+        self.status_var = tk.StringVar(value="Sistema operativo listo. Esperando carga o sincronizacion.")
         self.version_var = tk.StringVar(value=f"Version instalada: {self.current_version}")
-        self.update_badge_var = tk.StringVar(value="Sin nuevas versiones")
+        self.update_badge_var = tk.StringVar(value="Canal estable sin novedades")
         self.mode_description_var = tk.StringVar(value="Listados comerciales y documentos de venta")
 
-        # ✅ Carga de config robusta
+        # âœ… Carga de config robusta
         try:
             config = load_config()
             if not isinstance(config, dict):
-                logging.warning("[CONFIG] load_config no devolvió dict; usando {}")
+                logging.warning("[CONFIG] load_config no devolviÃ³ dict; usando {}")
                 config = {}
         except Exception:
-            logging.exception("[CONFIG] Error cargando configuración; usando {}")
+            logging.exception("[CONFIG] Error cargando configuraciÃ³n; usando {}")
             config = {}
 
         self.config_columns = config
 
-        # 🎛️ Selector de modo (Radiobutton para exclusividad)
+        # ðŸŽ›ï¸ Selector de modo (Radiobutton para exclusividad)
         self.mode_var = tk.StringVar(value="listados")
 
         self._setup_styles()
@@ -133,8 +133,8 @@ class ExcelPrinterApp(tk.Tk):
 
     def _apply_initial_geometry(self) -> None:
         """
-        Calcula un tamaño de ventana proporcional a la resolución disponible
-        y centra la aplicación en pantalla, manteniendo un mínimo cómodo.
+        Calcula un tamaÃ±o de ventana proporcional a la resoluciÃ³n disponible
+        y centra la aplicaciÃ³n en pantalla, manteniendo un mÃ­nimo cÃ³modo.
         """
         try:
             screen_w = self.winfo_screenwidth()
@@ -159,7 +159,7 @@ class ExcelPrinterApp(tk.Tk):
 
     def _on_root_resize(self, event) -> None:
         """
-        Ajusta elementos dependientes del tamaño cuando el usuario
+        Ajusta elementos dependientes del tamaÃ±o cuando el usuario
         redimensiona la ventana principal.
         """
         if event.widget is not self:
@@ -243,9 +243,9 @@ class ExcelPrinterApp(tk.Tk):
         style.configure("Mode.TLabelframe", padding=16, background="#FFFFFF")
         style.configure("Mode.TLabelframe.Label", font=("Segoe UI Semibold", 11), background="#FFFFFF", foreground="#243B53")
         style.configure("Status.TLabel", font=("Segoe UI", 10), padding=10, background="#102033", foreground="#E7EEF7")
-        style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 28), foreground="#0E2238", background="#F7FAFC")
-        style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#526277", background="#F7FAFC")
-        style.configure("HeroBadge.TLabel", font=("Segoe UI Semibold", 10), foreground="#F8FBFF", background="#295C96")
+        style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 30), foreground="#091E36", background="#F7FAFC")
+        style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#516274", background="#F7FAFC")
+        style.configure("HeroBadge.TLabel", font=("Segoe UI Semibold", 10), foreground="#FFF9EC", background="#9C6B17")
         style.configure("PanelTitle.TLabel", font=("Segoe UI Semibold", 12), foreground="#16324F", background="#FFFFFF")
         style.configure("MetricValue.TLabel", font=("Segoe UI Semibold", 16), foreground="#102A43", background="#FFFFFF")
         style.configure("MetricLabel.TLabel", font=("Segoe UI", 9), foreground="#6B7C93", background="#FFFFFF")
@@ -272,7 +272,7 @@ class ExcelPrinterApp(tk.Tk):
                  font=("Segoe UI Semibold", 18), padx=14).pack(anchor="w")
         tk.Label(
             brand,
-            text="Centro de operaciones y actualizaciones",
+            text="Centro de despacho, impresion y actualizaciones",
             bg="#0F2237",
             fg="#8FAECC",
             font=("Segoe UI", 9),
@@ -284,7 +284,7 @@ class ExcelPrinterApp(tk.Tk):
         tk.Label(info_box, textvariable=self.version_var, bg="#0A1625", fg="#A9BCD0", font=("Segoe UI", 9)).pack(anchor="w")
         tk.Label(info_box, textvariable=self.update_badge_var, bg="#0A1625", fg="#F4C86A", font=("Segoe UI Semibold", 9)).pack(anchor="w", pady=(4, 0))
 
-        tk.Label(sidebar, text="Operaciones", bg="#0A1625", fg="#6F89A8",
+        tk.Label(sidebar, text="Acciones disponibles", bg="#0A1625", fg="#6F89A8",
                  font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=14, pady=(0, 10))
 
         self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
@@ -297,7 +297,7 @@ class ExcelPrinterApp(tk.Tk):
         self._add_sidebar_button(sidebar, "Sra Mary", self._abrir_sra_mary)
         self._add_sidebar_button(sidebar, "Inventario", lambda: InventarioView(self))
         self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
-        self._update_button = self._add_sidebar_button(sidebar, "Actualizar", self._download_and_install_update)
+        self._update_button = self._add_sidebar_button(sidebar, "Actualizar Sistema", self._download_and_install_update)
         self._update_button.configure(state=tk.DISABLED, style="SidebarUpdate.TButton")
 
         footer = tk.Frame(sidebar, bg="#0A1625")
@@ -326,16 +326,16 @@ class ExcelPrinterApp(tk.Tk):
         hero = tk.Frame(self.main_frame, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
         hero.pack(fill="x", padx=24, pady=(24, 12))
 
-        ttk.Label(hero, text="Transformador Excel", style="CardTitle.TLabel", anchor="center").pack(
+        ttk.Label(hero, text="Centro de Despacho Exelcior", style="CardTitle.TLabel", anchor="center").pack(
             pady=(22, 6), padx=24, fill="x"
         )
         ttk.Label(
             hero,
-            text="Carga, transforma, imprime y distribuye reportes desde una sola consola operativa.",
+            text="Una consola unificada para preparar archivos, validar salidas y mantener cada puesto sincronizado.",
             style="CardSub.TLabel",
             anchor="center",
         ).pack(pady=(0, 12), padx=24, fill="x")
-        ttk.Label(hero, text="Panel central de despacho", style="HeroBadge.TLabel", anchor="center").pack(
+        ttk.Label(hero, text="Canal operativo + releases automÃ¡ticos", style="HeroBadge.TLabel", anchor="center").pack(
             pady=(0, 18), ipadx=12, ipady=4
         )
         mode_frame = ttk.LabelFrame(
@@ -374,21 +374,21 @@ class ExcelPrinterApp(tk.Tk):
         summary_row.pack(fill="x", padx=24, pady=(0, 12))
         self._build_metric_card(
             summary_row,
-            "Modo activo",
+            "Operacion activa",
             self.mode_var.get().capitalize(),
             self.mode_description_var,
             "#16324F",
         ).pack(side="left", fill="both", expand=True, padx=(0, 8))
         self._build_metric_card(
             summary_row,
-            "Version",
+            "Version de cliente",
             self.current_version,
             self.update_badge_var,
             "#285E61",
         ).pack(side="left", fill="both", expand=True, padx=8)
         self._build_metric_card(
             summary_row,
-            "Estado",
+            "Pulso del sistema",
             "Listo para procesar",
             self.status_var,
             "#8B5E34",
@@ -436,20 +436,20 @@ class ExcelPrinterApp(tk.Tk):
         except Exception as e:
             tk.Label(visual_panel, text=f"[Error cargando logo: {e}]", bg="#FFFFFF", fg="#c00").pack(pady=18)
 
-        ttk.Label(visual_panel, text="Flujo recomendado", style="PanelTitle.TLabel").pack(anchor="w", padx=24, pady=(8, 4))
+        ttk.Label(visual_panel, text="Recorrido recomendado", style="PanelTitle.TLabel").pack(anchor="w", padx=24, pady=(8, 4))
         for step in (
-            "1. Selecciona el modo operativo correcto",
-            "2. Carga manual o automática del Excel",
-            "3. Revisa la vista previa antes de imprimir",
-            "4. Publica y actualiza con releases de GitHub",
+            "1. Selecciona el canal operativo correcto para la carga",
+            "2. Carga manual o automÃ¡tica del Excel",
+            "3. Revisa la vista previa y valida impresoras antes de emitir",
+            "4. Publica releases y replica cambios a todos los puestos",
         ):
             tk.Label(visual_panel, text=step, bg="#FFFFFF", fg="#51606F", font=("Segoe UI", 10)).pack(anchor="w", padx=24, pady=4)
 
-        ttk.Label(side_panel, text="Estado del sistema", style="PanelTitle.TLabel").pack(anchor="w", padx=20, pady=(22, 10))
-        self._build_info_row(side_panel, "Actualizaciones", self.update_badge_var).pack(fill="x", padx=20, pady=6)
+        ttk.Label(side_panel, text="Salud operativa", style="PanelTitle.TLabel").pack(anchor="w", padx=20, pady=(22, 10))
+        self._build_info_row(side_panel, "Canal de actualizacion", self.update_badge_var).pack(fill="x", padx=20, pady=6)
         self._build_info_row(side_panel, "Version local", self.version_var).pack(fill="x", padx=20, pady=6)
-        self._build_info_row(side_panel, "Modo", self.mode_description_var).pack(fill="x", padx=20, pady=6)
-        self._build_info_row(side_panel, "Estado operativo", self.status_var).pack(fill="x", padx=20, pady=6)
+        self._build_info_row(side_panel, "Operacion", self.mode_description_var).pack(fill="x", padx=20, pady=6)
+        self._build_info_row(side_panel, "Estado en vivo", self.status_var).pack(fill="x", padx=20, pady=6)
 
         self._content_spacer = tk.Frame(self.main_frame, bg="#E7ECF3")
         self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
@@ -697,7 +697,7 @@ class ExcelPrinterApp(tk.Tk):
         self._set_windows_default_printer(str(report_printer))
 
     def _apply_default_printer_for_labels(self) -> None:
-        # Etiquetas: usar la configuración del editor de etiquetas.
+        # Etiquetas: usar la configuraciÃ³n del editor de etiquetas.
         # (archivo excel_printer_config.json, donde se guarda la etiquetadora elegida)
         label_cfg = {}
         try:
@@ -715,15 +715,15 @@ class ExcelPrinterApp(tk.Tk):
 
     def _switch_print_context(self, context: str) -> None:
         """
-        Cambia automáticamente la impresora default según el contexto activo:
+        Cambia automÃ¡ticamente la impresora default segÃºn el contexto activo:
         - report: listados/fedex/urbano
-        - labels: editor/impresión de etiquetas
+        - labels: editor/impresiÃ³n de etiquetas
         """
         ctx = (context or "").strip().lower()
         if ctx not in ("report", "labels"):
             return
         if ctx == self._active_print_context:
-            # Igual se reaplica para sincronizar si el usuario cambió impresoras fuera de la app.
+            # Igual se reaplica para sincronizar si el usuario cambiÃ³ impresoras fuera de la app.
             pass
         if ctx == "labels":
             self._apply_default_printer_for_labels()
@@ -753,7 +753,7 @@ class ExcelPrinterApp(tk.Tk):
         """
         Abre la app de Vale de Consumo (Bioplates) en una ventana separada.
 
-        - En desarrollo: lanza vale_consumo/run_app.py con el intérprete actual.
+        - En desarrollo: lanza vale_consumo/run_app.py con el intÃ©rprete actual.
         - En ejecutable PyInstaller: intenta abrir ValeConsumoBioplates.exe
           ubicado junto a ExelciorApolo.exe o en una subcarpeta 'vale_consumo'.
         """
@@ -771,7 +771,7 @@ class ExcelPrinterApp(tk.Tk):
                 self.safe_messagebox(
                     "error",
                     "Vale de Consumo",
-                    "No se encontró 'ValeConsumoBioplates.exe'.\n"
+                    "No se encontrÃ³ 'ValeConsumoBioplates.exe'.\n"
                     "Copia el ejecutable de vales junto a ExelciorApolo.exe "
                     "o dentro de una carpeta 'vale_consumo' y vuelve a intentarlo.",
                 )
@@ -782,7 +782,7 @@ class ExcelPrinterApp(tk.Tk):
                 self.safe_messagebox(
                     "error",
                     "Vale de Consumo",
-                    "No se encontró 'vale_consumo/run_app.py' en la carpeta del proyecto.",
+                    "No se encontrÃ³ 'vale_consumo/run_app.py' en la carpeta del proyecto.",
                 )
                 return
             python = sys.executable or "python"
@@ -802,8 +802,8 @@ class ExcelPrinterApp(tk.Tk):
             return
         valid, err = validate_file(path)
         if not valid:
-            self.safe_messagebox("error", "Archivo no válido", err)
-            log_evento(f"Archivo no válido seleccionado: {path}", nivel="warning", accion="seleccion_archivo")
+            self.safe_messagebox("error", "Archivo no vÃ¡lido", err)
+            log_evento(f"Archivo no vÃ¡lido seleccionado: {path}", nivel="warning", accion="seleccion_archivo")
             return
         # Primera carga manual: usa la misma carpeta base para todos los modos principales.
         base_folder = Path(path).parent
@@ -842,27 +842,27 @@ class ExcelPrinterApp(tk.Tk):
         t.start()
 
     def _auto_load_latest_file(self):
-        self._update_status("Buscando archivo más reciente...")
+        self._update_status("Buscando archivo mÃ¡s reciente...")
         try:
             archivo, estado = find_latest_file_by_mode(self.mode)
             if estado == "ok" and archivo:
                 valido, msg = validate_file(str(archivo))
                 if not valido:
-                    self._update_status(f"⚠️ Archivo más reciente inválido: {msg}")
-                    self.safe_messagebox("error", "Archivo no válido", msg)
+                    self._update_status(f"âš ï¸ Archivo mÃ¡s reciente invÃ¡lido: {msg}")
+                    self.safe_messagebox("error", "Archivo no vÃ¡lido", msg)
                     return
-                self._update_status(f"✅ Cargado: {archivo.name}")
+                self._update_status(f"âœ… Cargado: {archivo.name}")
                 self._process_file(str(archivo))
             elif estado == "no_match":
-                self._update_status("⚠️ No se encontraron archivos compatibles.")
-                self.safe_messagebox("warning", "Sin coincidencias", f"No hay archivos válidos para el modo '{self.mode}'")
+                self._update_status("âš ï¸ No se encontraron archivos compatibles.")
+                self.safe_messagebox("warning", "Sin coincidencias", f"No hay archivos vÃ¡lidos para el modo '{self.mode}'")
             elif estado == "empty_folder":
-                self._update_status("📂 Carpeta vacía o inexistente.")
-                self.safe_messagebox("error", "Carpeta vacía", "La carpeta de descargas está vacía o no existe.")
+                self._update_status("ðŸ“‚ Carpeta vacÃ­a o inexistente.")
+                self.safe_messagebox("error", "Carpeta vacÃ­a", "La carpeta de descargas estÃ¡ vacÃ­a o no existe.")
             else:
-                self._update_status("❌ Error en la autocarga.")
+                self._update_status("âŒ Error en la autocarga.")
         except Exception as e:
-            logging.error(f"Error en carga automática: {e}")
+            logging.error(f"Error en carga automÃ¡tica: {e}")
             self.safe_messagebox("error", "Error", str(e))
         finally:
             self.processing = False
@@ -880,11 +880,11 @@ class ExcelPrinterApp(tk.Tk):
         finally:
             self._update_status("Listo")
 
-    # ---------------- Impresión ----------------
+    # ---------------- ImpresiÃ³n ----------------
 
     def _threaded_print(self):
         if self.processing or self.transformed_df is None or self.transformed_df.empty:
-            self.safe_messagebox("error", "Error", "Debe cargar un archivo válido primero.")
+            self.safe_messagebox("error", "Error", "Debe cargar un archivo vÃ¡lido primero.")
             return
         # Refuerzo: antes de imprimir reportes, aplicar siempre default de informes.
         if self.mode in ("listados", "fedex", "urbano"):
@@ -912,23 +912,23 @@ class ExcelPrinterApp(tk.Tk):
 
     def _print_document(self):
         try:
-            # Imprime exactamente lo que está en la vista previa/CRUD
+            # Imprime exactamente lo que estÃ¡ en la vista previa/CRUD
             print_document(self.mode, self.transformed_df, self.config_columns, None)
             save_print_history(
                 archivo=f"{self.mode}_impresion.xlsx",
-                observacion=f"Impresión realizada en modo '{self.mode}'"
+                observacion=f"ImpresiÃ³n realizada en modo '{self.mode}'"
             )
             self.df = None
             self.transformed_df = None
         except Exception as e:
-            logging.error(f"Error en impresión: {e}")
+            logging.error(f"Error en impresiÃ³n: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
             if self._ui_alive():
                 msg = f"Error al imprimir:\n{e}"
                 self.after(0, lambda m=msg: self.safe_messagebox("error", "Error", m))
             raise
 
-    # ---------------- Configuración ----------------
+    # ---------------- ConfiguraciÃ³n ----------------
 
     def _open_config_menu(self):
         if self.df is None:
@@ -1006,7 +1006,7 @@ class ExcelPrinterApp(tk.Tk):
             )
             return
 
-        # Prioriza el log más reciente con contenido para evitar abrir archivos vacíos.
+        # Prioriza el log mÃ¡s reciente con contenido para evitar abrir archivos vacÃ­os.
         archivo = next((p for p in logs if p.stat().st_size > 0), logs[0])
         win = tk.Toplevel(self)
         win.title(f"Visor de Logs - {archivo.name}")
@@ -1046,7 +1046,7 @@ class ExcelPrinterApp(tk.Tk):
             except Exception as e:
                 logging.error(f"Error leyendo log: {e}")
 
-        ttk.Button(win, text="🔁 Refrescar Log", command=cargar_log).pack(pady=5)
+        ttk.Button(win, text="ðŸ” Refrescar Log", command=cargar_log).pack(pady=5)
         cargar_log()
 
     # ---------------- Cierre limpio ----------------
@@ -1089,22 +1089,22 @@ def run_app():
 
 def main():
     setup_logging()
-    # Si no hay servidor gráfico, informa y aborta con código claro
+    # Si no hay servidor grÃ¡fico, informa y aborta con cÃ³digo claro
     if not _has_display():
-        logging.error("No se detectó DISPLAY/servidor gráfico. La interfaz Tkinter requiere entorno gráfico.")
-        print("Error: No se detectó entorno gráfico (DISPLAY/Wayland).")
+        logging.error("No se detectÃ³ DISPLAY/servidor grÃ¡fico. La interfaz Tkinter requiere entorno grÃ¡fico.")
+        print("Error: No se detectÃ³ entorno grÃ¡fico (DISPLAY/Wayland).")
         sys.exit(2)
 
     try:
         run_app()
     except Exception as e:
-        logging.exception("Error fatal en la aplicación")
+        logging.exception("Error fatal en la aplicaciÃ³n")
         try:
             # Solo intentes messagebox si hay display
             if _has_display():
                 root = tk.Tk()
                 root.withdraw()
-                messagebox.showerror("Error crítico", f"Ocurrió un error fatal:\n{e}")
+                messagebox.showerror("Error crÃ­tico", f"OcurriÃ³ un error fatal:\n{e}")
                 root.destroy()
         except Exception:
             pass
@@ -1113,5 +1113,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
