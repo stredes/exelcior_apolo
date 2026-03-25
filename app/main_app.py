@@ -32,6 +32,15 @@ from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_config as cargar_config_etiquetas
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
+from app.gui.printer_admin import PrinterAdminDialog
+from app.updater import (
+    fetch_latest_release,
+    get_local_version,
+    is_newer_version,
+    launch_installer,
+    parse_release_info,
+    start_update_download,
+)
 
 # 🔽 Vista previa + CRUD externalizada (ventana + widget)
 from app.gui.preview_crud import open_preview_crud
@@ -78,6 +87,10 @@ class ExcelPrinterApp(tk.Tk):
         self.sidebar = None
         self._mode_buttons = {}
         self._active_print_context = "report"
+        self._update_release_info = None
+        self._update_download_thread = None
+        self._update_button = None
+        self._update_available = False
 
         # ✅ Carga de config robusta
         try:
@@ -100,6 +113,7 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_status_bar()
         self.bind("<Configure>", self._on_root_resize)
         self._switch_print_context("report")
+        self.after(2000, self._check_for_updates_async)
 
         # Cierre limpio
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -249,12 +263,15 @@ class ExcelPrinterApp(tk.Tk):
         self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
         self._add_sidebar_button(sidebar, "Carga Automatica", self._threaded_auto_load)
         self._add_sidebar_button(sidebar, "Configurar Modo", self._open_config_menu)
+        self._add_sidebar_button(sidebar, "Impresoras", self._abrir_admin_impresoras)
         self._add_sidebar_button(sidebar, "Ver Logs", self._view_logs)
         self._add_sidebar_button(sidebar, "Etiquetas", self._abrir_editor_etiquetas)
         self._add_sidebar_button(sidebar, "Codigos Postales", self._abrir_buscador_codigos_postales)
         self._add_sidebar_button(sidebar, "Sra Mary", self._abrir_sra_mary)
         self._add_sidebar_button(sidebar, "Inventario", lambda: InventarioView(self))
         self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
+        self._update_button = self._add_sidebar_button(sidebar, "Actualizar", self._download_and_install_update)
+        self._update_button.configure(state=tk.DISABLED)
 
         footer = tk.Frame(sidebar, bg="#0B1730")
         footer.pack(side="bottom", fill="x", padx=12, pady=(10, 14))
@@ -382,6 +399,92 @@ class ExcelPrinterApp(tk.Tk):
         if self._ui_alive():
             self.status_var.set(mensaje)
 
+    def _check_for_updates_async(self) -> None:
+        if getattr(self, "_update_check_started", False):
+            return
+        self._update_check_started = True
+        thread = threading.Thread(target=self._check_for_updates_worker, daemon=True)
+        thread.start()
+
+    def _check_for_updates_worker(self) -> None:
+        try:
+            current_version = get_local_version()
+            payload = fetch_latest_release()
+            release_info = parse_release_info(payload or {})
+            if not release_info:
+                logging.info("No hay release publicable con instalador para auto-update.")
+                return
+            if not is_newer_version(release_info["version"], current_version):
+                logging.info(
+                    "Version actual al dia. Local=%s Remota=%s",
+                    current_version,
+                    release_info["version"],
+                )
+                return
+            self._update_release_info = release_info
+            if self._ui_alive():
+                self.after(0, self._mark_update_available)
+        except Exception as e:
+            logging.info("No se pudo comprobar actualizaciones: %s", e)
+
+    def _mark_update_available(self) -> None:
+        release_info = self._update_release_info
+        if not release_info or not self._ui_alive():
+            return
+        self._update_available = True
+        if self._update_button is not None:
+            self._update_button.configure(state=tk.NORMAL, text=f"Actualizar ({release_info['version']})")
+        self._update_status(f"Actualizacion disponible: {release_info['version']}")
+
+    def _download_and_install_update(self) -> None:
+        release_info = self._update_release_info
+        if not release_info:
+            self.safe_messagebox("info", "Actualizacion", "No hay una actualizacion disponible en este momento.")
+            return
+        current_version = get_local_version()
+        wants_update = messagebox.askyesno(
+            "Actualizacion disponible",
+            (
+                f"Hay una nueva version disponible.\n\n"
+                f"Version actual: {current_version}\n"
+                f"Ultima version: {release_info['version']}\n\n"
+                f"Se descargara el instalador oficial desde GitHub Releases."
+            ),
+            parent=self,
+        )
+        if not wants_update:
+            return
+        if self._update_button is not None:
+            self._update_button.configure(state=tk.DISABLED, text="Descargando actualizacion...")
+        self._update_status(f"Descargando actualizacion {release_info['version']}...")
+        self._update_download_thread = start_update_download(
+            release_info=release_info,
+            on_ready=lambda installer_path: self.after(0, lambda: self._finish_update_download(installer_path)),
+            on_error=lambda exc: self.after(0, lambda: self._handle_update_error(exc)),
+        )
+
+    def _finish_update_download(self, installer_path: Path) -> None:
+        try:
+            launch_installer(installer_path)
+            self._update_status("Instalador lanzado. Cerrando aplicacion...")
+            self.after(500, self._on_close)
+        except Exception as exc:
+            self._handle_update_error(exc)
+
+    def _handle_update_error(self, exc: Exception) -> None:
+        logging.exception("Error durante la actualizacion")
+        self._update_status("No se pudo completar la actualizacion.")
+        if self._update_button is not None and self._update_available and self._update_release_info:
+            self._update_button.configure(
+                state=tk.NORMAL,
+                text=f"Actualizar ({self._update_release_info['version']})",
+            )
+        self.safe_messagebox(
+            "error",
+            "Actualizacion",
+            f"No se pudo descargar o iniciar la actualizacion:\n{exc}",
+        )
+
     def _ui_set_status_preview_totals(self, df, mode: str):
         try:
             stats = compute_preview_stats(df, mode)
@@ -465,8 +568,8 @@ class ExcelPrinterApp(tk.Tk):
             logging.warning(f"[PrinterSwitch] No se pudo cambiar default a '{printer_alias}': {e}")
 
     def _apply_default_printer_for_report_mode(self) -> None:
-        # Reportes: usar impresora de papel desde config (fallback a constante).
-        report_printer = self.REPORT_DEFAULT_PRINTER
+        # Reportes: usa impresora por modo si existe, si no toma la general.
+        report_printer = ""
         try:
             latest_cfg = load_config()
             if isinstance(latest_cfg, dict):
@@ -474,8 +577,14 @@ class ExcelPrinterApp(tk.Tk):
         except Exception:
             pass
         if isinstance(self.config_columns, dict):
+            mode_printers = self.config_columns.get("mode_printers", {})
+            if isinstance(mode_printers, dict):
+                mode_specific = mode_printers.get((self.mode or "").strip().lower(), "")
+                if isinstance(mode_specific, str) and mode_specific.strip():
+                    report_printer = mode_specific.strip()
             report_printer = (
-                self.config_columns.get("report_printer_name")
+                report_printer
+                or self.config_columns.get("report_printer_name")
                 or self.config_columns.get("paper_printer_name")
                 or self.config_columns.get("default_printer")
                 or (self.config_columns.get("paths", {}) or {}).get("default_printer")
@@ -492,7 +601,9 @@ class ExcelPrinterApp(tk.Tk):
         except Exception:
             label_cfg = {}
         label_printer = (
-            label_cfg.get("label_printer_name")
+            (self.config_columns.get("label_printer_name") if isinstance(self.config_columns, dict) else "")
+            or (self.config_columns.get("printer_name") if isinstance(self.config_columns, dict) else "")
+            or label_cfg.get("label_printer_name")
             or label_cfg.get("printer_name")
             or self.LABEL_DEFAULT_PRINTER
         )
@@ -519,6 +630,17 @@ class ExcelPrinterApp(tk.Tk):
     def _abrir_buscador_codigos_postales(self):
         from app.gui.buscador_codigos_postales import BuscadorCodigosPostales
         BuscadorCodigosPostales(self)
+
+    def _abrir_admin_impresoras(self):
+        dlg = PrinterAdminDialog(self)
+        self.wait_window(dlg)
+        try:
+            latest_cfg = load_config()
+            if isinstance(latest_cfg, dict):
+                self.config_columns = latest_cfg
+        except Exception:
+            pass
+        self._switch_print_context("report")
 
     def _abrir_sra_mary(self):
         SraMaryView(self)

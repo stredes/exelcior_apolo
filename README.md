@@ -58,6 +58,19 @@ bash
 Copiar
 Editar
 python run_app.py
+
+## Actualizaciones automáticas
+
+- Las versiones instaladas consultan `GitHub Releases` al iniciar.
+- Si existe una release más nueva con un asset `ExelciorApolo_*_Setup.exe`, la app avisa y descarga el instalador oficial.
+- El instalador cierra la app actual y reemplaza la instalación existente.
+
+### Publicar una nueva versión
+
+1. Actualiza la versión objetivo.
+2. Crea un tag semántico, por ejemplo `v1.4.2`.
+3. Haz `git push origin v1.4.2`.
+4. GitHub Actions compilará `PyInstaller`, generará el instalador Inno Setup y publicará los assets en Releases.
 📂 Modos de operación
 🟣 FedEx
 Archivos: Shipment_Report_YYYY-MM-DD.xlsx

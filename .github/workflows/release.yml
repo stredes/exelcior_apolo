@@ -1,0 +1,71 @@
+name: Build And Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version semantica a compilar, por ejemplo 1.4.2"
+        required: true
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --no-progress -y
+
+      - name: Resolve Version
+        id: version
+        shell: powershell
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}"
+            if ($version.StartsWith("v")) { $version = $version.Substring(1) }
+          }
+          if (-not ($version -match '^\d+\.\d+\.\d+$')) {
+            throw "Version invalida: $version"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build Release
+        shell: powershell
+        run: >
+          .\build_release.ps1
+          -Version ${{ steps.version.outputs.version }}
+          -CreateIssIfMissing
+          -RecreateVersionFile
+          -SkipSignBinaries
+          -SkipSignInstaller
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExelciorApolo-${{ steps.version.outputs.version }}
+          path: |
+            dist/ExelciorApolo/**
+            installer/output/**
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/output/*.exe
+            installer/output/checksums_*.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -11,19 +11,13 @@
   - Checksums SHA256
 
  Ejemplo:
-   powershell -ExecutionPolicy Bypass -File .\build_release.ps1 `
-     -Version 1.4.1 `
-     -AppName "Exelcior Apolo" `
-     -ExeName "ExelciorApolo.exe" `
-     -CreateIssIfMissing -RecreateVersionFile `
-     -CertPfx "C:\certs\empresa_code_signing.pfx" `
-     -CertPassword (Read-Host "Password PFX" -AsSecureString)
+   powershell -ExecutionPolicy Bypass -File .\build_release.ps1
 #>
 
 [CmdletBinding()]
 param(
   # --- Metadatos de la app ---
-  [string]$Version = "1.4.1",
+  [string]$Version = "",
   [string]$AppName = "Exelcior Apolo",
   [string]$ExeName = "ExelciorApolo.exe",
 
@@ -48,7 +42,22 @@ param(
   [switch]$SkipInstallerBuild,
   [switch]$SkipSignBinaries,
   [switch]$SkipSignInstaller,
-  [switch]$NoPipInstall
+  [switch]$NoPipInstall,
+
+  # --- Publicación opcional en GitHub ---
+  [switch]$SkipGitHubPublish,
+  [string]$GitTag = "",
+  [string]$GitRemote = "origin",
+  [string]$GitHubRepo = "",
+  [string]$GitHubToken = "",
+  [string]$ReleaseTitle = "",
+  [string]$ReleaseNotesFile = "",
+  [switch]$DraftRelease,
+  [switch]$Prerelease,
+  [switch]$SkipGitTagPush,
+  [switch]$AllowDirtyWorktree,
+  [switch]$SkipAutoVersion,
+  [switch]$SkipAutoCommit
 )
 
 # ===================== Helpers & Setup =====================
@@ -59,6 +68,11 @@ function Write-Info($m){ Write-Host "[INFO] $m" -ForegroundColor Cyan }
 function Write-OK($m){ Write-Host "[OK]   $m" -ForegroundColor Green }
 function Write-Warn($m){ Write-Host "[WARN] $m" -ForegroundColor Yellow }
 function Write-Err($m){ Write-Host "[ERR]  $m" -ForegroundColor Red }
+
+function Invoke-Step([scriptblock]$Action, [string]$Step){
+  & $Action
+  Assert-LastExitCode $Step
+}
 
 function Get-CommandPath([string]$name){
   $cmd = Get-Command $name -ErrorAction SilentlyContinue
@@ -84,6 +98,214 @@ function Assert-LastExitCode([string]$step){
   if ($LASTEXITCODE -ne 0) {
     throw "$step falló con código de salida $LASTEXITCODE."
   }
+}
+
+function Get-TextFileIfExists([string]$path){
+  if ($path -and (Test-Path -LiteralPath $path)) {
+    return (Get-Content -LiteralPath $path -Raw -Encoding UTF8)
+  }
+  return ""
+}
+
+function Get-GitHubTokenValue{
+  if ($GitHubToken -and $GitHubToken.Trim()) { return $GitHubToken.Trim() }
+  if ($env:GITHUB_TOKEN -and $env:GITHUB_TOKEN.Trim()) { return $env:GITHUB_TOKEN.Trim() }
+  if ($env:GH_TOKEN -and $env:GH_TOKEN.Trim()) { return $env:GH_TOKEN.Trim() }
+  return ""
+}
+
+function Get-GitHubRepoFromRemote([string]$remoteName){
+  try {
+    $url = (& git remote get-url $remoteName 2>$null | Select-Object -First 1).Trim()
+    if (-not $url) { return "" }
+    if ($url -match 'github\.com[:/](.+?)(?:\.git)?$') {
+      return $matches[1]
+    }
+  } catch {}
+  return ""
+}
+
+function Get-ReleaseTag([string]$version){
+  if ($GitTag -and $GitTag.Trim()) { return $GitTag.Trim() }
+  return "v$version"
+}
+
+function Get-CurrentGitBranch{
+  $branch = (& git branch --show-current 2>$null | Select-Object -First 1).Trim()
+  Assert-LastExitCode "git branch --show-current"
+  if (-not $branch) { throw "No se pudo determinar la rama actual." }
+  return $branch
+}
+
+function Test-GitWorktreeDirty{
+  $status = (& git status --porcelain 2>$null)
+  Assert-LastExitCode "git status --porcelain"
+  return [bool]$status
+}
+
+function Get-VersionFromTag([string]$tag){
+  $clean = ($tag -replace '^[vV]', '').Trim()
+  if ($clean -match '^\d+\.\d+\.\d+$') { return $clean }
+  return $null
+}
+
+function Get-LatestGitVersion{
+  try {
+    & git fetch --tags $GitRemote | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warn "No se pudieron actualizar tags desde '$GitRemote'. Se usarán los tags locales."
+    }
+  } catch {
+    Write-Warn "git fetch --tags falló: $($_.Exception.Message)"
+  }
+
+  $tags = @(& git tag --list "v*" 2>$null)
+  Assert-LastExitCode "git tag --list v*"
+  $versions = @()
+  foreach ($tag in $tags) {
+    $ver = Get-VersionFromTag ([string]$tag)
+    if ($ver) { $versions += $ver }
+  }
+  if (-not $versions -or $versions.Count -eq 0) { return "1.0.0" }
+  return ($versions | Sort-Object {
+    $parts = $_.Split('.') | ForEach-Object { [int]$_ }
+    '{0:D6}.{1:D6}.{2:D6}' -f $parts[0], $parts[1], $parts[2]
+  } | Select-Object -Last 1)
+}
+
+function Get-NextPatchVersion([string]$baseVersion){
+  if ($baseVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "Versión base inválida para autoincremento: $baseVersion"
+  }
+  $parts = $baseVersion.Split('.') | ForEach-Object { [int]$_ }
+  return ("{0}.{1}.{2}" -f $parts[0], $parts[1], ($parts[2] + 1))
+}
+
+function Update-IssVersionDefines([string]$issPath, [string]$version, [string]$appName, [string]$exeName){
+  Assert-File $issPath "Falta script de Inno Setup."
+  $content = Get-Content -LiteralPath $issPath -Raw -Encoding UTF8
+  $content = [regex]::Replace($content, '(?m)^#define AppName ".*"$', ('#define AppName "{0}"' -f $appName))
+  $content = [regex]::Replace($content, '(?m)^#define AppVersion ".*"$', ('#define AppVersion "{0}"' -f $version))
+  $content = [regex]::Replace($content, '(?m)^#define AppExeName ".*"$', ('#define AppExeName "{0}"' -f $exeName))
+  Set-Content -LiteralPath $issPath -Value $content -Encoding UTF8
+}
+
+function Invoke-GitHubApi([string]$Method, [string]$Url, [string]$Token, $Body = $null, [string]$ContentType = "application/json"){
+  $headers = @{
+    Authorization = "Bearer $Token"
+    Accept = "application/vnd.github+json"
+    "User-Agent" = "ExelciorApoloBuildRelease/1.0"
+  }
+  $params = @{
+    Method = $Method
+    Uri = $Url
+    Headers = $headers
+  }
+  if ($null -ne $Body) {
+    $params["Body"] = $Body
+    $params["ContentType"] = $ContentType
+  }
+  return Invoke-RestMethod @params
+}
+
+function Assert-CleanGitWorktree{
+  if (Test-GitWorktreeDirty) {
+    throw "El árbol de trabajo tiene cambios sin commit. Usa un commit limpio o pasa -AllowDirtyWorktree."
+  }
+}
+
+function Publish-GitBranch([string]$remoteName, [string]$branchName){
+  Write-Info "Empujando rama '$branchName' a '$remoteName'..."
+  & git push $remoteName $branchName | Out-Host
+  Assert-LastExitCode "git push $remoteName $branchName"
+}
+
+function Save-ReleaseCommit([string]$version, [string]$remoteName){
+  $branchName = Get-CurrentGitBranch
+  if (Test-GitWorktreeDirty) {
+    Write-Info "Creando commit automático de release para v$version..."
+    & git add -A | Out-Host
+    Assert-LastExitCode "git add -A"
+    & git commit -m "release: v$version" | Out-Host
+    Assert-LastExitCode "git commit release: v$version"
+  } else {
+    Write-Info "No hay cambios pendientes para commit automático."
+  }
+  Publish-GitBranch -remoteName $remoteName -branchName $branchName
+}
+
+function Publish-GitTag([string]$tagName, [string]$remoteName){
+  $existing = (& git tag --list $tagName | Select-Object -First 1).Trim()
+  Assert-LastExitCode "git tag --list"
+  if (-not $existing) {
+    Write-Info "Creando tag local: $tagName"
+    & git tag $tagName
+    Assert-LastExitCode "git tag $tagName"
+  } else {
+    Write-Info "El tag local ya existe: $tagName"
+  }
+  if (-not $SkipGitTagPush) {
+    Write-Info "Empujando tag a remoto '$remoteName'..."
+    & git push $remoteName $tagName | Out-Host
+    Assert-LastExitCode "git push $remoteName $tagName"
+  } else {
+    Write-Warn "Push del tag omitido por -SkipGitTagPush."
+  }
+}
+
+function Set-GitHubRelease([string]$repo, [string]$token, [string]$tagName, [string]$title, [string]$notes, [bool]$isDraft, [bool]$isPrerelease){
+  $baseApi = "https://api.github.com/repos/$repo"
+  $release = $null
+  try {
+    $release = Invoke-GitHubApi -Method "GET" -Url "$baseApi/releases/tags/$tagName" -Token $token
+    Write-Info "Release existente encontrada para tag $tagName."
+  } catch {
+    Write-Info "No existe release para $tagName. Se creará una nueva."
+  }
+
+  $payloadObj = @{
+    tag_name = $tagName
+    name = $title
+    body = $notes
+    draft = $isDraft
+    prerelease = $isPrerelease
+  }
+  $payloadJson = $payloadObj | ConvertTo-Json -Depth 5
+
+  if ($release -and $release.id) {
+    $release = Invoke-GitHubApi -Method "PATCH" -Url "$baseApi/releases/$($release.id)" -Token $token -Body $payloadJson
+  } else {
+    $release = Invoke-GitHubApi -Method "POST" -Url "$baseApi/releases" -Token $token -Body $payloadJson
+  }
+  return $release
+}
+
+function Remove-ExistingReleaseAsset([string]$repo, [string]$token, $release, [string]$assetName){
+  if (-not $release -or -not $release.assets) { return }
+  foreach ($asset in $release.assets) {
+    if ($asset.name -eq $assetName) {
+      Write-Info "Eliminando asset existente del release: $assetName"
+      Invoke-GitHubApi -Method "DELETE" -Url "https://api.github.com/repos/$repo/releases/assets/$($asset.id)" -Token $token
+    }
+  }
+}
+
+function Send-ReleaseAsset([string]$repo, [string]$token, $release, [string]$filePath){
+  Assert-File $filePath "Asset faltante para GitHub Release."
+  $assetName = Split-Path -Leaf $filePath
+  Remove-ExistingReleaseAsset -repo $repo -token $token -release $release -assetName $assetName
+  $uploadUrl = [string]$release.upload_url
+  if (-not $uploadUrl) { throw "La release no devolvió upload_url." }
+  $uploadUrl = $uploadUrl -replace '\{\?name,label\}$', ''
+  $uploadUrl = "$uploadUrl?name=$([System.Uri]::EscapeDataString($assetName))"
+
+  $headers = @{
+    Authorization = "Bearer $token"
+    Accept = "application/vnd.github+json"
+    "User-Agent" = "ExelciorApoloBuildRelease/1.0"
+  }
+  Write-Info "Subiendo asset al release: $assetName"
+  Invoke-RestMethod -Method "POST" -Uri $uploadUrl -Headers $headers -InFile $filePath -ContentType "application/octet-stream" | Out-Null
 }
 
 function Test-PythonImport([string]$pythonExe, [string]$moduleName){
@@ -112,6 +334,25 @@ function Install-PythonPackageIfMissing([string]$pythonExe, [string]$moduleName,
 $ScriptPath = $MyInvocation.MyCommand.Path
 $ScriptRoot = Split-Path -Parent $ScriptPath
 Set-Location -LiteralPath $ScriptRoot
+
+if (-not $SkipGitHubPublish) {
+  if (-not $AllowDirtyWorktree -and $SkipAutoCommit) {
+    Assert-CleanGitWorktree
+  } elseif ($AllowDirtyWorktree) {
+    Write-Warn "Publicando con árbol de trabajo sucio por -AllowDirtyWorktree."
+  }
+}
+
+if (-not $Version -or $Version.Trim() -eq "") {
+  if ($SkipAutoVersion) {
+    throw "Debes indicar -Version cuando usas -SkipAutoVersion."
+  }
+  $latestVersion = Get-LatestGitVersion
+  $Version = Get-NextPatchVersion $latestVersion
+  Write-Info "Versión autoincrementada: $Version"
+} else {
+  Write-Info "Versión manual: $Version"
+}
 
 # ===================== DetecciÃ³n de herramientas =====================
 
@@ -206,7 +447,7 @@ VSVersionInfo(
 "@
 }
 
-if ($RecreateVersionFile -or -not (Test-Path -LiteralPath $VersionFile)) {
+if ($RecreateVersionFile -or -not (Test-Path -LiteralPath $VersionFile) -or (-not $PSBoundParameters.ContainsKey('Version'))) {
   Write-Info "Generando archivo de versiÃ³n: $VersionFile"
   (New-VersionInfoContent $Version) | Out-File -LiteralPath $VersionFile -Encoding UTF8 -Force
 }
@@ -242,6 +483,9 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+CloseApplications=yes
+RestartApplications=no
+CloseApplicationsFilter=*.exe
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -270,6 +514,7 @@ if ($CreateIssIfMissing -or -not (Test-Path -LiteralPath $InnoScript)) {
   }
 }
 Assert-File $InnoScript "Falta el script de Inno Setup. Ejecuta con -CreateIssIfMissing para crearlo."
+Update-IssVersionDefines -issPath $InnoScript -version $Version -appName $AppName -exeName $ExeName
 $lic = "installer\LICENSE.txt"
 Assert-File $lic "Falta installer\LICENSE.txt (requerido por el script .iss)."
 
@@ -312,7 +557,8 @@ $runtimeDeps = @(
   @{ Module = "openpyxl"; Pip = "openpyxl" },
   @{ Module = "odf"; Pip = "odfpy" },
   @{ Module = "reportlab"; Pip = "reportlab" },
-  @{ Module = "PIL"; Pip = "pillow" }
+  @{ Module = "PIL"; Pip = "pillow" },
+  @{ Module = "requests"; Pip = "requests" }
 )
 
 # Impresión Windows (Excel COM / printto) depende de pywin32.
@@ -328,6 +574,22 @@ if ($isWindowsHost) {
 foreach ($dep in $runtimeDeps) {
   Install-PythonPackageIfMissing -pythonExe $PythonExe -moduleName $dep.Module -pipName $dep.Pip
 }
+
+# Validación de módulos internos críticos antes de empaquetar.
+# Evita generar un build que arranca pero falla por imports faltantes/refactors.
+$appRuntimeModules = @(
+  "app.main_app",
+  "app.services.file_service",
+  "app.gui.etiqueta_editor",
+  "app.gui.inventario_view",
+  "app.gui.printer_admin"
+)
+foreach ($mod in $appRuntimeModules) {
+  if (-not (Test-PythonImport $PythonExe $mod)) {
+    throw "Import interno fallido antes del build: '$mod'. Revisa errores de código o rutas."
+  }
+}
+Write-OK "Imports internos validados (incluye administración de impresoras)."
 
 # ===================== Build con PyInstaller =====================
 
@@ -483,6 +745,56 @@ if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName))
 }
 $hashLines | Out-File -LiteralPath $hashFile -Encoding ascii -Force
 
+# ===================== Publicación GitHub (opcional) =====================
+
+$publishedRelease = $null
+if (-not $SkipGitHubPublish) {
+  if (-not $SkipAutoCommit) {
+    Save-ReleaseCommit -version $Version -remoteName $GitRemote
+  } elseif (-not $AllowDirtyWorktree) {
+    Assert-CleanGitWorktree
+  }
+
+  Write-Info "Preparando publicación en GitHub..."
+  $tokenValue = Get-GitHubTokenValue
+  if (-not $tokenValue) {
+    throw "Falta token de GitHub. Usa -GitHubToken o define GITHUB_TOKEN / GH_TOKEN."
+  }
+
+  $repoValue = $GitHubRepo
+  if (-not $repoValue -or -not $repoValue.Trim()) {
+    $repoValue = Get-GitHubRepoFromRemote $GitRemote
+  }
+  if (-not $repoValue) {
+    throw "No se pudo resolver el repositorio GitHub. Usa -GitHubRepo owner/repo."
+  }
+
+  $tagName = Get-ReleaseTag $Version
+  $titleValue = if ($ReleaseTitle -and $ReleaseTitle.Trim()) { $ReleaseTitle.Trim() } else { "$AppName $Version" }
+  $notesValue = Get-TextFileIfExists $ReleaseNotesFile
+  if (-not $notesValue) {
+    $notesValue = "Release automatizada para $AppName v$Version."
+  }
+
+  Publish-GitTag -tagName $tagName -remoteName $GitRemote
+  $publishedRelease = Set-GitHubRelease `
+    -repo $repoValue `
+    -token $tokenValue `
+    -tagName $tagName `
+    -title $titleValue `
+    -notes $notesValue `
+    -isDraft ([bool]$DraftRelease) `
+    -isPrerelease ([bool]$Prerelease)
+
+  if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName)) {
+    Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $setupName
+  } else {
+    Write-Warn "No hay instalador para subir al release."
+  }
+  Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $hashFile
+  Write-OK "Publicación en GitHub completada."
+}
+
 Write-Host ""
 Write-OK "BUILD COMPLETADO"
 Write-Host "-----------------------------------------------"
@@ -496,6 +808,9 @@ if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName))
   Write-Host ("Installer:  {0}" -f "OMITIDO")
 }
 Write-Host ("Checksums:  {0}" -f (Resolve-Path $hashFile))
+if ($publishedRelease -and $publishedRelease.html_url) {
+  Write-Host ("Release:    {0}" -f $publishedRelease.html_url)
+}
 Write-Host "-----------------------------------------------"
 
 

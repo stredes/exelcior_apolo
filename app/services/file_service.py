@@ -39,7 +39,7 @@ FALLBACK_MAIN_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
 FORCED_MAIN_MODES = {"listados", "fedex", "urbano"}
 
 
-def _get_report_printer(cfg: dict) -> str:
+def _get_report_printer(cfg: dict, mode: Optional[str] = None) -> str:
     """
     Resuelve la impresora de reportes (papel común) desde config:
     prioridad alta -> baja:
@@ -50,6 +50,13 @@ def _get_report_printer(cfg: dict) -> str:
     """
     if not isinstance(cfg, dict):
         return FALLBACK_MAIN_PRINTER
+
+    mode_norm = _normalize_mode(mode)
+    mode_printers = cfg.get("mode_printers")
+    if isinstance(mode_printers, dict) and mode_norm in FORCED_MAIN_MODES:
+        mp = mode_printers.get(mode_norm)
+        if isinstance(mp, str) and mp.strip():
+            return mp.strip()
 
     top_level = (
         cfg.get("report_printer_name")
@@ -377,7 +384,7 @@ def print_document(
 
     # Forzar cola física de papel para Listados/FedEx/Urbano.
     if mode_norm in FORCED_MAIN_MODES:
-        report_printer = _get_report_printer(cfg)
+        report_printer = _get_report_printer(cfg, mode_norm)
         cfg_to_use = dict(cfg)
         cfg_to_use["printer_name"] = report_printer
         cfg_to_use["printer"] = report_printer
@@ -386,7 +393,7 @@ def print_document(
 
     logger.info(f"[print_document] Ejecutando impresora de modo '{mode_norm}'")
     if mode_norm in FORCED_MAIN_MODES:
-        forced = _get_report_printer(cfg_to_use)
+        forced = _get_report_printer(cfg_to_use, mode_norm)
         with _temporary_forced_printer_env(forced):
             with _temporary_windows_default_printer(forced):
                 return fn(file_path, cfg_to_use, df)

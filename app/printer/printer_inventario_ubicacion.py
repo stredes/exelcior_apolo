@@ -1,5 +1,5 @@
-# Módulo: printer_inventario_ubicacion.py
-# Descripción: Impresión automática del inventario filtrado por ubicación, compatible con printer_map
+﻿# MÃ³dulo: printer_inventario_ubicacion.py
+# DescripciÃ³n: ImpresiÃ³n automÃ¡tica del inventario filtrado por ubicaciÃ³n, compatible con printer_map
 
 from pathlib import Path
 from datetime import datetime
@@ -16,18 +16,23 @@ TEMP_PATH = Path("temp/inventario_ubicacion.xlsx")
 TEMP_PATH.parent.mkdir(parents=True, exist_ok=True)  # Asegurar carpeta temp
 
 
-def print_inventario_ubicacion(file_path, config, df: pd.DataFrame):
+def print_inventario_ubicacion(file_path=None, config=None, df: pd.DataFrame = None):
     """
-    Entrada estándar para printer_map. Genera archivo Excel con estilo y lo imprime automáticamente.
+    Entrada estandar para printer_map. Genera archivo Excel con estilo y lo imprime automaticamente.
+    Compatible con llamada antigua: print_inventario_ubicacion(df=...).
     """
     try:
+        if isinstance(file_path, pd.DataFrame) and df is None:
+            df = file_path
+        if df is None:
+            raise ValueError("No se recibio DataFrame para impresion de inventario por ubicacion.")
         if df.empty:
-            raise ValueError("El DataFrame del inventario por ubicación está vacío.")
+            raise ValueError("El DataFrame del inventario por ubicacion esta vacio.")
 
         fecha = datetime.now().strftime("%d/%m/%Y")
-        titulo = f"INVENTARIO POR UBICACIÓN - {fecha}"
+        titulo = f"INVENTARIO POR UBICACIÃ“N - {fecha}"
 
-        # Agregar fila vacía para el título
+        # Agregar fila vacÃ­a para el tÃ­tulo
         df_to_export = pd.DataFrame(columns=df.columns)
         df_to_export.loc[0] = [""] * len(df.columns)
         df_to_export = pd.concat([df_to_export, df], ignore_index=True)
@@ -61,20 +66,34 @@ def print_inventario_ubicacion(file_path, config, df: pd.DataFrame):
                     cell.alignment = Alignment(horizontal="center")
                     cell.border = borde_fino
 
-        log_evento(f"📄 Archivo temporal generado para Inventario por Ubicación: {TEMP_PATH}", "info")
+            # Configuracion de impresion: horizontal y ajuste a una sola hoja.
+            sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
+            sheet.page_setup.fitToWidth = 1
+            sheet.page_setup.fitToHeight = 1
+            sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
+            sheet.sheet_properties.pageSetUpPr.fitToPage = True
+            sheet.page_margins.left = 0.2
+            sheet.page_margins.right = 0.2
+            sheet.page_margins.top = 0.3
+            sheet.page_margins.bottom = 0.3
+            sheet.page_margins.header = 0.1
+            sheet.page_margins.footer = 0.1
+            sheet.print_options.horizontalCentered = True
+
+        log_evento(f"ðŸ“„ Archivo temporal generado para Inventario por UbicaciÃ³n: {TEMP_PATH}", "info")
 
         _enviar_a_impresora(TEMP_PATH)
 
-        log_evento("✅ Impresión de inventario por ubicación completada correctamente.", "info")
+        log_evento("âœ… ImpresiÃ³n de inventario por ubicaciÃ³n completada correctamente.", "info")
 
     except Exception as e:
-        log_evento(f"❌ Error al imprimir inventario por ubicación: {e}", "error")
-        raise RuntimeError(f"Error al imprimir inventario por ubicación: {e}")
+        log_evento(f"âŒ Error al imprimir inventario por ubicaciÃ³n: {e}", "error")
+        raise RuntimeError(f"Error al imprimir inventario por ubicaciÃ³n: {e}")
 
 
 def _enviar_a_impresora(file_path: Path):
     """
-    Envia un archivo Excel a la impresora predeterminada según sistema operativo.
+    Envia un archivo Excel a la impresora predeterminada segÃºn sistema operativo.
     """
     sistema = platform.system()
     try:
@@ -85,7 +104,8 @@ def _enviar_a_impresora(file_path: Path):
         elif sistema == "Darwin":
             subprocess.run(["lp", str(file_path)], check=True)
         else:
-            raise OSError("Sistema operativo no compatible para impresión automática.")
+            raise OSError("Sistema operativo no compatible para impresiÃ³n automÃ¡tica.")
     except Exception as e:
-        log_evento(f"❌ Error al imprimir archivo: {e}", "error")
+        log_evento(f"âŒ Error al imprimir archivo: {e}", "error")
         raise RuntimeError(f"Error al enviar a impresora: {e}")
+

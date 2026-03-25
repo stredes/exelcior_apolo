@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import unicodedata
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict
 
@@ -115,9 +116,15 @@ class InventarioView(tk.Toplevel):
         self.df = pd.DataFrame()
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
+        self.sort_column = None
+        self.sort_ascending = True
+        self.ubicaciones_disponibles = []
+        self.ubicaciones_seleccionadas = set()
+        self._ubic_popup = None
         self._archivo_actual = ""
         self.status_var = tk.StringVar(value="Carga un archivo de inventario para comenzar.")
         self.summary_var = tk.StringVar(value="Registros: 0")
+        self.ubicaciones_var = tk.StringVar(value="Ubicaciones: todas")
 
         self._crear_widgets()
         self._cargar_o_pedir_archivo()
@@ -177,15 +184,17 @@ class InventarioView(tk.Toplevel):
         self.entry_fila.grid(row=0, column=5, padx=(6, 12), sticky="w")
         self.entry_fila.bind("<Return>", lambda e: self._filtrar())
 
-        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=6, padx=(0, 6))
-        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=7, padx=(0, 6))
-        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=8, padx=(0, 6))
-        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=9)
-        top_card.columnconfigure(10, weight=1)
+        ttk.Button(top_card, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=6, padx=(0, 6))
+        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=7, padx=(0, 6))
+        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=8, padx=(0, 6))
+        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=9, padx=(0, 6))
+        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=10)
+        top_card.columnconfigure(11, weight=1)
 
         info_row = ttk.Frame(top_card, style="Card.TFrame")
-        info_row.grid(row=1, column=0, columnspan=11, sticky="ew", pady=(10, 0))
+        info_row.grid(row=1, column=0, columnspan=12, sticky="ew", pady=(10, 0))
         ttk.Label(info_row, textvariable=self.summary_var, style="InvLabel.TLabel").pack(side="left")
+        ttk.Label(info_row, textvariable=self.ubicaciones_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
         ttk.Label(info_row, textvariable=self.status_var, style="InvHint.TLabel").pack(side="left", padx=(16, 0))
 
         self.sugerencias_var = tk.StringVar(value="")
@@ -199,7 +208,7 @@ class InventarioView(tk.Toplevel):
 
         self.tree = ttk.Treeview(tree_container, columns=VISIBLE_COLUMNS, show="headings", height=25)
         for col in VISIBLE_COLUMNS:
-            self.tree.heading(col, text=col)
+            self.tree.heading(col, text=col, command=lambda c=col: self._sort_by_column(c))
             width = 140
             if col in ("Producto",):
                 width = 280
@@ -281,6 +290,11 @@ class InventarioView(tk.Toplevel):
             self.df = df
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
+            self.sort_column = None
+            self.sort_ascending = True
+            self.ubicaciones_disponibles = sorted(df["Ubicación"].dropna().astype(str).str.strip().unique().tolist())
+            self.ubicaciones_seleccionadas = set()
+            self._actualizar_label_ubicaciones()
             self._archivo_actual = path.name
             self._actualizar_tree(self.df)
             self.status_var.set(f"Archivo cargado: {path.name}")
@@ -295,6 +309,11 @@ class InventarioView(tk.Toplevel):
             self.df = pd.DataFrame()
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
+            self.sort_column = None
+            self.sort_ascending = True
+            self.ubicaciones_disponibles = []
+            self.ubicaciones_seleccionadas = set()
+            self._actualizar_label_ubicaciones()
             self._archivo_actual = ""
             self.status_var.set("No se pudo cargar el archivo.")
             self._actualizar_tree(self.df)
@@ -312,8 +331,8 @@ class InventarioView(tk.Toplevel):
         columna = self._norm_text(self.entry_columna.get())
         fila = self._norm_text(self.entry_fila.get())
 
-        if not termino and not columna and not fila:
-            self.safe_messagebox("info", "Buscar", "Ingrese un termino, columna o fila para filtrar.")
+        if not termino and not columna and not fila and not self.ubicaciones_seleccionadas:
+            self.safe_messagebox("info", "Buscar", "Ingrese un termino, columna/fila o seleccione ubicaciones.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -355,11 +374,16 @@ class InventarioView(tk.Toplevel):
                 lambda val: any(token_fila == frag[-1] for frag in val.split("-") if frag and frag[-1].isdigit())
             )
 
-        mask_total = mask_texto & mask_col & mask_fila
+        mask_sel_ubic = pd.Series([True] * len(df), index=df.index)
+        if self.ubicaciones_seleccionadas:
+            sel_norm = {self._norm_text(v) for v in self.ubicaciones_seleccionadas}
+            mask_sel_ubic = m_ubi.isin(sel_norm)
+
+        mask_total = mask_texto & mask_col & mask_fila & mask_sel_ubic
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
-            if columna or fila or mask_ubi.any():
+            if self.ubicaciones_seleccionadas or columna or fila or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
@@ -382,13 +406,67 @@ class InventarioView(tk.Toplevel):
         self.entry_fila.delete(0, "end")
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
+        self.ubicaciones_seleccionadas = set()
+        self._actualizar_label_ubicaciones()
         self.sugerencias_var.set("")
         self.status_var.set("Filtros limpiados.")
         self._actualizar_tree(self.df)
 
+    def _sort_by_column(self, column: str):
+        if self.df.empty:
+            return
+
+        if self.sort_column == column:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_column = column
+            self.sort_ascending = True
+
+        target_df = self.df_filtrado if not self.df_filtrado.empty else self.df
+        if target_df.empty or column not in target_df.columns:
+            return
+
+        sorted_df = self._sorted_dataframe(target_df, column, self.sort_ascending)
+        if not self.df_filtrado.empty:
+            self.df_filtrado = sorted_df.reset_index(drop=True)
+            self._actualizar_tree(self.df_filtrado)
+        else:
+            self.df = sorted_df.reset_index(drop=True)
+            self._actualizar_tree(self.df)
+
+    def _sorted_dataframe(self, df: pd.DataFrame, column: str, ascending: bool) -> pd.DataFrame:
+        s = df[column]
+        numeric = pd.to_numeric(s, errors="coerce")
+        if numeric.notna().any():
+            return df.assign(__sort_key=numeric).sort_values(
+                by="__sort_key",
+                ascending=ascending,
+                na_position="last",
+                kind="mergesort",
+            ).drop(columns=["__sort_key"])
+
+        if column == "Fecha Vencimiento":
+            dt = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
+            if dt.notna().any():
+                return df.assign(__sort_key=dt).sort_values(
+                    by="__sort_key",
+                    ascending=ascending,
+                    na_position="last",
+                    kind="mergesort",
+                ).drop(columns=["__sort_key"])
+
+        txt = s.astype(str).map(self._norm_text)
+        return df.assign(__sort_key=txt).sort_values(
+            by="__sort_key",
+            ascending=ascending,
+            na_position="last",
+            kind="mergesort",
+        ).drop(columns=["__sort_key"])
+
     # --------------------------- Actualizar UI ---------------------------
 
     def _actualizar_tree(self, df: pd.DataFrame):
+        self._update_heading_texts()
         self.tree.delete(*self.tree.get_children())
         if df is None or df.empty:
             self.summary_var.set("Registros: 0")
@@ -402,6 +480,13 @@ class InventarioView(tk.Toplevel):
         self.tree.tag_configure("odd", background="#F6F8FD")
         origen = self._archivo_actual or "sin archivo"
         self.summary_var.set(f"Registros: {len(df)} | Fuente: {origen}")
+
+    def _update_heading_texts(self):
+        for col in VISIBLE_COLUMNS:
+            arrow = ""
+            if self.sort_column == col:
+                arrow = " ▲" if self.sort_ascending else " ▼"
+            self.tree.heading(col, text=f"{col}{arrow}", command=lambda c=col: self._sort_by_column(c))
 
     # ------------------------------ Print -------------------------------
 
@@ -419,10 +504,137 @@ class InventarioView(tk.Toplevel):
             )
 
             if self.tipo_busqueda == "ubicacion":
-                printer_inventario_ubicacion.print_inventario_ubicacion(df=df_to_print)
+                printer_inventario_ubicacion.print_inventario_ubicacion(
+                    file_path=self._archivo_actual or "inventario.xlsx",
+                    config={},
+                    df=df_to_print,
+                )
             else:
-                printer_inventario_codigo.print_inventario_codigo(df=df_to_print)
+                printer_inventario_codigo.print_inventario_codigo(
+                    file_path=self._archivo_actual or "inventario.xlsx",
+                    config={},
+                    df=df_to_print,
+                )
 
         except Exception as e:
             capturar_log_bod1(f"[Inventario] Error al imprimir inventario: {e}", "error")
             self.safe_messagebox("error", "Error", f"No se pudo imprimir:\n{e}")
+
+    # ---------------------- Selector de ubicaciones ----------------------
+
+    def _actualizar_label_ubicaciones(self):
+        total = len(self.ubicaciones_disponibles)
+        sel = len(self.ubicaciones_seleccionadas)
+        if sel == 0:
+            self.ubicaciones_var.set(f"Ubicaciones: todas ({total})")
+            return
+        if sel <= 3:
+            muestra = ", ".join(sorted(self.ubicaciones_seleccionadas))
+            self.ubicaciones_var.set(f"Ubicaciones: {muestra}")
+            return
+        self.ubicaciones_var.set(f"Ubicaciones seleccionadas: {sel} de {total}")
+
+    def _abrir_selector_ubicaciones(self):
+        if self.df.empty:
+            self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
+            return
+
+        if self._ubic_popup and self._ubic_popup.winfo_exists():
+            self._ubic_popup.focus_force()
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("Seleccionar ubicaciones")
+        popup.geometry("460x520")
+        popup.transient(self)
+        popup.grab_set()
+        popup.config(bg="#FFFFFF")
+        self._ubic_popup = popup
+        popup.protocol("WM_DELETE_WINDOW", lambda: (setattr(self, "_ubic_popup", None), popup.destroy()))
+
+        ttk.Label(popup, text="Buscar ubicación:").pack(anchor="w", padx=12, pady=(12, 4))
+        search_var = tk.StringVar(value="")
+        entry = ttk.Entry(popup, textvariable=search_var)
+        entry.pack(fill="x", padx=12)
+        entry.focus_set()
+
+        list_frame = ttk.Frame(popup)
+        list_frame.pack(fill="both", expand=True, padx=12, pady=10)
+
+        canvas = tk.Canvas(list_frame, highlightthickness=0, bg="#FFFFFF")
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas)
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        vars_map = {
+            u: tk.BooleanVar(value=(u in self.ubicaciones_seleccionadas))
+            for u in self.ubicaciones_disponibles
+        }
+
+        def matches_location(location: str, term: str) -> bool:
+            if not term:
+                return True
+            loc_n = self._norm_text(location)
+            if term in loc_n:
+                return True
+            return SequenceMatcher(None, term, loc_n).ratio() >= 0.62
+
+        def on_check_change():
+            seleccion = {u for u, var in vars_map.items() if var.get()}
+            self.ubicaciones_seleccionadas = seleccion
+            self._actualizar_label_ubicaciones()
+
+        def rebuild_list():
+            for widget in inner.winfo_children():
+                widget.destroy()
+            term = self._norm_text(search_var.get())
+            visibles = [u for u in self.ubicaciones_disponibles if matches_location(u, term)]
+            if not visibles:
+                ttk.Label(inner, text="Sin coincidencias").pack(anchor="w", padx=4, pady=4)
+                return
+            for loc in visibles:
+                ttk.Checkbutton(
+                    inner,
+                    text=loc,
+                    variable=vars_map[loc],
+                    command=on_check_change,
+                ).pack(anchor="w", padx=4, pady=1)
+
+        def seleccionar_visibles(valor: bool):
+            term = self._norm_text(search_var.get())
+            for loc in self.ubicaciones_disponibles:
+                if matches_location(loc, term):
+                    vars_map[loc].set(valor)
+            on_check_change()
+            rebuild_list()
+
+        def aplicar_y_filtrar():
+            on_check_change()
+            self._filtrar_desde_selector()
+            self._ubic_popup = None
+            popup.destroy()
+
+        action_row = ttk.Frame(popup)
+        action_row.pack(fill="x", padx=12, pady=(0, 12))
+        ttk.Button(action_row, text="Marcar visibles", command=lambda: seleccionar_visibles(True)).pack(side="left")
+        ttk.Button(action_row, text="Desmarcar visibles", command=lambda: seleccionar_visibles(False)).pack(side="left", padx=(6, 0))
+        ttk.Button(action_row, text="Aplicar", command=aplicar_y_filtrar).pack(side="right")
+
+        search_var.trace_add("write", lambda *_: rebuild_list())
+        rebuild_list()
+
+    def _filtrar_desde_selector(self):
+        tiene_texto = bool(self._norm_text(self.entry_busqueda.get()))
+        tiene_col = bool(self._norm_text(self.entry_columna.get()))
+        tiene_fila = bool(self._norm_text(self.entry_fila.get()))
+        if self.ubicaciones_seleccionadas or tiene_texto or tiene_col or tiene_fila:
+            self._filtrar()
+        else:
+            self.df_filtrado = pd.DataFrame()
+            self.tipo_busqueda = None
+            self.status_var.set("Sin ubicaciones seleccionadas. Mostrando todos los registros.")
+            self._actualizar_tree(self.df)
