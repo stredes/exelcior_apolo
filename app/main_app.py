@@ -147,8 +147,11 @@ class ExcelPrinterApp(tk.Tk):
             screen_w, screen_h = 1366, 768
 
         min_w, min_h = 960, 640
-        width = max(min_w, int(screen_w * 0.85))
-        height = max(min_h, int(screen_h * 0.85))
+        width = max(min_w, int(screen_w * 0.76))
+        height = max(min_h, int(screen_h * 0.82))
+
+        # Evita ventanas excesivamente anchas que dejan mucho espacio muerto
+        width = min(width, 1440)
 
         width = min(width, screen_w)
         height = min(height, screen_h)
@@ -172,6 +175,14 @@ class ExcelPrinterApp(tk.Tk):
             try:
                 target_width = max(220, int(event.width * 0.18))
                 self.sidebar.configure(width=target_width)
+            except Exception:
+                pass
+        content_wrap = getattr(self, "_content_wrap", None)
+        if content_wrap is not None:
+            try:
+                available = max(760, event.width - (self.sidebar.winfo_width() if self.sidebar is not None else 260) - 48)
+                target = min(available, 1280)
+                content_wrap.configure(width=target)
             except Exception:
                 pass
 
@@ -246,7 +257,7 @@ class ExcelPrinterApp(tk.Tk):
         )
         style.configure("Mode.TLabelframe", padding=16, background="#FFFFFF")
         style.configure("Mode.TLabelframe.Label", font=("Segoe UI Semibold", 11), background="#FFFFFF", foreground="#243B53")
-        style.configure("Status.TLabel", font=("Segoe UI", 10), padding=10, background="#102033", foreground="#E7EEF7")
+        style.configure("Status.TLabel", font=("Segoe UI", 9), padding=6, background="#102033", foreground="#E7EEF7")
         style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 30), foreground="#091E36", background="#F7FAFC")
         style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#516274", background="#F7FAFC")
         style.configure("HeroBadge.TLabel", font=("Segoe UI Semibold", 10), foreground="#FFF9EC", background="#9C6B17")
@@ -325,9 +336,16 @@ class ExcelPrinterApp(tk.Tk):
     def _setup_main_area(self):
         self.main_frame = tk.Frame(self, bg="#E7ECF3")
         self.main_frame.pack(side="left", fill="both", expand=True)
-        self.main_frame.pack_propagate(False)
 
-        hero = tk.Frame(self.main_frame, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
+        shell = tk.Frame(self.main_frame, bg="#E7ECF3")
+        shell.pack(fill="both", expand=True)
+        shell.grid_columnconfigure(0, weight=1)
+
+        content_wrap = tk.Frame(shell, bg="#E7ECF3")
+        content_wrap.grid(row=0, column=0, sticky="n", padx=24)
+        self._content_wrap = content_wrap
+
+        hero = tk.Frame(content_wrap, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
         hero.pack(fill="x", padx=24, pady=(24, 12))
 
         ttk.Label(hero, text="Exelcior Apolo  |  Actualizacion Visible", style="CardTitle.TLabel", anchor="center").pack(
@@ -374,7 +392,7 @@ class ExcelPrinterApp(tk.Tk):
             self._mode_buttons[modo] = rb
         self._refresh_mode_buttons()
 
-        summary_row = tk.Frame(self.main_frame, bg="#E7ECF3")
+        summary_row = tk.Frame(content_wrap, bg="#E7ECF3")
         summary_row.pack(fill="x", padx=24, pady=(0, 12))
         self._build_metric_card(
             summary_row,
@@ -398,10 +416,10 @@ class ExcelPrinterApp(tk.Tk):
             "#8B5E34",
         ).pack(side="left", fill="both", expand=True, padx=(8, 0))
 
-        showcase = tk.Frame(self.main_frame, bg="#E7ECF3")
+        showcase = tk.Frame(content_wrap, bg="#E7ECF3")
         showcase.pack(fill="both", expand=True, padx=24, pady=(0, 16))
-        showcase.columnconfigure(0, weight=3)
-        showcase.columnconfigure(1, weight=2)
+        showcase.columnconfigure(0, weight=2)
+        showcase.columnconfigure(1, weight=1)
         showcase.rowconfigure(0, weight=1)
 
         visual_panel = tk.Frame(showcase, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
@@ -455,7 +473,7 @@ class ExcelPrinterApp(tk.Tk):
         self._build_info_row(side_panel, "Operacion", self.mode_description_var).pack(fill="x", padx=20, pady=6)
         self._build_info_row(side_panel, "Estado en vivo", self.status_var).pack(fill="x", padx=20, pady=6)
 
-        self._content_spacer = tk.Frame(self.main_frame, bg="#E7ECF3")
+        self._content_spacer = tk.Frame(content_wrap, bg="#E7ECF3")
         self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
     def _setup_status_bar(self):
