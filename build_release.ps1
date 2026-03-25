@@ -246,7 +246,7 @@ function Assert-CleanGitWorktree{
 
 function Publish-GitBranch([string]$remoteName, [string]$branchName){
   Write-Info "Empujando rama '$branchName' a '$remoteName'..."
-  Invoke-GitPassthru -Arguments @("push", $remoteName, $branchName) -Step "git push $remoteName $branchName"
+  Invoke-GitPassthru -Arguments @("push", $remoteName, "HEAD") -Step "git push $remoteName HEAD"
 }
 
 function Save-ReleaseCommit([string]$version, [string]$remoteName){
