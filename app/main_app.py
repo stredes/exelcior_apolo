@@ -36,6 +36,7 @@ from app.gui.printer_admin import PrinterAdminDialog
 from app.updater import (
     fetch_latest_release,
     get_local_version,
+    get_update_startup_notice,
     is_newer_version,
     launch_installer,
     launch_portable_update,
@@ -100,6 +101,7 @@ class ExcelPrinterApp(tk.Tk):
         self.version_var = tk.StringVar(value=f"Version instalada: {self.current_version}")
         self.update_badge_var = tk.StringVar(value="Interfaz actualizada correctamente")
         self.mode_description_var = tk.StringVar(value="Listados comerciales y documentos de venta")
+        self._startup_update_notice = get_update_startup_notice(self.current_version)
 
         # âœ… Carga de config robusta
         try:
@@ -122,6 +124,7 @@ class ExcelPrinterApp(tk.Tk):
         self._setup_status_bar()
         self.bind("<Configure>", self._on_root_resize)
         self._switch_print_context("report")
+        self.after(700, self._show_startup_update_notice)
         self.after(2000, self._check_for_updates_async)
 
         # Cierre limpio
@@ -594,7 +597,10 @@ class ExcelPrinterApp(tk.Tk):
         try:
             self._close_update_progress()
             if self._update_release_info and self._update_release_info.get("asset_kind") == "portable_zip":
-                launch_portable_update(installer_path)
+                launch_portable_update(
+                    installer_path,
+                    target_version=str(self._update_release_info.get("version") or ""),
+                )
             else:
                 launch_installer(installer_path)
             self._update_status("Instalador lanzado. Cerrando aplicacion...")
@@ -678,6 +684,18 @@ class ExcelPrinterApp(tk.Tk):
             pass
         finally:
             self._update_progress_win = None
+
+    def _show_startup_update_notice(self) -> None:
+        notice = self._startup_update_notice
+        self._startup_update_notice = None
+        if not notice:
+            return
+        self._update_status(notice["message"])
+        if notice.get("level") == "warning":
+            self.update_badge_var.set("Revision de actualizacion requerida")
+            self.safe_messagebox("warning", "Actualizacion", notice["message"])
+        else:
+            self.update_badge_var.set("Actualizacion aplicada correctamente")
 
     def _ui_set_status_preview_totals(self, df, mode: str):
         try:

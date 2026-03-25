@@ -17,6 +17,9 @@ GITHUB_API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest
 SETUP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_Setup\.exe$", re.IGNORECASE)
 PORTABLE_ZIP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_(Portable|portable)\.zip$", re.IGNORECASE)
 REQUEST_TIMEOUT = 12
+UPDATE_RUNTIME_DIRNAME = "ExelciorApoloUpdates"
+UPDATE_STATE_FILE = "portable_update_state.json"
+UPDATE_LOG_FILE = "portable_update_last.log"
 
 
 def _get_requests():
@@ -34,6 +37,88 @@ def _resource_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
     return Path(__file__).resolve().parent.parent
+
+
+def get_update_runtime_dir() -> Path:
+    path = Path(tempfile.gettempdir()) / UPDATE_RUNTIME_DIRNAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_update_log_path() -> Path:
+    return get_update_runtime_dir() / UPDATE_LOG_FILE
+
+
+def _get_update_state_path() -> Path:
+    return get_update_runtime_dir() / UPDATE_STATE_FILE
+
+
+def _write_update_state(payload: Dict[str, Any]) -> Path:
+    state_path = _get_update_state_path()
+    state_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return state_path
+
+
+def read_update_state() -> Optional[Dict[str, Any]]:
+    state_path = _get_update_state_path()
+    if not state_path.exists():
+        return None
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        logging.exception("No se pudo leer el estado del actualizador desde %s", state_path)
+    return None
+
+
+def clear_update_state() -> None:
+    state_path = _get_update_state_path()
+    try:
+        if state_path.exists():
+            state_path.unlink()
+    except Exception:
+        logging.exception("No se pudo limpiar el estado del actualizador")
+
+
+def get_update_startup_notice(current_version: str) -> Optional[Dict[str, str]]:
+    state = read_update_state()
+    if not state:
+        return None
+
+    status = str(state.get("status") or "").strip().lower()
+    target_version = str(state.get("target_version") or "").strip()
+    log_path = str(state.get("log_path") or get_update_log_path())
+    error_message = str(state.get("error") or "").strip()
+
+    if status == "applied" and target_version and current_version == target_version:
+        clear_update_state()
+        return {
+            "level": "info",
+            "message": f"Actualizacion aplicada correctamente a la version {target_version}.",
+        }
+
+    if status == "failed":
+        clear_update_state()
+        extra = f"\nRevisa el log: {log_path}" if log_path else ""
+        return {
+            "level": "warning",
+            "message": f"No se pudo completar la actualizacion automatica.{extra}" + (f"\nDetalle: {error_message}" if error_message else ""),
+        }
+
+    if status in {"pending", "applied"} and target_version and current_version != target_version:
+        clear_update_state()
+        extra = f"\nRevisa el log: {log_path}" if log_path else ""
+        return {
+            "level": "warning",
+            "message": (
+                f"La actualizacion esperaba dejar la version {target_version}, "
+                f"pero la app inicio en {current_version}.{extra}"
+            ),
+        }
+
+    clear_update_state()
+    return None
 
 
 def get_local_version() -> str:
@@ -151,7 +236,7 @@ def launch_installer(installer_path: Path) -> None:
     raise RuntimeError("La instalacion automatica solo esta soportada en Windows.")
 
 
-def launch_portable_update(zip_path: Path) -> None:
+def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
     if not zip_path.exists():
         raise FileNotFoundError(f"No se encontro el paquete portable descargado: {zip_path}")
     if not getattr(sys, "frozen", False):
@@ -161,17 +246,20 @@ def launch_portable_update(zip_path: Path) -> None:
 
     exe_path = Path(sys.executable).resolve()
     install_dir = exe_path.parent
-    temp_root = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
+    temp_root = get_update_runtime_dir()
     extract_dir = temp_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
     extract_dir.mkdir(parents=True, exist_ok=True)
     helper_path = temp_root / "apply_portable_update.ps1"
-    log_path = temp_root / "portable_update_last.log"
+    log_path = get_update_log_path()
     update_config = {
         "zip_path": str(zip_path),
         "extract_dir": str(extract_dir),
         "install_dir": str(install_dir),
         "exe_name": exe_path.name,
         "current_pid": os.getpid(),
+        "target_version": target_version.strip(),
+        "state_path": str(_get_update_state_path()),
+        "log_path": str(log_path),
         "desktop_names": [
             "Exelcior Apolo.lnk",
             "ExelciorApolo.lnk",
@@ -179,7 +267,11 @@ def launch_portable_update(zip_path: Path) -> None:
     }
     config_path = temp_root / f"portable_update_{uuid.uuid4().hex}.json"
     config_path.write_text(json.dumps(update_config, ensure_ascii=False, indent=2), encoding="utf-8")
-    helper_script = r"""
+    updater_template_path = _resource_root() / "data" / "portable_updater.ps1"
+    if updater_template_path.exists():
+        helper_script = updater_template_path.read_text(encoding="utf-8")
+    else:
+        helper_script = r"""
 $ErrorActionPreference = 'Stop'
 $cfg = Get-Content -LiteralPath '__CONFIG_PATH__' -Raw | ConvertFrom-Json
 $zipPath = [string]$cfg.zip_path
@@ -187,6 +279,8 @@ $extractDir = [string]$cfg.extract_dir
 $installDir = [string]$cfg.install_dir
 $exeName = [string]$cfg.exe_name
 $currentPid = [int]$cfg.current_pid
+$targetVersion = [string]$cfg.target_version
+$statePath = [string]$cfg.state_path
 $desktopNames = @($cfg.desktop_names)
 $parentDir = Split-Path -Parent $installDir
 $backupDir = Join-Path $parentDir ((Split-Path -Leaf $installDir) + '_backup')
@@ -198,10 +292,23 @@ function Write-Log([string]$message) {
   Add-Content -LiteralPath $logPath -Value "[$timestamp] $message" -Encoding UTF8
 }
 
+function Save-State([string]$status, [string]$errorMessage = '') {
+  $payload = @{
+    status = $status
+    target_version = $targetVersion
+    install_dir = $installDir
+    log_path = $logPath
+    error = $errorMessage
+    updated_at = (Get-Date).ToString('s')
+  } | ConvertTo-Json -Depth 5
+  Set-Content -LiteralPath $statePath -Value $payload -Encoding UTF8
+}
+
 try {
   if (Test-Path -LiteralPath $logPath) {
     Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
   }
+  Save-State -status 'pending'
 
   Write-Log 'Inicio de parche portable.'
   Write-Log "ZIP: $zipPath"
@@ -301,9 +408,11 @@ try {
   }
 
   Write-Log 'Relanzando ejecutable actualizado.'
+  Save-State -status 'applied'
   Start-Process -FilePath $targetExe -WorkingDirectory $installDir
 } catch {
   Write-Log "Fallo de parche portable: $($_.Exception.Message)"
+  Save-State -status 'failed' -errorMessage $_.Exception.Message
   throw
 }
 """
