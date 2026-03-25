@@ -37,3 +37,6 @@ Name: "desktopicon"; Description: "Crear acceso directo en el Escritorio"; Group
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Flags: nowait postinstall skipifsilent
+
+
+

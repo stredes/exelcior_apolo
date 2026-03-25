@@ -100,6 +100,23 @@ function Assert-LastExitCode([string]$step){
   }
 }
 
+function Invoke-GitCapture([string[]]$Arguments, [string]$Step){
+  $output = @(& git @Arguments 2>$null)
+  $code = $LASTEXITCODE
+  if ($code -ne 0) {
+    throw "$Step falló con código de salida $code."
+  }
+  return $output
+}
+
+function Invoke-GitPassthru([string[]]$Arguments, [string]$Step){
+  & git @Arguments | Out-Host
+  $code = $LASTEXITCODE
+  if ($code -ne 0) {
+    throw "$Step falló con código de salida $code."
+  }
+}
+
 function Get-TextFileIfExists([string]$path){
   if ($path -and (Test-Path -LiteralPath $path)) {
     return (Get-Content -LiteralPath $path -Raw -Encoding UTF8)
@@ -116,7 +133,8 @@ function Get-GitHubTokenValue{
 
 function Get-GitHubRepoFromRemote([string]$remoteName){
   try {
-    $url = (& git remote get-url $remoteName 2>$null | Select-Object -First 1).Trim()
+    $out = Invoke-GitCapture -Arguments @("remote", "get-url", $remoteName) -Step "git remote get-url $remoteName"
+    $url = if ($out.Count -gt 0) { ([string]$out[0]).Trim() } else { "" }
     if (-not $url) { return "" }
     if ($url -match 'github\.com[:/](.+?)(?:\.git)?$') {
       return $matches[1]
@@ -131,15 +149,31 @@ function Get-ReleaseTag([string]$version){
 }
 
 function Get-CurrentGitBranch{
-  $branch = (& git branch --show-current 2>$null | Select-Object -First 1).Trim()
-  Assert-LastExitCode "git branch --show-current"
-  if (-not $branch) { throw "No se pudo determinar la rama actual." }
+  $branch = ""
+  try {
+    $out = Invoke-GitCapture -Arguments @("rev-parse", "--abbrev-ref", "HEAD") -Step "git rev-parse --abbrev-ref HEAD"
+    if ($out.Count -gt 0) {
+      $branch = ([string]$out[0]).Trim()
+    }
+  } catch {}
+
+  if (-not $branch) {
+    try {
+      $out = Invoke-GitCapture -Arguments @("branch", "--show-current") -Step "git branch --show-current"
+      if ($out.Count -gt 0) {
+        $branch = ([string]$out[0]).Trim()
+      }
+    } catch {}
+  }
+
+  if (-not $branch -or $branch -eq "HEAD") {
+    throw "No se pudo determinar la rama actual. Verifica que el repositorio no esté en detached HEAD."
+  }
   return $branch
 }
 
 function Test-GitWorktreeDirty{
-  $status = (& git status --porcelain 2>$null)
-  Assert-LastExitCode "git status --porcelain"
+  $status = Invoke-GitCapture -Arguments @("status", "--porcelain") -Step "git status --porcelain"
   return [bool]$status
 }
 
@@ -151,16 +185,12 @@ function Get-VersionFromTag([string]$tag){
 
 function Get-LatestGitVersion{
   try {
-    & git fetch --tags $GitRemote | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-      Write-Warn "No se pudieron actualizar tags desde '$GitRemote'. Se usarán los tags locales."
-    }
+    Invoke-GitPassthru -Arguments @("fetch", "--tags", $GitRemote) -Step "git fetch --tags $GitRemote"
   } catch {
-    Write-Warn "git fetch --tags falló: $($_.Exception.Message)"
+    Write-Warn "No se pudieron actualizar tags desde '$GitRemote'. Se usarán los tags locales. $($_.Exception.Message)"
   }
 
-  $tags = @(& git tag --list "v*" 2>$null)
-  Assert-LastExitCode "git tag --list v*"
+  $tags = Invoke-GitCapture -Arguments @("tag", "--list", "v*") -Step "git tag --list v*"
   $versions = @()
   foreach ($tag in $tags) {
     $ver = Get-VersionFromTag ([string]$tag)
@@ -216,18 +246,15 @@ function Assert-CleanGitWorktree{
 
 function Publish-GitBranch([string]$remoteName, [string]$branchName){
   Write-Info "Empujando rama '$branchName' a '$remoteName'..."
-  & git push $remoteName $branchName | Out-Host
-  Assert-LastExitCode "git push $remoteName $branchName"
+  Invoke-GitPassthru -Arguments @("push", $remoteName, $branchName) -Step "git push $remoteName $branchName"
 }
 
 function Save-ReleaseCommit([string]$version, [string]$remoteName){
   $branchName = Get-CurrentGitBranch
   if (Test-GitWorktreeDirty) {
     Write-Info "Creando commit automático de release para v$version..."
-    & git add -A | Out-Host
-    Assert-LastExitCode "git add -A"
-    & git commit -m "release: v$version" | Out-Host
-    Assert-LastExitCode "git commit release: v$version"
+    Invoke-GitPassthru -Arguments @("add", "-A") -Step "git add -A"
+    Invoke-GitPassthru -Arguments @("commit", "-m", "release: v$version") -Step "git commit release: v$version"
   } else {
     Write-Info "No hay cambios pendientes para commit automático."
   }
@@ -235,19 +262,17 @@ function Save-ReleaseCommit([string]$version, [string]$remoteName){
 }
 
 function Publish-GitTag([string]$tagName, [string]$remoteName){
-  $existing = (& git tag --list $tagName | Select-Object -First 1).Trim()
-  Assert-LastExitCode "git tag --list"
+  $out = Invoke-GitCapture -Arguments @("tag", "--list", $tagName) -Step "git tag --list $tagName"
+  $existing = if ($out.Count -gt 0) { ([string]$out[0]).Trim() } else { "" }
   if (-not $existing) {
     Write-Info "Creando tag local: $tagName"
-    & git tag $tagName
-    Assert-LastExitCode "git tag $tagName"
+    Invoke-GitPassthru -Arguments @("tag", $tagName) -Step "git tag $tagName"
   } else {
     Write-Info "El tag local ya existe: $tagName"
   }
   if (-not $SkipGitTagPush) {
     Write-Info "Empujando tag a remoto '$remoteName'..."
-    & git push $remoteName $tagName | Out-Host
-    Assert-LastExitCode "git push $remoteName $tagName"
+    Invoke-GitPassthru -Arguments @("push", $remoteName, $tagName) -Step "git push $remoteName $tagName"
   } else {
     Write-Warn "Push del tag omitido por -SkipGitTagPush."
   }
