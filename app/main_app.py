@@ -69,7 +69,7 @@ class ExcelPrinterApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("Exelcior Apolo | Centro de Despacho")
+        self.title("Exelcior Apolo | Release Visual Nueva")
         self.configure(bg="#E7ECF3")
         self._apply_initial_geometry()
 
@@ -93,9 +93,9 @@ class ExcelPrinterApp(tk.Tk):
         self._update_button = None
         self._update_available = False
         self.current_version = get_local_version()
-        self.status_var = tk.StringVar(value="Sistema operativo listo. Esperando carga o sincronizacion.")
+        self.status_var = tk.StringVar(value="Release visual nueva activa. Sistema listo para operar.")
         self.version_var = tk.StringVar(value=f"Version instalada: {self.current_version}")
-        self.update_badge_var = tk.StringVar(value="Canal estable sin novedades")
+        self.update_badge_var = tk.StringVar(value="Interfaz actualizada correctamente")
         self.mode_description_var = tk.StringVar(value="Listados comerciales y documentos de venta")
 
         # âœ… Carga de config robusta
@@ -273,7 +273,7 @@ class ExcelPrinterApp(tk.Tk):
                  font=("Segoe UI Semibold", 18), padx=14).pack(anchor="w")
         tk.Label(
             brand,
-            text="Centro de despacho, impresion y actualizaciones",
+            text="Release de prueba con cambios visuales notorios",
             bg="#0F2237",
             fg="#8FAECC",
             font=("Segoe UI", 9),
@@ -327,16 +327,16 @@ class ExcelPrinterApp(tk.Tk):
         hero = tk.Frame(self.main_frame, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
         hero.pack(fill="x", padx=24, pady=(24, 12))
 
-        ttk.Label(hero, text="Centro de Despacho Exelcior", style="CardTitle.TLabel", anchor="center").pack(
+        ttk.Label(hero, text="Exelcior Apolo  |  Actualizacion Visible", style="CardTitle.TLabel", anchor="center").pack(
             pady=(22, 6), padx=24, fill="x"
         )
         ttk.Label(
             hero,
-            text="Una consola unificada para preparar archivos, validar salidas y mantener cada puesto sincronizado.",
+            text="Esta version incluye cambios visuales de prueba para confirmar que el sistema de actualizacion está funcionando.",
             style="CardSub.TLabel",
             anchor="center",
         ).pack(pady=(0, 12), padx=24, fill="x")
-        ttk.Label(hero, text="Canal operativo + releases automáticos", style="HeroBadge.TLabel", anchor="center").pack(
+        ttk.Label(hero, text="BUILD DE PRUEBA DE ACTUALIZACION", style="HeroBadge.TLabel", anchor="center").pack(
             pady=(0, 18), ipadx=12, ipady=4
         )
         mode_frame = ttk.LabelFrame(
