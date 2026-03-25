@@ -48,7 +48,7 @@ param(
   [switch]$SkipGitHubPublish,
   [string]$GitTag = "",
   [string]$GitRemote = "origin",
-  [string]$GitHubRepo = "",
+  [string]$GitHubRepo = "stredes/exelcior_apolo",
   [string]$GitHubToken = "",
   [string]$ReleaseTitle = "",
   [string]$ReleaseNotesFile = "",
@@ -136,7 +136,8 @@ function Get-GitHubRepoFromRemote([string]$remoteName){
     $out = Invoke-GitCapture -Arguments @("remote", "get-url", $remoteName) -Step "git remote get-url $remoteName"
     $url = if ($out.Count -gt 0) { ([string]$out[0]).Trim() } else { "" }
     if (-not $url) { return "" }
-    if ($url -match 'github\.com[:/](.+?)(?:\.git)?$') {
+    $url = $url -replace '\s+', ''
+    if ($url -match 'github\.com[:/](.+?)(?:\.git)?/?$') {
       return $matches[1]
     }
   } catch {}
