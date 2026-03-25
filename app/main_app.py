@@ -210,42 +210,46 @@ class ExcelPrinterApp(tk.Tk):
                 pass
 
         style.configure("TButton", font=("Segoe UI Semibold", 10), padding=7)
-        style.configure("TLabel", font=("Segoe UI", 10), background="#EEF2F6")
+        style.configure("TLabel", font=("Segoe UI", 10), background="#E7ECF3")
         style.configure("TCheckbutton", font=("Segoe UI", 10))
         style.configure("TRadiobutton", font=("Segoe UI", 10))
         style.configure(
             "Sidebar.TButton",
             font=("Segoe UI Semibold", 10),
-            padding=(12, 9),
+            padding=(14, 10),
             borderwidth=0,
             relief="flat",
-            foreground="#E6EEF7",
-            background="#1C2B3A",
+            foreground="#DBE7FF",
+            background="#132238",
         )
         style.map(
             "Sidebar.TButton",
-            background=[("active", "#2A3E52"), ("disabled", "#172330")],
-            foreground=[("active", "#FFFFFF"), ("disabled", "#73859A")],
+            background=[("active", "#1D3658"), ("disabled", "#0F1A2B")],
+            foreground=[("active", "#FFFFFF"), ("disabled", "#627189")],
         )
         style.configure(
             "SidebarUpdate.TButton",
             font=("Segoe UI Semibold", 10),
-            padding=(12, 9),
+            padding=(14, 10),
             borderwidth=0,
             relief="flat",
-            foreground="#FFF8E5",
-            background="#9B6C18",
+            foreground="#FFF6DD",
+            background="#B7791F",
         )
         style.map(
             "SidebarUpdate.TButton",
-            background=[("active", "#B98524"), ("disabled", "#6C5523")],
-            foreground=[("active", "#FFFFFF"), ("disabled", "#E6D2A3")],
+            background=[("active", "#D69E2E"), ("disabled", "#6D5525")],
+            foreground=[("active", "#FFFFFF"), ("disabled", "#F2DFAE")],
         )
-        style.configure("Mode.TLabelframe", padding=14, background="#FFFFFF")
-        style.configure("Mode.TLabelframe.Label", font=("Segoe UI Semibold", 11), background="#FFFFFF", foreground="#334E68")
-        style.configure("Status.TLabel", font=("Segoe UI", 10), padding=9, background="#203040", foreground="#EAF1F7")
-        style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 24), foreground="#17324D", background="#FFFFFF")
-        style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#5B6B7C", background="#FFFFFF")
+        style.configure("Mode.TLabelframe", padding=16, background="#FFFFFF")
+        style.configure("Mode.TLabelframe.Label", font=("Segoe UI Semibold", 11), background="#FFFFFF", foreground="#243B53")
+        style.configure("Status.TLabel", font=("Segoe UI", 10), padding=10, background="#102033", foreground="#E7EEF7")
+        style.configure("CardTitle.TLabel", font=("Segoe UI Semibold", 30), foreground="#091E36", background="#F7FAFC")
+        style.configure("CardSub.TLabel", font=("Segoe UI", 10), foreground="#516274", background="#F7FAFC")
+        style.configure("HeroBadge.TLabel", font=("Segoe UI Semibold", 10), foreground="#FFF9EC", background="#9C6B17")
+        style.configure("PanelTitle.TLabel", font=("Segoe UI Semibold", 12), foreground="#16324F", background="#FFFFFF")
+        style.configure("MetricValue.TLabel", font=("Segoe UI Semibold", 16), foreground="#102A43", background="#FFFFFF")
+        style.configure("MetricLabel.TLabel", font=("Segoe UI", 9), foreground="#6B7C93", background="#FFFFFF")
 
     def _add_sidebar_button(self, parent, text, cmd):
         b = ttk.Button(parent, text=text, command=cmd, style="Sidebar.TButton")
@@ -256,22 +260,32 @@ class ExcelPrinterApp(tk.Tk):
     def _setup_sidebar(self):
         initial_width = getattr(self, "_initial_window_size", (1200, 800))[0]
         sidebar_width = max(220, int(initial_width * 0.18))
-        sidebar = tk.Frame(self, bg="#1F2C3A", width=sidebar_width)
+        sidebar = tk.Frame(self, bg="#0A1625", width=sidebar_width)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
         self.sidebar = sidebar
 
-        tk.Label(sidebar, text="Exelcior Apolo", bg="#1F2C3A", fg="#FFFFFF",
-                 font=("Segoe UI Semibold", 16)).pack(anchor="w", padx=14, pady=(20, 4))
-        tk.Label(sidebar, text="Panel principal", bg="#1F2C3A", fg="#A8B7C8",
-                 font=("Segoe UI", 9)).pack(anchor="w", padx=14, pady=(0, 12))
+        brand = tk.Frame(sidebar, bg="#0F2237", bd=0, highlightthickness=1, highlightbackground="#1F3C5A")
+        brand.pack(fill="x", padx=12, pady=(16, 14))
+        tk.Label(brand, text="EXELCIOR", bg="#0F2237", fg="#D6E7FF",
+                 font=("Segoe UI Semibold", 9), padx=14, pady=12).pack(anchor="w")
+        tk.Label(brand, text="Apolo", bg="#0F2237", fg="#FFFFFF",
+                 font=("Segoe UI Semibold", 18), padx=14).pack(anchor="w")
+        tk.Label(
+            brand,
+            text="Centro de despacho, impresion y actualizaciones",
+            bg="#0F2237",
+            fg="#8FAECC",
+            font=("Segoe UI", 9),
+            padx=14,
+        ).pack(anchor="w", pady=(2, 12))
 
-        info_box = tk.Frame(sidebar, bg="#1F2C3A")
+        info_box = tk.Frame(sidebar, bg="#0A1625")
         info_box.pack(fill="x", padx=12, pady=(0, 12))
-        tk.Label(info_box, textvariable=self.version_var, bg="#1F2C3A", fg="#B8C6D6", font=("Segoe UI", 9)).pack(anchor="w")
-        tk.Label(info_box, textvariable=self.update_badge_var, bg="#1F2C3A", fg="#F4D089", font=("Segoe UI Semibold", 9)).pack(anchor="w", pady=(4, 0))
+        tk.Label(info_box, textvariable=self.version_var, bg="#0A1625", fg="#A9BCD0", font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(info_box, textvariable=self.update_badge_var, bg="#0A1625", fg="#F4C86A", font=("Segoe UI Semibold", 9)).pack(anchor="w", pady=(4, 0))
 
-        tk.Label(sidebar, text="Acciones", bg="#1F2C3A", fg="#7F95AB",
+        tk.Label(sidebar, text="Acciones disponibles", bg="#0A1625", fg="#6F89A8",
                  font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=14, pady=(0, 10))
 
         self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
@@ -287,7 +301,7 @@ class ExcelPrinterApp(tk.Tk):
         self._update_button = self._add_sidebar_button(sidebar, "Actualizar Sistema", self._download_and_install_update)
         self._update_button.configure(state=tk.DISABLED, style="SidebarUpdate.TButton")
 
-        footer = tk.Frame(sidebar, bg="#1F2C3A")
+        footer = tk.Frame(sidebar, bg="#0A1625")
         footer.pack(side="bottom", fill="x", padx=12, pady=(10, 14))
         ttk.Separator(footer, orient="horizontal").pack(fill="x", pady=(0, 10))
         tk.Button(
@@ -306,22 +320,25 @@ class ExcelPrinterApp(tk.Tk):
         ).pack(fill="x")
 
     def _setup_main_area(self):
-        self.main_frame = tk.Frame(self, bg="#EEF2F6")
+        self.main_frame = tk.Frame(self, bg="#E7ECF3")
         self.main_frame.pack(side="left", fill="both", expand=True)
         self.main_frame.pack_propagate(False)
 
-        hero = tk.Frame(self.main_frame, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
-        hero.pack(fill="x", padx=24, pady=(24, 14))
+        hero = tk.Frame(self.main_frame, bg="#F7FAFC", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
+        hero.pack(fill="x", padx=24, pady=(24, 12))
 
         ttk.Label(hero, text="Centro de Despacho Exelcior", style="CardTitle.TLabel", anchor="center").pack(
-            pady=(20, 6), padx=24, fill="x"
+            pady=(22, 6), padx=24, fill="x"
         )
         ttk.Label(
             hero,
-            text="Carga, transforma e imprime desde una interfaz simple.",
+            text="Una consola unificada para preparar archivos, validar salidas y mantener cada puesto sincronizado.",
             style="CardSub.TLabel",
             anchor="center",
-        ).pack(pady=(0, 14), padx=24, fill="x")
+        ).pack(pady=(0, 12), padx=24, fill="x")
+        ttk.Label(hero, text="Canal operativo + releases automáticos", style="HeroBadge.TLabel", anchor="center").pack(
+            pady=(0, 18), ipadx=12, ipady=4
+        )
         mode_frame = ttk.LabelFrame(
             hero,
             text="Modo de Operacion",
@@ -354,13 +371,40 @@ class ExcelPrinterApp(tk.Tk):
             self._mode_buttons[modo] = rb
         self._refresh_mode_buttons()
 
-        info_bar = tk.Frame(self.main_frame, bg="#EEF2F6")
-        info_bar.pack(fill="x", padx=24, pady=(0, 12))
-        tk.Label(info_bar, textvariable=self.mode_description_var, bg="#EEF2F6", fg="#51606F", font=("Segoe UI", 10)).pack(side="left")
-        tk.Label(info_bar, textvariable=self.update_badge_var, bg="#EEF2F6", fg="#9B6C18", font=("Segoe UI Semibold", 10)).pack(side="right")
+        summary_row = tk.Frame(self.main_frame, bg="#E7ECF3")
+        summary_row.pack(fill="x", padx=24, pady=(0, 12))
+        self._build_metric_card(
+            summary_row,
+            "Operacion activa",
+            self.mode_var.get().capitalize(),
+            self.mode_description_var,
+            "#16324F",
+        ).pack(side="left", fill="both", expand=True, padx=(0, 8))
+        self._build_metric_card(
+            summary_row,
+            "Version de cliente",
+            self.current_version,
+            self.update_badge_var,
+            "#285E61",
+        ).pack(side="left", fill="both", expand=True, padx=8)
+        self._build_metric_card(
+            summary_row,
+            "Pulso del sistema",
+            "Listo para procesar",
+            self.status_var,
+            "#8B5E34",
+        ).pack(side="left", fill="both", expand=True, padx=(8, 0))
 
-        content = tk.Frame(self.main_frame, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
-        content.pack(fill="both", expand=True, padx=24, pady=(0, 16))
+        showcase = tk.Frame(self.main_frame, bg="#E7ECF3")
+        showcase.pack(fill="both", expand=True, padx=24, pady=(0, 16))
+        showcase.columnconfigure(0, weight=3)
+        showcase.columnconfigure(1, weight=2)
+        showcase.rowconfigure(0, weight=1)
+
+        visual_panel = tk.Frame(showcase, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
+        visual_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        side_panel = tk.Frame(showcase, bg="#FFFFFF", bd=0, highlightthickness=1, highlightbackground="#D7E2EF")
+        side_panel.grid(row=0, column=1, sticky="nsew")
 
         # -------- LOGO / identidad --------
         try:
@@ -385,16 +429,31 @@ class ExcelPrinterApp(tk.Tk):
 
             if logo_file is not None:
                 img = Image.open(logo_file)
-                img.thumbnail((180, 180), Image.LANCZOS)
+                img.thumbnail((220, 220), Image.LANCZOS)
                 self._logo_image = ImageTk.PhotoImage(img)  # guardar referencia
-                tk.Label(content, image=self._logo_image, bg="#FFFFFF").pack(padx=20, pady=(26, 14))
+                tk.Label(visual_panel, image=self._logo_image, bg="#FFFFFF").pack(padx=20, pady=(28, 14))
             else:
-                tk.Label(content, text="[Logo no encontrado]", bg="#FFFFFF", fg="#c00").pack(pady=18)
+                tk.Label(visual_panel, text="[Logo no encontrado]", bg="#FFFFFF", fg="#c00").pack(pady=18)
         except Exception as e:
-            tk.Label(content, text=f"[Error cargando logo: {e}]", bg="#FFFFFF", fg="#c00").pack(pady=18)
+            tk.Label(visual_panel, text=f"[Error cargando logo: {e}]", bg="#FFFFFF", fg="#c00").pack(pady=18)
 
-        tk.Label(content, textvariable=self.version_var, bg="#FFFFFF", fg="#677788", font=("Segoe UI", 10)).pack(pady=(0, 6))
-        tk.Label(content, textvariable=self.status_var, bg="#FFFFFF", fg="#4F5D6B", font=("Segoe UI", 10)).pack(pady=(0, 20))
+        ttk.Label(visual_panel, text="Recorrido recomendado", style="PanelTitle.TLabel").pack(anchor="w", padx=24, pady=(8, 4))
+        for step in (
+            "1. Selecciona el canal operativo correcto para la carga",
+            "2. Carga manual o automática del Excel",
+            "3. Revisa la vista previa y valida impresoras antes de emitir",
+            "4. Publica releases y replica cambios a todos los puestos",
+        ):
+            tk.Label(visual_panel, text=step, bg="#FFFFFF", fg="#51606F", font=("Segoe UI", 10)).pack(anchor="w", padx=24, pady=4)
+
+        ttk.Label(side_panel, text="Salud operativa", style="PanelTitle.TLabel").pack(anchor="w", padx=20, pady=(22, 10))
+        self._build_info_row(side_panel, "Canal de actualizacion", self.update_badge_var).pack(fill="x", padx=20, pady=6)
+        self._build_info_row(side_panel, "Version local", self.version_var).pack(fill="x", padx=20, pady=6)
+        self._build_info_row(side_panel, "Operacion", self.mode_description_var).pack(fill="x", padx=20, pady=6)
+        self._build_info_row(side_panel, "Estado en vivo", self.status_var).pack(fill="x", padx=20, pady=6)
+
+        self._content_spacer = tk.Frame(self.main_frame, bg="#E7ECF3")
+        self._content_spacer.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
     def _setup_status_bar(self):
         status_frame = tk.Frame(self, bg="#102033")
