@@ -35,7 +35,7 @@ from app.printer.printer_tools import prepare_fedex_dataframe
 logger = logging.getLogger(__name__)
 
 # Impresora fallback para los 3 modos principales (papel común).
-FALLBACK_MAIN_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
+FALLBACK_MAIN_PRINTER = ""
 FORCED_MAIN_MODES = {"listados", "fedex", "urbano"}
 
 
@@ -46,7 +46,7 @@ def _get_report_printer(cfg: dict, mode: Optional[str] = None) -> str:
       1) report_printer_name / paper_printer_name
       2) default_printer (legacy)
       3) paths.default_printer (v2)
-      4) fallback hardcodeado
+      4) sin fallback hardcodeado
     """
     if not isinstance(cfg, dict):
         return FALLBACK_MAIN_PRINTER

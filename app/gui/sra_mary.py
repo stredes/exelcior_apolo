@@ -15,6 +15,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 import pandas as pd
+from app.utils.app_dirs import DATA_DIR, ensure_file
 from app.gui.etiqueta_editor import (
     CLIENTES_PATH_KEY,
     buscar_cliente_por_rut,
@@ -23,10 +24,11 @@ from app.gui.etiqueta_editor import (
 )
 
 
-DB_PATH = Path("data/sra_mary_db.json")
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-if not DB_PATH.exists():
-    DB_PATH.write_text("[]", encoding="utf-8")
+DB_PATH = ensure_file(
+    DATA_DIR / "sra_mary_db.json",
+    legacy_candidates=(Path("data/sra_mary_db.json"),),
+    default_text="[]",
+)
 
 logger = logging.getLogger("eventos_logger")
 

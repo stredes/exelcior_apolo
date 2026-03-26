@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,7 @@ GITHUB_REPO = "stredes/exelcior_apolo"
 GITHUB_API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 SETUP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_Setup\.exe$", re.IGNORECASE)
 PORTABLE_ZIP_ASSET_PATTERN = re.compile(r"ExelciorApolo_.*_(Portable|portable)\.zip$", re.IGNORECASE)
+CHECKSUM_ASSET_PATTERN = re.compile(r"checksums_.*\.txt$", re.IGNORECASE)
 REQUEST_TIMEOUT = 12
 UPDATE_RUNTIME_DIRNAME = "ExelciorApoloUpdates"
 UPDATE_STATE_FILE = "portable_update_state.json"
@@ -45,6 +47,12 @@ def get_update_runtime_dir() -> Path:
     return path
 
 
+def create_update_session_dir() -> Path:
+    session_dir = get_update_runtime_dir() / f"session_{uuid.uuid4().hex}"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    return session_dir
+
+
 def get_update_log_path() -> Path:
     return get_update_runtime_dir() / UPDATE_LOG_FILE
 
@@ -64,7 +72,7 @@ def read_update_state() -> Optional[Dict[str, Any]]:
     if not state_path.exists():
         return None
     try:
-        payload = json.loads(state_path.read_text(encoding="utf-8"))
+        payload = json.loads(state_path.read_text(encoding="utf-8-sig"))
         if isinstance(payload, dict):
             return payload
     except Exception:
@@ -162,6 +170,86 @@ def fetch_latest_release() -> Optional[Dict[str, Any]]:
     return payload
 
 
+def _compute_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            if chunk:
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _download_text_asset(asset_url: str) -> str:
+    requests = _get_requests()
+    with requests.get(asset_url, timeout=REQUEST_TIMEOUT) as response:
+        response.raise_for_status()
+        return response.text
+
+
+def _parse_checksums(content: str) -> Dict[str, str]:
+    hashes: Dict[str, str] = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        match = re.search(r"([A-Fa-f0-9]{64})\s+\*(.+)$", line)
+        if not match:
+            continue
+        hashes[Path(match.group(2).strip()).name] = match.group(1).lower()
+    return hashes
+
+
+def _verify_windows_signature(path: Path) -> None:
+    if not sys.platform.startswith("win"):
+        return
+    if path.suffix.lower() != ".exe":
+        return
+
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        (
+            "$sig = Get-AuthenticodeSignature -LiteralPath $args[0]; "
+            "if ($sig.Status -ne 'Valid') { "
+            "Write-Output ($sig.Status.ToString()); exit 1 "
+            "} "
+            "Write-Output ($sig.SignerCertificate.Subject)"
+        ),
+        str(path),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        detail = (result.stdout or result.stderr or "firma no valida").strip()
+        raise RuntimeError(
+            f"La firma digital del instalador no es valida para {path.name}: {detail}"
+        )
+
+
+def verify_downloaded_asset(asset_path: Path, release_info: Dict[str, str]) -> None:
+    checksum_url = str(release_info.get("checksum_url") or "").strip()
+    if not checksum_url:
+        raise RuntimeError(
+            "La release no publica checksums. Se cancela la actualizacion por seguridad."
+        )
+
+    checksums = _parse_checksums(_download_text_asset(checksum_url))
+    expected_hash = checksums.get(asset_path.name)
+    if not expected_hash:
+        raise RuntimeError(
+            f"No se encontro checksum publicado para {asset_path.name}. Actualizacion cancelada."
+        )
+
+    current_hash = _compute_sha256(asset_path)
+    if current_hash.lower() != expected_hash.lower():
+        raise RuntimeError(
+            f"Checksum invalido para {asset_path.name}. Esperado {expected_hash}, obtenido {current_hash}."
+        )
+
+    if str(release_info.get("asset_kind") or "") == "setup":
+        _verify_windows_signature(asset_path)
+
+
 def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
     tag_name = str(payload.get("tag_name") or "").strip()
     version = tag_name.lstrip("vV")
@@ -171,15 +259,17 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
     assets = payload.get("assets") or []
     setup_asset = None
     portable_asset = None
+    checksum_asset = None
     for asset in assets:
         if not isinstance(asset, dict):
             continue
         name = str(asset.get("name") or "")
         url = str(asset.get("browser_download_url") or "")
-        if name and url and SETUP_ASSET_PATTERN.search(name):
+        if name and url and CHECKSUM_ASSET_PATTERN.search(name):
+            checksum_asset = {"name": name, "url": url}
+        elif name and url and SETUP_ASSET_PATTERN.search(name):
             setup_asset = {"name": name, "url": url}
-            break
-        if name and url and PORTABLE_ZIP_ASSET_PATTERN.search(name):
+        elif name and url and PORTABLE_ZIP_ASSET_PATTERN.search(name):
             portable_asset = {"name": name, "url": url}
 
     selected_asset = setup_asset or portable_asset
@@ -192,6 +282,8 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
         "asset_name": selected_asset["name"],
         "asset_url": selected_asset["url"],
         "asset_kind": "setup" if setup_asset else "portable_zip",
+        "checksum_name": str((checksum_asset or {}).get("name") or ""),
+        "checksum_url": str((checksum_asset or {}).get("url") or ""),
         "html_url": str(payload.get("html_url") or ""),
         "published_at": str(payload.get("published_at") or ""),
         "body": str(payload.get("body") or ""),
@@ -204,8 +296,7 @@ def download_release_asset(
     on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> Path:
     requests = _get_requests()
-    target_dir = Path(tempfile.gettempdir()) / "ExelciorApoloUpdates"
-    target_dir.mkdir(parents=True, exist_ok=True)
+    target_dir = create_update_session_dir()
     target_path = target_dir / asset_name
 
     with requests.get(asset_url, stream=True, timeout=60) as response:
@@ -247,9 +338,10 @@ def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
     exe_path = Path(sys.executable).resolve()
     install_dir = exe_path.parent
     temp_root = get_update_runtime_dir()
-    extract_dir = temp_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
+    session_root = create_update_session_dir()
+    extract_dir = session_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
     extract_dir.mkdir(parents=True, exist_ok=True)
-    helper_path = temp_root / "apply_portable_update.ps1"
+    helper_path = session_root / "apply_portable_update.ps1"
     log_path = get_update_log_path()
     update_config = {
         "zip_path": str(zip_path),
@@ -265,7 +357,7 @@ def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
             "ExelciorApolo.lnk",
         ],
     }
-    config_path = temp_root / f"portable_update_{uuid.uuid4().hex}.json"
+    config_path = session_root / f"portable_update_{uuid.uuid4().hex}.json"
     config_path.write_text(json.dumps(update_config, ensure_ascii=False, indent=2), encoding="utf-8")
     updater_template_path = _resource_root() / "data" / "portable_updater.ps1"
     if updater_template_path.exists():
@@ -428,7 +520,7 @@ try {
             "-File",
             str(helper_path),
         ],
-        cwd=str(temp_root),
+        cwd=str(session_root),
         close_fds=True,
     )
 
@@ -446,6 +538,7 @@ def start_update_download(
                 asset_name=release_info["asset_name"],
                 on_progress=on_progress,
             )
+            verify_downloaded_asset(asset_path, release_info)
             on_ready(asset_path)
         except Exception as exc:
             logging.exception("Fallo la descarga del instalador")

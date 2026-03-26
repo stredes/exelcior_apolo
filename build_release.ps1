@@ -250,11 +250,108 @@ function Publish-GitBranch([string]$remoteName, [string]$branchName){
   Invoke-GitPassthru -Arguments @("push", $remoteName, "HEAD") -Step "git push $remoteName HEAD"
 }
 
+function Get-DirtyGitPaths{
+  $status = Invoke-GitCapture -Arguments @("status", "--porcelain") -Step "git status --porcelain"
+  $paths = @()
+  foreach ($line in $status) {
+    $text = [string]$line
+    if (-not $text -or $text.Length -lt 4) { continue }
+    $path = $text.Substring(3).Trim()
+    if (-not $path) { continue }
+    if ($path.Contains(" -> ")) {
+      $parts = $path.Split(" -> ")
+      $path = $parts[$parts.Length - 1].Trim()
+    }
+    if ($path) { $paths += $path }
+  }
+  return @($paths | Select-Object -Unique)
+}
+
+function Get-AllowedReleaseCommitPaths{
+  $candidates = @(
+    $VersionFile,
+    $InnoScript,
+    $SpecPath
+  )
+
+  $allowed = @()
+  foreach ($candidate in $candidates) {
+    if (-not $candidate) { continue }
+    $trimmed = ([string]$candidate).Trim()
+    if (-not $trimmed) { continue }
+    $allowed += ($trimmed -replace '/', '\')
+  }
+
+  return @($allowed | Select-Object -Unique)
+}
+
+function Invoke-WithRetry([scriptblock]$Action, [string]$Step, [int]$Attempts = 5, [int]$DelaySeconds = 2){
+  $lastError = $null
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    try {
+      & $Action
+      return
+    } catch {
+      $lastError = $_
+      if ($attempt -ge $Attempts) { break }
+      Write-Warn "$Step falló en intento $attempt/$Attempts. Reintentando en $DelaySeconds s... $($_.Exception.Message)"
+      Start-Sleep -Seconds $DelaySeconds
+    }
+  }
+  throw "$Step falló tras $Attempts intentos. $($lastError.Exception.Message)"
+}
+
+function New-PortableZipPackage([string]$sourceDir, [string]$destinationZip){
+  Assert-File $sourceDir "No existe la carpeta dist para generar el ZIP portable."
+
+  $sourceResolved = (Resolve-Path -LiteralPath $sourceDir).Path
+  $stagingRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ExelciorApoloPortable_" + [guid]::NewGuid().ToString("N"))
+  $stagingDir = Join-Path $stagingRoot (Split-Path -Leaf $sourceResolved)
+
+  try {
+    New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
+
+    Invoke-WithRetry -Step "Preparar staging portable" -Action {
+      if (Test-Path -LiteralPath $stagingDir) {
+        Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      Copy-Item -LiteralPath $sourceResolved -Destination $stagingDir -Recurse -Force -ErrorAction Stop
+    }
+
+    Invoke-WithRetry -Step "Comprimir portable ZIP" -Action {
+      if (Test-Path -LiteralPath $destinationZip) {
+        Remove-Item -LiteralPath $destinationZip -Force -ErrorAction SilentlyContinue
+      }
+      Compress-Archive -Path $stagingDir -DestinationPath $destinationZip -Force -ErrorAction Stop
+    }
+  } finally {
+    if (Test-Path -LiteralPath $stagingRoot) {
+      Remove-Item -LiteralPath $stagingRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Save-ReleaseCommit([string]$version, [string]$remoteName){
   $branchName = Get-CurrentGitBranch
   if (Test-GitWorktreeDirty) {
+    $dirtyPaths = Get-DirtyGitPaths
+    $allowedPaths = Get-AllowedReleaseCommitPaths
+    $unexpectedPaths = @()
+    foreach ($path in $dirtyPaths) {
+      $normalized = ([string]$path).Trim() -replace '/', '\'
+      if ($allowedPaths -notcontains $normalized) {
+        $unexpectedPaths += $path
+      }
+    }
+    if ($unexpectedPaths.Count -gt 0) {
+      throw ("Se detectaron cambios fuera del scope de release: {0}. Haz commit manual o limpia el árbol antes de publicar." -f ($unexpectedPaths -join ", "))
+    }
     Write-Info "Creando commit automático de release para v$version..."
-    Invoke-GitPassthru -Arguments @("add", "-A") -Step "git add -A"
+    foreach ($path in $allowedPaths) {
+      if (Test-Path -LiteralPath $path) {
+        Invoke-GitPassthru -Arguments @("add", "--", $path) -Step "git add -- $path"
+      }
+    }
     Invoke-GitPassthru -Arguments @("commit", "-m", "release: v$version") -Step "git commit release: v$version"
   } else {
     Write-Info "No hay cambios pendientes para commit automático."
@@ -770,7 +867,7 @@ if (Test-Path -LiteralPath $portableZip) {
   Remove-Item -LiteralPath $portableZip -Force
 }
 Write-Info "Generando paquete portable ZIP..."
-Compress-Archive -Path $distDir -DestinationPath $portableZip -Force
+New-PortableZipPackage -sourceDir $distDir -destinationZip $portableZip
 
 $hashLines = @(
   "== Checksums $AppName v$Version ==",

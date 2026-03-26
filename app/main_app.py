@@ -1,6 +1,7 @@
 ﻿# app/main_app.py
 import os
 import sys
+import re
 import logging
 import threading
 import subprocess
@@ -28,6 +29,7 @@ from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog  # ConfiguraciÃ³n por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
 from app.core.logger_eventos import capturar_log_bod1
+from app.utils.app_dirs import LOGS_DIR
 from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_config as cargar_config_etiquetas
 from app.gui.sra_mary import SraMaryView
@@ -65,8 +67,8 @@ def _has_display() -> bool:
 
 
 class ExcelPrinterApp(tk.Tk):
-    REPORT_DEFAULT_PRINTER = "Brother DCP-L5650DN series [b422002bd4a6]"
-    LABEL_DEFAULT_PRINTER = "URBANO"
+    REPORT_DEFAULT_PRINTER = ""
+    LABEL_DEFAULT_PRINTER = ""
 
     def __init__(self):
         super().__init__()
@@ -745,6 +747,15 @@ class ExcelPrinterApp(tk.Tk):
         base = (alias or "").strip()
         if not base or not sys.platform.startswith("win"):
             return base
+
+        def _normalize_printer_name(value: str) -> str:
+            normalized = (value or "").strip().lower()
+            normalized = re.sub(r"\s*\[[^\]]+\]\s*$", "", normalized)
+            normalized = re.sub(r"\s*\(copiar\s+\d+\)\s*$", "", normalized)
+            normalized = re.sub(r"\s+printer\s*$", "", normalized)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            return normalized
+
         try:
             import win32print  # type: ignore
 
@@ -758,15 +769,26 @@ class ExcelPrinterApp(tk.Tk):
                 if n:
                     names.append(n)
             low = base.lower()
+            normalized_base = _normalize_printer_name(base)
             for n in names:
                 if n.lower() == low:
                     return n
             for n in names:
                 if low in n.lower() or n.lower() in low:
                     return n
+            for n in names:
+                normalized_candidate = _normalize_printer_name(n)
+                if normalized_candidate == normalized_base:
+                    return n
+            for n in names:
+                normalized_candidate = _normalize_printer_name(n)
+                if normalized_base and (
+                    normalized_base in normalized_candidate or normalized_candidate in normalized_base
+                ):
+                    return n
         except Exception:
             pass
-        return base
+        return ""
 
     def _set_windows_default_printer(self, printer_alias: str) -> None:
         if not sys.platform.startswith("win"):
@@ -776,11 +798,24 @@ class ExcelPrinterApp(tk.Tk):
 
             resolved = self._resolve_windows_printer_name(printer_alias)
             if not resolved:
+                logging.warning(
+                    f"[PrinterSwitch] No se encontro coincidencia instalada para '{printer_alias}'."
+                )
+                return
+            current_default = ""
+            try:
+                current_default = str(win32print.GetDefaultPrinter() or "").strip()
+            except Exception:
+                current_default = ""
+            if current_default and current_default.strip().lower() == resolved.strip().lower():
+                logging.info(f"[PrinterSwitch] Default ya aplicada: {resolved}")
                 return
             win32print.SetDefaultPrinter(resolved)
             logging.info(f"[PrinterSwitch] Default aplicada: {resolved}")
         except Exception as e:
-            logging.warning(f"[PrinterSwitch] No se pudo cambiar default a '{printer_alias}': {e}")
+            logging.warning(
+                f"[PrinterSwitch] No se pudo cambiar default a '{printer_alias}' (resuelta: '{resolved if 'resolved' in locals() else ''}'): {e}"
+            )
 
     def _apply_default_printer_for_report_mode(self) -> None:
         # Reportes: usa impresora por modo si existe, si no toma la general.
@@ -1087,11 +1122,12 @@ class ExcelPrinterApp(tk.Tk):
             self.safe_messagebox("error", "Error", f"No se pudo abrir el editor de etiquetas:\n{e}")
 
     def _view_logs(self):
+        app_logs = LOGS_DIR
         root_logs = Path(__file__).resolve().parent.parent / "logs"
         legacy_logs = Path(__file__).resolve().parent / "logs"  # app/logs (ruta antigua)
         cwd_logs = Path.cwd() / "logs"
         cwd_legacy_logs = Path.cwd() / "app" / "logs"
-        search_dirs = (root_logs, legacy_logs, cwd_logs, cwd_legacy_logs)
+        search_dirs = (app_logs, root_logs, legacy_logs, cwd_logs, cwd_legacy_logs)
         for d in search_dirs:
             try:
                 d.mkdir(parents=True, exist_ok=True)
@@ -1178,7 +1214,7 @@ class ExcelPrinterApp(tk.Tk):
 
 
 def setup_logging():
-    log_dir = (Path(__file__).resolve().parent.parent / "logs")
+    log_dir = LOGS_DIR
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
     except Exception:

@@ -1,10 +1,9 @@
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from pathlib import Path
-from app.utils.paths import resource_path  # Asegura compatibilidad con PyInstaller
+from app.utils.app_dirs import LOGS_DIR
 
 def setup_logging():
-    logs_dir = Path(resource_path("logs"))
+    logs_dir = LOGS_DIR
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Log general (app.log)
@@ -36,4 +35,4 @@ def setup_logging():
     root_logger.info("🟢 Sistema de logging inicializado correctamente.")
 
 # Constante exportable para compatibilidad con otros módulos
-LOG_FILE = Path(resource_path("logs")) / "app.log"
+LOG_FILE = LOGS_DIR / "app.log"

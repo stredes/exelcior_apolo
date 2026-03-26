@@ -42,9 +42,16 @@ installer/output/
 # Configuracion y datos locales
 user_config.json
 config/user_config.json
+app/config/user_config.json
+app/config/excel_printer_config.json
+app/config/output/
 data/**/*.db
 data/**/*.sqlite
 data/**/*.bak
+app/db/*.db
+app/db/*.sqlite
+app/db/*.bak
+data/sra_mary_db.json
 logs/
 temp/
 

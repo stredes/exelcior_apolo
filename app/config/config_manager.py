@@ -8,14 +8,23 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, Optional, Union
 
 from app.utils.validate_config_structure import validate_config_structure
+from app.utils.app_dirs import CONFIG_DIR, OUTPUT_DIR, ensure_file
 from app.core.logger_eventos import log_evento
 
 # =============================================================================
-# Rutas de config (SIEMPRE dentro del proyecto, salvo que se use ENV)
+# Rutas de config. Los defaults viven en el proyecto; la config mutable vive en
+# un directorio privado del usuario, salvo que se use ENV.
 # =============================================================================
 CFG_DIR = Path(__file__).resolve().parent                    # app/config/
 DEFAULT_CFG_PATH = CFG_DIR / "excel_printer_default.json"    # default en repo
-USER_CFG_PROJECT = CFG_DIR / "user_config.json"              # <-- destino único
+USER_CFG_PROJECT = ensure_file(
+    CONFIG_DIR / "user_config.json",
+    legacy_candidates=(
+        CFG_DIR / "user_config.json",
+        Path("config/user_config.json"),
+        Path("user_config.json"),
+    ),
+)
 
 # Variables de entorno opcionales:
 # - EXCELPRINTER_CONFIG: archivo o carpeta externa
@@ -34,7 +43,7 @@ def _detect_default_downloads_dir() -> str:
     return str(cand if cand.exists() else Path.home())
 
 def _detect_default_output_dir() -> str:
-    out = CFG_DIR / "output"
+    out = OUTPUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     return str(out)
 
@@ -150,7 +159,7 @@ def ensure_defaults() -> None:
         log_evento(f"❌ No se pudo crear default en {DEFAULT_CFG_PATH}: {e}", "error")
 
 # =============================================================================
-# Resolución de rutas (USER en el proyecto, salvo ENV)
+# Resolución de rutas (USER fuera del proyecto, salvo ENV)
 # =============================================================================
 def _resolve_user_cfg_path() -> Path:
     """
@@ -158,7 +167,7 @@ def _resolve_user_cfg_path() -> Path:
       - archivo -> ese archivo
       - carpeta -> <carpeta>/excel_print_config.json
     Si NO hay ENV:
-      - SIEMPRE app/config/user_config.json (USER_CFG_PROJECT)
+      - SIEMPRE el directorio privado del usuario (USER_CFG_PROJECT)
     """
     if ENV_CFG:
         p = Path(ENV_CFG)
@@ -317,7 +326,7 @@ def save_config(config: Dict[str, Any]) -> bool:
     """
     Persiste SIEMPRE en:
       - EXCELPRINTER_CONFIG (si se definió) o
-      - app/config/user_config.json (por defecto).
+      - config privada del usuario (por defecto).
     """
     def convert_sets(obj):
         if isinstance(obj, set):
@@ -382,7 +391,7 @@ def guardar_ultimo_path(path_str: str, clave: str = "last_opened_file") -> None:
     """
     Guarda un path bajo la clave indicada en user_config.json.
     - Si la clave es una de paths conocidos, también lo deja en paths.
-    - Siempre persiste en app/config/user_config.json (o ENV si existe).
+    - Siempre persiste en la config privada del usuario (o ENV si existe).
     """
     cfg = load_config()
 

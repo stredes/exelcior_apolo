@@ -10,9 +10,16 @@ from tkinter import filedialog, messagebox, ttk
 import unicodedata
 
 import pandas as pd
+from app.utils.app_dirs import CONFIG_DIR, ensure_file
 from app.printer.printer_etiquetas import generar_etiqueta_excel, imprimir_excel
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "excel_printer_config.json"
+CONFIG_PATH = ensure_file(
+    CONFIG_DIR / "excel_printer_config.json",
+    legacy_candidates=(
+        Path("app/config/excel_printer_config.json"),
+        Path("config/excel_printer_config.json"),
+    ),
+)
 CLIENTES_PATH_KEY = "clientes_proveedores_path"
 
 

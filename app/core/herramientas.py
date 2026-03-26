@@ -7,8 +7,16 @@ from email.message import EmailMessage
 from typing import Optional, Dict, List, Any
 import json
 import logging
+from app.utils.app_dirs import CONFIG_DIR, ensure_file
 
-USER_CONFIG_FILE = Path("config/user_config.json")
+USER_CONFIG_FILE = ensure_file(
+    CONFIG_DIR / "user_config.json",
+    legacy_candidates=(
+        Path("app/config/user_config.json"),
+        Path("config/user_config.json"),
+        Path("user_config.json"),
+    ),
+)
 
 # ------------------- CONFIGURACIÓN -------------------
 
@@ -25,6 +33,7 @@ def guardar_config_usuario(config: Dict[str, Any]) -> None:
     """
     Guarda la configuración del usuario en archivo JSON.
     """
+    USER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with USER_CONFIG_FILE.open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 

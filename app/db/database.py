@@ -3,13 +3,14 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from app.db.models import Base, HistorialArchivo, RegistroImpresion
 from app.core.logger_eventos import log_evento
+from app.utils.paths import DB_PATH
 from pathlib import Path
 from datetime import datetime
 import shutil
 
 # --- Configuración de rutas y motor de base de datos ---
-DATABASE_PATH = Path("data/excel_printer.db")
-BACKUP_PATH = Path("data/excel_printer_backup.db")
+DATABASE_PATH = DB_PATH
+BACKUP_PATH = DATABASE_PATH.with_name("excel_printer_backup.db")
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 # Asegura la carpeta data

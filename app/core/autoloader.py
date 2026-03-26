@@ -5,9 +5,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Tuple
 from contextlib import suppress
+from app.utils.app_dirs import CONFIG_DIR, ensure_file
 
 # Configuración de ruta global para el archivo de usuario
-CONFIG_PATH = Path("app/config/user_config.json")
+CONFIG_PATH = ensure_file(
+    CONFIG_DIR / "user_config.json",
+    legacy_candidates=(
+        Path("app/config/user_config.json"),
+        Path("config/user_config.json"),
+        Path("user_config.json"),
+    ),
+)
 LEGACY_CONFIG_PATH = Path("config/user_config.json")
 logger = logging.getLogger(__name__)
 
@@ -15,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def cargar_config_usuario() -> dict:
     """Carga la configuración del usuario desde archivo JSON."""
-    for p in (CONFIG_PATH, LEGACY_CONFIG_PATH):
+    for p in (CONFIG_PATH, LEGACY_CONFIG_PATH, Path("app/config/user_config.json"), Path("user_config.json")):
         if p.exists():
             with suppress(Exception):
                 with p.open("r", encoding="utf-8") as f:
