@@ -285,28 +285,97 @@ class ExcelPrinterApp(tk.Tk):
         sidebar.pack_propagate(False)
         self.sidebar = sidebar
 
-        brand = tk.Frame(sidebar, bg="#0F2237", bd=0, highlightthickness=1, highlightbackground="#1F3C5A")
+        brand = tk.Frame(sidebar, bg="#11263D", bd=0, highlightthickness=1, highlightbackground="#24486D")
         brand.pack(fill="x", padx=12, pady=(16, 14))
-        tk.Label(brand, text="EXELCIOR", bg="#0F2237", fg="#D6E7FF",
-                 font=("Segoe UI Semibold", 9), padx=14, pady=12).pack(anchor="w")
-        tk.Label(brand, text="Apolo", bg="#0F2237", fg="#FFFFFF",
-                 font=("Segoe UI Semibold", 18), padx=14).pack(anchor="w")
+        brand_header = tk.Frame(brand, bg="#11263D")
+        brand_header.pack(fill="x", padx=16, pady=(14, 8))
         tk.Label(
-            brand,
-            text="Release de prueba con cambios visuales notorios",
-            bg="#0F2237",
-            fg="#8FAECC",
+            brand_header,
+            text="EXELCIOR",
+            bg="#11263D",
+            fg="#C8DCF8",
+            font=("Segoe UI Semibold", 8),
+            pady=2,
+        ).pack(anchor="w")
+        tk.Label(
+            brand_header,
+            text="Apolo",
+            bg="#11263D",
+            fg="#FFFFFF",
+            font=("Georgia", 23, "bold"),
+        ).pack(anchor="w", pady=(8, 2))
+        tk.Label(
+            brand_header,
+            text="Centro de operaciones para carga, impresion y seguimiento.",
+            bg="#11263D",
+            fg="#9DB8D6",
             font=("Segoe UI", 9),
-            padx=14,
-        ).pack(anchor="w", pady=(2, 12))
+            wraplength=max(180, sidebar_width - 64),
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
 
-        info_box = tk.Frame(sidebar, bg="#0A1625")
-        info_box.pack(fill="x", padx=12, pady=(0, 12))
-        tk.Label(info_box, textvariable=self.version_var, bg="#0A1625", fg="#A9BCD0", font=("Segoe UI", 9)).pack(anchor="w")
-        tk.Label(info_box, textvariable=self.update_badge_var, bg="#0A1625", fg="#F4C86A", font=("Segoe UI Semibold", 9)).pack(anchor="w", pady=(4, 0))
+        accent = tk.Frame(brand, bg="#3FA7FF", height=2)
+        accent.pack(fill="x", padx=16)
 
-        tk.Label(sidebar, text="Acciones disponibles", bg="#0A1625", fg="#6F89A8",
-                 font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=14, pady=(0, 10))
+        status_grid = tk.Frame(brand, bg="#11263D")
+        status_grid.pack(fill="x", padx=16, pady=(12, 14))
+
+        version_card = tk.Frame(status_grid, bg="#16324C", bd=0)
+        version_card.pack(fill="x")
+        tk.Label(
+            version_card,
+            text="VERSION INSTALADA",
+            bg="#16324C",
+            fg="#8FB0D3",
+            font=("Segoe UI Semibold", 7),
+            padx=10,
+            pady=6,
+        ).pack(anchor="w")
+        tk.Label(
+            version_card,
+            textvariable=self.version_var,
+            bg="#16324C",
+            fg="#F4F8FC",
+            font=("Segoe UI Semibold", 10),
+            padx=10,
+            pady=8,
+            wraplength=max(170, sidebar_width - 72),
+            justify="left",
+        ).pack(anchor="w")
+
+        status_card = tk.Frame(status_grid, bg="#3E2E12", bd=0)
+        status_card.pack(fill="x", pady=(8, 0))
+        tk.Label(
+            status_card,
+            text="ESTADO DE INTERFAZ",
+            bg="#3E2E12",
+            fg="#E7C989",
+            font=("Segoe UI Semibold", 7),
+            padx=10,
+            pady=6,
+        ).pack(anchor="w")
+        tk.Label(
+            status_card,
+            textvariable=self.update_badge_var,
+            bg="#3E2E12",
+            fg="#FFE6A6",
+            font=("Segoe UI Semibold", 10),
+            padx=10,
+            pady=8,
+            wraplength=max(170, sidebar_width - 72),
+            justify="left",
+        ).pack(anchor="w")
+
+        section_row = tk.Frame(sidebar, bg="#0A1625")
+        section_row.pack(fill="x", padx=14, pady=(2, 10))
+        tk.Label(
+            section_row,
+            text="Acciones disponibles",
+            bg="#0A1625",
+            fg="#6F89A8",
+            font=("Segoe UI Semibold", 9),
+        ).pack(side="left")
+        tk.Frame(section_row, bg="#1C314C", height=1).pack(side="left", fill="x", expand=True, padx=(10, 0), pady=(8, 0))
 
         self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
         self._add_sidebar_button(sidebar, "Carga Automatica", self._threaded_auto_load)
@@ -1157,29 +1226,113 @@ class ExcelPrinterApp(tk.Tk):
         archivo = next((p for p in logs if p.stat().st_size > 0), logs[0])
         win = tk.Toplevel(self)
         win.title(f"Visor de Logs - {archivo.name}")
-        win.geometry("1000x600")
-        win.configure(bg="#F9FAFB")
+        win.geometry("1120x720")
+        win.configure(bg="#EEF4F8")
 
-        frame = ttk.Frame(win, padding=10)
+        selected_log = tk.StringVar(value=str(archivo))
+        meta_var = tk.StringVar(value="")
+
+        shell = tk.Frame(win, bg="#EEF4F8")
+        shell.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+
+        hero = tk.Frame(shell, bg="#FFFFFF", highlightthickness=1, highlightbackground="#D8E4EF")
+        hero.pack(fill=tk.X, pady=(0, 10))
+
+        hero_left = tk.Frame(hero, bg="#FFFFFF")
+        hero_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=16, pady=14)
+        tk.Label(
+            hero_left,
+            text="Visor de Logs",
+            bg="#FFFFFF",
+            fg="#102A43",
+            font=("Segoe UI Semibold", 16),
+        ).pack(anchor="w")
+        tk.Label(
+            hero_left,
+            text="Consulta el archivo de log mas reciente o cambia entre logs historicos para revisar eventos, warnings y errores.",
+            bg="#FFFFFF",
+            fg="#627D98",
+            font=("Segoe UI", 9),
+            wraplength=720,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
+
+        hero_right = tk.Frame(hero, bg="#FFFFFF")
+        hero_right.pack(side=tk.RIGHT, padx=16, pady=14)
+        tk.Label(
+            hero_right,
+            textvariable=meta_var,
+            bg="#EAF4FF",
+            fg="#0F4C81",
+            font=("Segoe UI Semibold", 9),
+            padx=12,
+            pady=8,
+            justify="right",
+        ).pack(anchor="e")
+
+        controls = tk.Frame(shell, bg="#FFFFFF", highlightthickness=1, highlightbackground="#D8E4EF")
+        controls.pack(fill=tk.X, pady=(0, 10))
+
+        controls_inner = tk.Frame(controls, bg="#FFFFFF")
+        controls_inner.pack(fill=tk.X, padx=14, pady=12)
+        tk.Label(
+            controls_inner,
+            text="Archivo activo",
+            bg="#FFFFFF",
+            fg="#486581",
+            font=("Segoe UI Semibold", 8),
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        log_options = [str(p) for p in logs]
+        selector = ttk.Combobox(
+            controls_inner,
+            textvariable=selected_log,
+            values=log_options,
+            state="readonly",
+            width=90,
+        )
+        selector.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        action_bar = ttk.Frame(controls_inner)
+        action_bar.pack(side=tk.LEFT, padx=(10, 0))
+
+        content = tk.Frame(shell, bg="#FFFFFF", highlightthickness=1, highlightbackground="#D8E4EF")
+        content.pack(fill=tk.BOTH, expand=True)
+
+        frame = ttk.Frame(content, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        txt = tk.Text(frame, wrap="word", font=("Consolas", 10), bg="white")
+        txt = tk.Text(
+            frame,
+            wrap="word",
+            font=("Consolas", 10),
+            bg="#FBFDFF",
+            fg="#102A43",
+            insertbackground="#102A43",
+            relief="flat",
+            padx=10,
+            pady=10,
+        )
         txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         scrollbar = ttk.Scrollbar(frame, command=txt.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         txt.config(yscrollcommand=scrollbar.set)
 
-        txt.tag_configure("ERROR", foreground="red")
-        txt.tag_configure("WARNING", foreground="orange")
-        txt.tag_configure("DEBUG", foreground="gray")
-        txt.tag_configure("INFO", foreground="black")
+        txt.tag_configure("ERROR", foreground="#B42318")
+        txt.tag_configure("WARNING", foreground="#B54708")
+        txt.tag_configure("DEBUG", foreground="#667085")
+        txt.tag_configure("INFO", foreground="#0F172A")
 
         def cargar_log():
             try:
+                archivo_actual = Path(selected_log.get())
+                if not archivo_actual.exists():
+                    meta_var.set("Archivo no disponible")
+                    return
                 txt.config(state="normal")
                 txt.delete("1.0", tk.END)
-                with archivo.open("r", encoding="utf-8", errors="replace") as f:
+                with archivo_actual.open("r", encoding="utf-8", errors="replace") as f:
                     for line in f:
                         if "ERROR" in line:
                             txt.insert(tk.END, line, "ERROR")
@@ -1190,10 +1343,19 @@ class ExcelPrinterApp(tk.Tk):
                         else:
                             txt.insert(tk.END, line, "INFO")
                 txt.config(state="disabled")
+                try:
+                    stat = archivo_actual.stat()
+                    updated = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    size_kb = max(1, int(stat.st_size / 1024))
+                    meta_var.set(f"{archivo_actual.name}\n{size_kb} KB | Actualizado {updated}")
+                except Exception:
+                    meta_var.set(archivo_actual.name)
             except Exception as e:
                 logging.error(f"Error leyendo log: {e}")
+                meta_var.set("No se pudo leer el log")
 
-        ttk.Button(win, text="ðŸ” Refrescar Log", command=cargar_log).pack(pady=5)
+        ttk.Button(action_bar, text="Refrescar", command=cargar_log).pack(side=tk.LEFT)
+        selector.bind("<<ComboboxSelected>>", lambda _e: cargar_log())
         cargar_log()
 
     # ---------------- Cierre limpio ----------------

@@ -66,6 +66,18 @@ class ValeConsumoApp:
             style.configure('TLabel', font=base_font)
             style.configure('TLabelframe.Label', font=('Segoe UI', 10, 'bold'))
             style.configure('TButton', font=base_font)
+            style.configure('Shell.TFrame', background='#EEF4F8')
+            style.configure('Hero.TFrame', background='#17324A')
+            style.configure('Card.TFrame', background='#FFFFFF')
+            style.configure('Section.TLabelframe', background='#FFFFFF', padding=10)
+            style.configure('Section.TLabelframe.Label', font=('Segoe UI', 10, 'bold'), foreground='#16324F', background='#FFFFFF')
+            style.configure('HeroTitle.TLabel', font=('Georgia', 22, 'bold'), foreground='#FFFFFF', background='#17324A')
+            style.configure('HeroKicker.TLabel', font=('Segoe UI Semibold', 8), foreground='#C7DCF4', background='#17324A')
+            style.configure('HeroSub.TLabel', font=('Segoe UI', 10), foreground='#9FC0DD', background='#17324A')
+            style.configure('Meta.TLabel', font=('Segoe UI Semibold', 8), foreground='#5D7690', background='#FFFFFF')
+            style.configure('Hint.TLabel', font=('Segoe UI', 9), foreground='#6A7F94', background='#FFFFFF')
+            style.configure('Notebook.TNotebook', background='#EEF4F8', borderwidth=0)
+            style.configure('Notebook.TNotebook.Tab', padding=(14, 8), font=('Segoe UI Semibold', 9))
             style.configure('Treeview', font=base_font, rowheight=24, background='#ffffff', fieldbackground='#ffffff')
             style.configure('Treeview.Heading', font=('Segoe UI', 10, 'bold'), padding=(6, 4), background='#f0f0f0')
             style.map('Treeview', background=[('selected', '#e1ecff')], foreground=[('selected', '#000000')])
@@ -73,12 +85,14 @@ class ValeConsumoApp:
             # BotÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de acciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n acentuado
             style.configure('Accent.TButton', background='#4a90e2', foreground='#ffffff')
             style.map('Accent.TButton', background=[('active', '#3d7fcc'), ('pressed', '#346dac')])
+            style.configure('Soft.TButton', background='#E8F0F8', foreground='#17324A')
+            style.map('Soft.TButton', background=[('active', '#D8E6F2'), ('pressed', '#CBDCEC')])
         except Exception:
             pass
 
         self._build_menu()
 
-        container = ttk.Frame(self.master)
+        container = ttk.Frame(self.master, style='Shell.TFrame')
         container.grid(row=0, column=0, sticky='nsew')
         self.master.rowconfigure(0, weight=1)
         self.master.columnconfigure(0, weight=1)
@@ -87,28 +101,66 @@ class ValeConsumoApp:
         container.rowconfigure(2, weight=4)  # vale/historial
         container.columnconfigure(0, weight=1)
 
-        # Barra superior: seleccion de archivo + recordatorio
-        self.topbar = ttk.Frame(container, padding=(8, 6))
+        # Barra superior: seleccion de archivo + contexto visual
+        self.topbar = ttk.Frame(container, style='Hero.TFrame', padding=(12, 12))
         self.topbar.grid(row=0, column=0, sticky='ew')
         self.topbar.columnconfigure(1, weight=1)
 
-        self.select_btn = ttk.Button(self.topbar, text="Seleccionar archivo de inventario...", command=self.select_inventory_file)
-        self.select_btn.grid(row=0, column=0, sticky='w', padx=(0, 10))
+        hero_text = ttk.Frame(self.topbar, style='Hero.TFrame')
+        hero_text.grid(row=0, column=0, columnspan=2, sticky='ew')
+        ttk.Label(hero_text, text="VALE DE CONSUMO", style='HeroKicker.TLabel').pack(anchor='w')
+        ttk.Label(hero_text, text="Bioplates", style='HeroTitle.TLabel').pack(anchor='w', pady=(4, 2))
+        ttk.Label(
+            hero_text,
+            text="Filtra productos, arma el vale y gestiona historial desde una sola vista.",
+            style='HeroSub.TLabel'
+        ).pack(anchor='w')
 
-        self.file_label = ttk.Label(self.topbar, text="(ningun archivo cargado)")
-        self.file_label.grid(row=0, column=1, sticky='w')
+        actions_bar = ttk.Frame(self.topbar, style='Hero.TFrame')
+        actions_bar.grid(row=1, column=0, sticky='w', pady=(12, 0))
+        self.select_btn = ttk.Button(
+            actions_bar,
+            text="Seleccionar archivo de inventario",
+            command=self.select_inventory_file,
+            style='Accent.TButton'
+        )
+        self.select_btn.pack(side='left')
 
         # Acceso rapido a instrucciones
         try:
             self.topbar.columnconfigure(2, weight=0)
-            ttk.Button(self.topbar, text="Instrucciones", command=self._open_instructions).grid(row=0, column=2, sticky='e')
+            ttk.Button(actions_bar, text="Instrucciones", command=self._open_instructions, style='Soft.TButton').pack(side='left', padx=(8, 0))
         except Exception:
             pass
 
+        file_card = tk.Frame(self.topbar, bg='#22425F', highlightthickness=1, highlightbackground='#355D81')
+        file_card.grid(row=1, column=1, sticky='ew', padx=(14, 0), pady=(12, 0))
+        tk.Label(
+            file_card,
+            text="ARCHIVO ACTIVO",
+            bg='#22425F',
+            fg='#C6DCF1',
+            font=('Segoe UI Semibold', 8),
+            padx=12,
+            pady=6
+        ).pack(anchor='w')
+        self.file_label = tk.Label(
+            file_card,
+            text="Ningun archivo cargado",
+            bg='#22425F',
+            fg='#FFFFFF',
+            font=('Segoe UI Semibold', 10),
+            padx=12,
+            pady=8,
+            anchor='w',
+            justify='left'
+        )
+        self.file_label.pack(fill='x')
+
         if settings.get_reminder_enabled():
             lbl_txt = settings.get_reminder_text()
-            self.reminder_label = ttk.Label(self.topbar, text=lbl_txt, foreground="#666666")
-            self.reminder_label.grid(row=1, column=0, columnspan=2, sticky='w', pady=(4, 0))
+            self.reminder_label = ttk.Label(self.topbar, text=lbl_txt, foreground="#DCE7F3", background="#17324A")
+            self.reminder_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=(8, 0))
         else:
             self.reminder_label = None
 
@@ -336,14 +388,25 @@ class ValeConsumoApp:
 
     # -------- Productos y filtros --------
     def _build_products_area(self, parent: ttk.Frame) -> None:
-        frame = ttk.Frame(parent, padding=(8, 0))
+        frame = ttk.Frame(parent, style='Shell.TFrame', padding=(10, 0))
         frame.grid(row=1, column=0, sticky='nsew')
         frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
 
         # Tabla a la izquierda
-        table_frame = ttk.Frame(frame)
-        table_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 8))
-        frame.rowconfigure(1, weight=1)
+        products_card = ttk.LabelFrame(frame, text="Productos disponibles", style='Section.TLabelframe')
+        products_card.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
+        products_card.columnconfigure(0, weight=1)
+        products_card.rowconfigure(1, weight=1)
+
+        ttk.Label(
+            products_card,
+            text="Selecciona un producto del inventario filtrado para agregarlo al vale.",
+            style='Hint.TLabel'
+        ).grid(row=0, column=0, sticky='w', pady=(0, 8))
+
+        table_frame = ttk.Frame(products_card)
+        table_frame.grid(row=1, column=0, sticky='nsew')
         frame.columnconfigure(0, weight=1)
 
         self.product_tree = ttk.Treeview(
@@ -376,7 +439,7 @@ class ValeConsumoApp:
         self.product_tree.bind('<Configure>', self._autosize_product_columns)
 
         # Panel de control con scroll
-        filters_lf = ttk.LabelFrame(frame, text="Filtros y Acciones", padding=0, width=260)
+        filters_lf = ttk.LabelFrame(frame, text="Filtros y acciones", style='Section.TLabelframe', padding=0, width=290)
         filters_lf.grid(row=0, column=1, sticky='ns')
         try:
             filters_lf.grid_propagate(False)
@@ -389,7 +452,7 @@ class ValeConsumoApp:
         filters_vsb.pack(side='right', fill='y')
         filters_canvas.pack(side='left', fill='both', expand=True)
 
-        self.control_frame = ttk.Frame(filters_canvas, padding=10)
+        self.control_frame = ttk.Frame(filters_canvas, padding=12)
         self._filters_window = filters_canvas.create_window((0, 0), window=self.control_frame, anchor='nw')
 
         def _on_cf_configure(event):
@@ -425,53 +488,59 @@ class ValeConsumoApp:
         filters_lf.bind('<Enter>', lambda e: filters_canvas.bind_all('<MouseWheel>', _on_mousewheel))
         filters_lf.bind('<Leave>', lambda e: filters_canvas.unbind_all('<MouseWheel>'))
 
+        ttk.Label(
+            self.control_frame,
+            text="Ajusta el inventario visible y agrega productos al vale en curso.",
+            style='Hint.TLabel'
+        ).grid(row=0, column=0, sticky='w', pady=(0, 10))
+
         # Buscar
-        ttk.Label(self.control_frame, text="Buscar producto:").grid(row=0, column=0, sticky='w', pady=(0, 2))
+        ttk.Label(self.control_frame, text="Buscar producto:", style='Meta.TLabel').grid(row=1, column=0, sticky='w', pady=(0, 2))
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(self.control_frame, textvariable=self.search_var, width=28)
-        self.search_entry.grid(row=1, column=0, sticky='ew', pady=(0, 6))
+        self.search_entry.grid(row=2, column=0, sticky='ew', pady=(0, 8))
         self.search_var.trace_add('write', lambda *_: self.filter_products())
 
         # Cantidad y acciones
-        ttk.Label(self.control_frame, text="Cantidad a retirar:").grid(row=2, column=0, sticky='w')
+        ttk.Label(self.control_frame, text="Cantidad a retirar:", style='Meta.TLabel').grid(row=3, column=0, sticky='w')
         self.quantity_entry = ttk.Entry(self.control_frame, width=10)
         self.quantity_entry.insert(0, '1')
-        self.quantity_entry.grid(row=3, column=0, sticky='w', pady=(0, 6))
-        ttk.Button(self.control_frame, text="Agregar al Vale", style='Accent.TButton', command=self.add_to_vale, width=26).grid(row=4, column=0, sticky='ew', pady=(4, 4))
-        ttk.Button(self.control_frame, text="Generar e Imprimir Vale", style='Accent.TButton', command=self.generate_and_print_vale, width=26).grid(row=5, column=0, sticky='ew', pady=(2, 8))
+        self.quantity_entry.grid(row=4, column=0, sticky='w', pady=(0, 8))
+        ttk.Button(self.control_frame, text="Agregar al Vale", style='Accent.TButton', command=self.add_to_vale, width=26).grid(row=5, column=0, sticky='ew', pady=(4, 4))
+        ttk.Button(self.control_frame, text="Generar e Imprimir Vale", style='Accent.TButton', command=self.generate_and_print_vale, width=26).grid(row=6, column=0, sticky='ew', pady=(2, 10))
 
         # Subfamilia
-        ttk.Label(self.control_frame, text="Subfamilia:").grid(row=6, column=0, sticky='w')
+        ttk.Label(self.control_frame, text="Subfamilia:", style='Meta.TLabel').grid(row=7, column=0, sticky='w')
         self.subfam_var = tk.StringVar(value='(Todas)')
         self.subfam_combo = ttk.Combobox(self.control_frame, textvariable=self.subfam_var, state='readonly', width=26)
-        self.subfam_combo.grid(row=7, column=0, sticky='ew', pady=(0, 6))
+        self.subfam_combo.grid(row=8, column=0, sticky='ew', pady=(0, 8))
         self.subfam_combo.bind('<<ComboboxSelected>>', lambda *_: self.filter_products())
 
         # Lote / Ubicacion
-        ttk.Label(self.control_frame, text="Lote:").grid(row=8, column=0, sticky='w')
+        ttk.Label(self.control_frame, text="Lote:", style='Meta.TLabel').grid(row=9, column=0, sticky='w')
         self.lote_var = tk.StringVar()
-        ttk.Entry(self.control_frame, textvariable=self.lote_var, width=28).grid(row=9, column=0, sticky='ew', pady=(0, 6))
+        ttk.Entry(self.control_frame, textvariable=self.lote_var, width=28).grid(row=10, column=0, sticky='ew', pady=(0, 8))
 
-        ttk.Label(self.control_frame, text="Ubicacion:").grid(row=10, column=0, sticky='w')
+        ttk.Label(self.control_frame, text="Ubicacion:", style='Meta.TLabel').grid(row=11, column=0, sticky='w')
         self.ubi_var = tk.StringVar()
-        ttk.Entry(self.control_frame, textvariable=self.ubi_var, width=28).grid(row=11, column=0, sticky='ew', pady=(0, 6))
+        ttk.Entry(self.control_frame, textvariable=self.ubi_var, width=28).grid(row=12, column=0, sticky='ew', pady=(0, 8))
 
         # Rango de vencimiento
-        ttk.Label(self.control_frame, text="Vencimiento desde (YYYY-MM-DD):").grid(row=12, column=0, sticky='w')
+        ttk.Label(self.control_frame, text="Vencimiento desde (YYYY-MM-DD):", style='Meta.TLabel').grid(row=13, column=0, sticky='w')
         self.vdesde_var = tk.StringVar()
-        ttk.Entry(self.control_frame, textvariable=self.vdesde_var, width=28).grid(row=13, column=0, sticky='ew', pady=(0, 6))
-        ttk.Label(self.control_frame, text="Vencimiento hasta (YYYY-MM-DD):").grid(row=14, column=0, sticky='w')
+        ttk.Entry(self.control_frame, textvariable=self.vdesde_var, width=28).grid(row=14, column=0, sticky='ew', pady=(0, 8))
+        ttk.Label(self.control_frame, text="Vencimiento hasta (YYYY-MM-DD):", style='Meta.TLabel').grid(row=15, column=0, sticky='w')
         self.vhasta_var = tk.StringVar()
-        ttk.Entry(self.control_frame, textvariable=self.vhasta_var, width=28).grid(row=15, column=0, sticky='ew', pady=(0, 6))
+        ttk.Entry(self.control_frame, textvariable=self.vhasta_var, width=28).grid(row=16, column=0, sticky='ew', pady=(0, 8))
 
         # Solo con stock
         self.stock_only_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.control_frame, text='Solo con stock', variable=self.stock_only_var, command=self.filter_products).grid(row=16, column=0, sticky='w', pady=(4, 10))
+        ttk.Checkbutton(self.control_frame, text='Solo con stock', variable=self.stock_only_var, command=self.filter_products).grid(row=17, column=0, sticky='w', pady=(4, 10))
 
         # Limpiar filtros
-        ttk.Button(self.control_frame, text="Limpiar filtros", command=self._clear_filters, width=26).grid(row=17, column=0, sticky='ew', pady=(2, 2))
+        ttk.Button(self.control_frame, text="Limpiar filtros", command=self._clear_filters, width=26, style='Soft.TButton').grid(row=18, column=0, sticky='ew', pady=(2, 2))
 
-        for i in range(0, 18):
+        for i in range(0, 19):
             self.control_frame.rowconfigure(i, weight=0)
         self.control_frame.columnconfigure(0, weight=1)
 
@@ -506,12 +575,12 @@ class ValeConsumoApp:
 
     # -------- Vale / Historial --------
     def _build_vale_and_history(self, parent: ttk.Frame) -> None:
-        frame = ttk.Frame(parent, padding=(8, 6))
+        frame = ttk.Frame(parent, style='Shell.TFrame', padding=(10, 8))
         frame.grid(row=2, column=0, sticky='nsew')
-        frame.rowconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
         frame.columnconfigure(0, weight=1)
 
-        self.vale_notebook = ttk.Notebook(frame)
+        self.vale_notebook = ttk.Notebook(frame, style='Notebook.TNotebook')
         self.vale_notebook.grid(row=0, column=0, sticky='nsew')
 
         # Tab Vale
@@ -520,10 +589,10 @@ class ValeConsumoApp:
         self.vale_tab.columnconfigure(0, weight=1)
         self.vale_tab.rowconfigure(0, weight=1)
 
-        vale_table_frame = ttk.Frame(self.vale_tab)
+        vale_table_frame = ttk.LabelFrame(self.vale_tab, text='Vale en curso', style='Section.TLabelframe')
         vale_table_frame.grid(row=0, column=0, sticky='nsew')
         vale_table_frame.columnconfigure(0, weight=1)
-        vale_table_frame.rowconfigure(1, weight=1)
+        vale_table_frame.rowconfigure(0, weight=1)
 
         self.vale_tree = ttk.Treeview(
             vale_table_frame,
@@ -546,11 +615,16 @@ class ValeConsumoApp:
         v_vsb.grid(row=0, column=1, sticky='ns')
         self.vale_tree.configure(yscrollcommand=v_vsb.set)
 
-        self.vale_actions_frame = ttk.Frame(self.vale_tab, padding=10)
+        self.vale_actions_frame = ttk.LabelFrame(self.vale_tab, text='Acciones del vale', style='Section.TLabelframe', padding=10)
         self.vale_actions_frame.grid(row=0, column=1, sticky='ns', padx=(8, 0))
-        ttk.Button(self.vale_actions_frame, text="Eliminar Producto", command=self.remove_from_vale, width=26).pack(pady=6, fill='x')
-        ttk.Button(self.vale_actions_frame, text="Generar e Imprimir Vale", command=self.generate_and_print_vale, width=26).pack(pady=6, fill='x')
-        ttk.Button(self.vale_actions_frame, text="Limpiar Vale", command=self.clear_vale, width=26).pack(pady=6, fill='x')
+        ttk.Label(
+            self.vale_actions_frame,
+            text='Gestiona rapidamente los items seleccionados y genera el documento final.',
+            style='Hint.TLabel'
+        ).pack(anchor='w', fill='x', pady=(0, 8))
+        ttk.Button(self.vale_actions_frame, text="Eliminar Producto", command=self.remove_from_vale, width=26, style='Soft.TButton').pack(pady=6, fill='x')
+        ttk.Button(self.vale_actions_frame, text="Generar e Imprimir Vale", command=self.generate_and_print_vale, width=26, style='Accent.TButton').pack(pady=6, fill='x')
+        ttk.Button(self.vale_actions_frame, text="Limpiar Vale", command=self.clear_vale, width=26, style='Soft.TButton').pack(pady=6, fill='x')
 
         # Tab Historial
         self.hist_tab = ttk.Frame(self.vale_notebook)
