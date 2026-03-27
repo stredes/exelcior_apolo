@@ -298,80 +298,32 @@ class ExcelPrinterApp(tk.Tk):
         brand_header.pack(fill="x", padx=16, pady=(14, 8))
         tk.Label(
             brand_header,
-            text="EXELCIOR",
+            text="Exelcior Apolo",
             bg="#11263D",
-            fg="#C8DCF8",
-            font=("Segoe UI Semibold", 8),
-            pady=2,
+            fg="#FFFFFF",
+            font=("Georgia", 21, "bold"),
+        ).pack(anchor="w", pady=(2, 4))
+        tk.Label(
+            brand_header,
+            textvariable=self.version_var,
+            bg="#11263D",
+            fg="#CFE1F5",
+            font=("Segoe UI Semibold", 9),
+            wraplength=max(180, sidebar_width - 64),
+            justify="left",
         ).pack(anchor="w")
         tk.Label(
             brand_header,
-            text="Apolo",
+            textvariable=self.update_badge_var,
             bg="#11263D",
-            fg="#FFFFFF",
-            font=("Georgia", 23, "bold"),
-        ).pack(anchor="w", pady=(8, 2))
-        tk.Label(
-            brand_header,
-            text="Centro de operaciones para carga, impresion y seguimiento.",
-            bg="#11263D",
-            fg="#9DB8D6",
+            fg="#8FB7D8",
             font=("Segoe UI", 9),
             wraplength=max(180, sidebar_width - 64),
             justify="left",
-        ).pack(anchor="w", pady=(0, 10))
+        ).pack(anchor="w", pady=(6, 8))
 
         accent = tk.Frame(brand, bg="#3FA7FF", height=2)
         accent.pack(fill="x", padx=16)
-
-        status_grid = tk.Frame(brand, bg="#11263D")
-        status_grid.pack(fill="x", padx=16, pady=(12, 14))
-
-        version_card = tk.Frame(status_grid, bg="#16324C", bd=0)
-        version_card.pack(fill="x")
-        tk.Label(
-            version_card,
-            text="VERSION INSTALADA",
-            bg="#16324C",
-            fg="#8FB0D3",
-            font=("Segoe UI Semibold", 7),
-            padx=10,
-            pady=6,
-        ).pack(anchor="w")
-        tk.Label(
-            version_card,
-            textvariable=self.version_var,
-            bg="#16324C",
-            fg="#F4F8FC",
-            font=("Segoe UI Semibold", 10),
-            padx=10,
-            pady=8,
-            wraplength=max(170, sidebar_width - 72),
-            justify="left",
-        ).pack(anchor="w")
-
-        status_card = tk.Frame(status_grid, bg="#3E2E12", bd=0)
-        status_card.pack(fill="x", pady=(8, 0))
-        tk.Label(
-            status_card,
-            text="ESTADO DE INTERFAZ",
-            bg="#3E2E12",
-            fg="#E7C989",
-            font=("Segoe UI Semibold", 7),
-            padx=10,
-            pady=6,
-        ).pack(anchor="w")
-        tk.Label(
-            status_card,
-            textvariable=self.update_badge_var,
-            bg="#3E2E12",
-            fg="#FFE6A6",
-            font=("Segoe UI Semibold", 10),
-            padx=10,
-            pady=8,
-            wraplength=max(170, sidebar_width - 72),
-            justify="left",
-        ).pack(anchor="w")
 
         section_row = tk.Frame(sidebar, bg="#0A1625")
         section_row.pack(fill="x", padx=14, pady=(2, 10))
@@ -384,18 +336,47 @@ class ExcelPrinterApp(tk.Tk):
         ).pack(side="left")
         tk.Frame(section_row, bg="#1C314C", height=1).pack(side="left", fill="x", expand=True, padx=(10, 0), pady=(8, 0))
 
-        self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
-        self._add_sidebar_button(sidebar, "Carga Automatica", self._threaded_auto_load)
-        self._add_sidebar_button(sidebar, "Fin de Dia Listados", self._open_daily_listados_close)
-        self._add_sidebar_button(sidebar, "Configurar Modo", self._open_config_menu)
-        self._add_sidebar_button(sidebar, "Impresoras", self._abrir_admin_impresoras)
-        self._add_sidebar_button(sidebar, "Ver Logs", self._view_logs)
-        self._add_sidebar_button(sidebar, "Etiquetas", self._abrir_editor_etiquetas)
-        self._add_sidebar_button(sidebar, "Codigos Postales", self._abrir_buscador_codigos_postales)
-        self._add_sidebar_button(sidebar, "Sra Mary", self._abrir_sra_mary)
-        self._add_sidebar_button(sidebar, "Inventario", lambda: InventarioView(self))
-        self._add_sidebar_button(sidebar, "Vale de Consumo", self._abrir_vale_consumo)
-        self._update_button = self._add_sidebar_button(sidebar, "Actualizar Sistema", self._download_and_install_update)
+        actions_shell = tk.Frame(sidebar, bg="#0A1625")
+        actions_shell.pack(fill="both", expand=True, padx=(8, 4), pady=(0, 8))
+
+        actions_canvas = tk.Canvas(
+            actions_shell,
+            bg="#0A1625",
+            bd=0,
+            highlightthickness=0,
+            relief="flat",
+        )
+        actions_scroll = ttk.Scrollbar(actions_shell, orient="vertical", command=actions_canvas.yview)
+        actions_canvas.configure(yscrollcommand=actions_scroll.set)
+
+        actions_canvas.pack(side="left", fill="both", expand=True)
+        actions_scroll.pack(side="right", fill="y")
+
+        actions_frame = tk.Frame(actions_canvas, bg="#0A1625")
+        actions_window = actions_canvas.create_window((0, 0), window=actions_frame, anchor="nw")
+
+        def _sync_sidebar_actions(_event=None):
+            try:
+                actions_canvas.configure(scrollregion=actions_canvas.bbox("all"))
+                actions_canvas.itemconfigure(actions_window, width=actions_canvas.winfo_width())
+            except Exception:
+                pass
+
+        actions_frame.bind("<Configure>", _sync_sidebar_actions)
+        actions_canvas.bind("<Configure>", _sync_sidebar_actions)
+
+        self._add_sidebar_button(actions_frame, "Seleccionar Excel", self._threaded_select_file)
+        self._add_sidebar_button(actions_frame, "Carga Automatica", self._threaded_auto_load)
+        self._add_sidebar_button(actions_frame, "Fin de Dia Listados", self._open_daily_listados_close)
+        self._add_sidebar_button(actions_frame, "Configurar Modo", self._open_config_menu)
+        self._add_sidebar_button(actions_frame, "Impresoras", self._abrir_admin_impresoras)
+        self._add_sidebar_button(actions_frame, "Ver Logs", self._view_logs)
+        self._add_sidebar_button(actions_frame, "Etiquetas", self._abrir_editor_etiquetas)
+        self._add_sidebar_button(actions_frame, "Codigos Postales", self._abrir_buscador_codigos_postales)
+        self._add_sidebar_button(actions_frame, "Sra Mary", self._abrir_sra_mary)
+        self._add_sidebar_button(actions_frame, "Inventario", lambda: InventarioView(self))
+        self._add_sidebar_button(actions_frame, "Vale de Consumo", self._abrir_vale_consumo)
+        self._update_button = self._add_sidebar_button(actions_frame, "Actualizar Sistema", self._download_and_install_update)
         self._update_button.configure(state=tk.DISABLED, style="SidebarUpdate.TButton")
 
         footer = tk.Frame(sidebar, bg="#0A1625")
