@@ -79,10 +79,11 @@ class BuscadorCodigosPostales(tk.Toplevel):
         self._creating = True
 
         # UI
-        self._build_header()
-        self._build_toolbar()
-        self._build_tree()
-        self._build_statusbar()
+        self._configure_styles_modern()
+        self._build_header_modern()
+        self._build_toolbar_modern()
+        self._build_tree_modern()
+        self._build_statusbar_modern()
 
         # Atajos
         self.bind("<Control-f>", lambda e: self.entry_busqueda.focus_set())
@@ -164,6 +165,134 @@ class BuscadorCodigosPostales(tk.Toplevel):
 
         self.btn_copiar = ttk.Button(bar, text="Copiar Código Postal", command=self._copiar_codigo_postal)
         self.btn_copiar.pack(side="right", padx=8, pady=3)
+        self.btn_copiar["state"] = "disabled"
+
+    def _configure_styles_modern(self) -> None:
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure("CPHero.TFrame", background="#17324A")
+        style.configure("CPHeroKicker.TLabel", background="#17324A", foreground="#C9DDF2", font=("Segoe UI Semibold", 8))
+        style.configure("CPHeroTitle.TLabel", background="#17324A", foreground="#FFFFFF", font=("Segoe UI Semibold", 17))
+        style.configure("CPHeroSub.TLabel", background="#17324A", foreground="#A8C2DA", font=("Segoe UI", 9))
+        style.configure("CPCard.TLabelframe", background="#FFFFFF")
+        style.configure("CPCard.TLabelframe.Label", background="#FFFFFF", foreground="#17324A", font=("Segoe UI Semibold", 10))
+        style.configure("CPBody.TLabel", background="#FFFFFF", foreground="#243B53", font=("Segoe UI", 10))
+        style.configure("CPHint.TLabel", background="#FFFFFF", foreground="#627D98", font=("Segoe UI", 9))
+        style.configure("CPPrimary.TButton", font=("Segoe UI Semibold", 10), padding=(12, 8))
+        style.configure("CPSecondary.TButton", font=("Segoe UI Semibold", 10), padding=(12, 8))
+        style.configure("CP.Treeview", rowheight=28, font=("Segoe UI", 10), background="#F8FBFD", fieldbackground="#F8FBFD")
+        style.configure("CP.Treeview.Heading", font=("Segoe UI Semibold", 9))
+
+    def _build_header_modern(self) -> None:
+        header = ttk.Frame(self, style="CPHero.TFrame", padding=14)
+        header.pack(fill="x", padx=14, pady=(12, 8))
+
+        left = ttk.Frame(header, style="CPHero.TFrame")
+        left.pack(side="left", fill="both", expand=True)
+        ttk.Label(left, text="CODIGOS POSTALES", style="CPHeroKicker.TLabel").pack(anchor="w")
+        ttk.Label(left, text="Buscador operativo", style="CPHeroTitle.TLabel").pack(anchor="w", pady=(4, 2))
+        ttk.Label(
+            left,
+            text="Busca por comuna o región, revisa resultados y copia el código postal sin salir de la ventana.",
+            style="CPHeroSub.TLabel",
+        ).pack(anchor="w")
+
+        badge = tk.Frame(header, bg="#234866", highlightthickness=1, highlightbackground="#3E678B")
+        badge.pack(side="right", padx=(12, 0), pady=4)
+        self.lbl_archivo = tk.Label(
+            badge,
+            text="Archivo: (no cargado)",
+            bg="#234866",
+            fg="#E6F0FA",
+            font=("Segoe UI", 9),
+            padx=12,
+            pady=8,
+            justify="left",
+        )
+        self.lbl_archivo.pack()
+
+    def _build_toolbar_modern(self) -> None:
+        shell = ttk.LabelFrame(self, text="Busqueda", padding=12, style="CPCard.TLabelframe")
+        shell.pack(fill="x", padx=14, pady=(0, 10))
+        ttk.Label(
+            shell,
+            text="Escribe parte del nombre de la comuna o región para filtrar resultados al instante.",
+            style="CPHint.TLabel",
+        ).pack(anchor="w", pady=(0, 8))
+
+        bar = tk.Frame(shell, bg="#FFFFFF")
+        bar.pack(fill="x")
+
+        ttk.Label(bar, text="Buscar comuna o región:", style="CPBody.TLabel").pack(side="left")
+
+        self.entry_busqueda = tk.Entry(
+            bar,
+            width=40,
+            bd=0,
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground="#D8E4EF",
+            font=("Segoe UI", 10),
+        )
+        self.entry_busqueda.pack(side="left", padx=8, ipady=6)
+        self.entry_busqueda.bind("<KeyRelease>", self._on_search_changed)
+
+        ttk.Button(bar, text="Buscar", style="CPPrimary.TButton", command=self._buscar_now).pack(side="left", padx=(0, 6))
+        ttk.Button(bar, text="Limpiar", style="CPSecondary.TButton", command=self._clear_search).pack(side="left")
+
+        tk.Frame(bar, bg="#FFFFFF").pack(side="left", expand=True, fill="x")
+        ttk.Button(bar, text="Cambiar archivo...", style="CPSecondary.TButton", command=self._cambiar_archivo).pack(side="right")
+
+    def _build_tree_modern(self) -> None:
+        shell = ttk.LabelFrame(self, text="Resultados", padding=10, style="CPCard.TLabelframe")
+        shell.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        ttk.Label(
+            shell,
+            text="Doble clic o Ctrl+C para copiar el código postal seleccionado.",
+            style="CPHint.TLabel",
+        ).pack(anchor="w", pady=(0, 8))
+
+        frame = tk.Frame(shell, bg="#FFFFFF")
+        frame.pack(fill="both", expand=True)
+
+        cols = self.COLS_TARGET
+        self.tree = ttk.Treeview(frame, columns=cols, show="headings", selectmode="browse", style="CP.Treeview")
+        for c in cols:
+            self.tree.heading(c, text=c)
+            self.tree.column(c, anchor="center", width=180, stretch=True)
+
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
+        hsb = ttk.Scrollbar(frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscroll=vsb.set, xscroll=hsb.set)
+
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        frame.rowconfigure(0, weight=1)
+        frame.columnconfigure(0, weight=1)
+
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self.tree.bind("<Double-1>", self._copiar_codigo_postal)
+
+    def _build_statusbar_modern(self) -> None:
+        bar = tk.Frame(self, bg="#E8EEF5")
+        bar.pack(fill="x", side="bottom")
+
+        self.lbl_estado = tk.Label(
+            bar,
+            text="Listo",
+            bg="#E8EEF5",
+            fg="#334E68",
+            anchor="w",
+            font=("Segoe UI Semibold", 9),
+        )
+        self.lbl_estado.pack(side="left", padx=10, pady=6)
+
+        self.btn_copiar = ttk.Button(bar, text="Copiar Codigo Postal", style="CPPrimary.TButton", command=self._copiar_codigo_postal)
+        self.btn_copiar.pack(side="right", padx=10, pady=6)
         self.btn_copiar["state"] = "disabled"
 
     # ---------------------------- Flujo de carga -----------------------------
