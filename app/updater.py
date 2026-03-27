@@ -22,6 +22,7 @@ REQUEST_TIMEOUT = 12
 UPDATE_RUNTIME_DIRNAME = "ExelciorApoloUpdates"
 UPDATE_STATE_FILE = "portable_update_state.json"
 UPDATE_LOG_FILE = "portable_update_last.log"
+PORTABLE_APP_DIRNAME = "ExelciorApolo"
 
 
 def _get_requests():
@@ -39,6 +40,31 @@ def _resource_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
     return Path(__file__).resolve().parent.parent
+
+
+def _get_runtime_exe_path() -> Path:
+    return Path(sys.executable).resolve() if getattr(sys, "frozen", False) else Path(__file__).resolve()
+
+
+def _is_program_files_path(path: Path) -> bool:
+    text = str(path).lower()
+    candidates = [
+        os.environ.get("ProgramFiles", ""),
+        os.environ.get("ProgramFiles(x86)", ""),
+    ]
+    return any(candidate and text.startswith(str(Path(candidate)).lower()) for candidate in candidates)
+
+
+def should_prefer_portable_asset() -> bool:
+    if not getattr(sys, "frozen", False):
+        return False
+    exe_path = _get_runtime_exe_path()
+    install_dir = exe_path.parent
+    if install_dir.name.lower() != PORTABLE_APP_DIRNAME.lower():
+        return False
+    if _is_program_files_path(install_dir):
+        return False
+    return True
 
 
 def get_update_runtime_dir() -> Path:
@@ -280,16 +306,18 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
         elif name and url and PORTABLE_ZIP_ASSET_PATTERN.search(name):
             portable_asset = {"name": name, "url": url}
 
-    selected_asset = setup_asset or portable_asset
+    prefer_portable = should_prefer_portable_asset()
+    selected_asset = portable_asset if prefer_portable and portable_asset else (setup_asset or portable_asset)
     if not selected_asset:
         return None
 
+    selected_kind = "portable_zip" if selected_asset == portable_asset else "setup"
     return {
         "version": version,
         "tag_name": tag_name,
         "asset_name": selected_asset["name"],
         "asset_url": selected_asset["url"],
-        "asset_kind": "setup" if setup_asset else "portable_zip",
+        "asset_kind": selected_kind,
         "checksum_name": str((checksum_asset or {}).get("name") or ""),
         "checksum_url": str((checksum_asset or {}).get("url") or ""),
         "html_url": str(payload.get("html_url") or ""),
@@ -345,6 +373,14 @@ def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
 
     exe_path = Path(sys.executable).resolve()
     install_dir = exe_path.parent
+    if install_dir.name.lower() != PORTABLE_APP_DIRNAME.lower():
+        raise RuntimeError(
+            "La actualización portable solo puede aplicarse cuando la app corre desde una carpeta portable 'ExelciorApolo'."
+        )
+    if _is_program_files_path(install_dir):
+        raise RuntimeError(
+            "La app actual parece instalada en Program Files. Para ese caso se debe usar el instalador, no el parche portable."
+        )
     temp_root = get_update_runtime_dir()
     session_root = create_update_session_dir()
     extract_dir = session_root / f"extract_{zip_path.stem}_{uuid.uuid4().hex[:8]}"
@@ -370,6 +406,9 @@ def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
             "Exelcior Apolo.lnk",
             "ExelciorApolo.lnk",
         ],
+        "desktop_exe_names": [
+            exe_path.name,
+        ],
     }
     config_path = session_root / f"portable_update_{uuid.uuid4().hex}.json"
     config_path.write_text(json.dumps(update_config, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -388,6 +427,7 @@ $currentPid = [int]$cfg.current_pid
 $targetVersion = [string]$cfg.target_version
 $statePath = [string]$cfg.state_path
 $desktopNames = @($cfg.desktop_names)
+$desktopExeNames = @($cfg.desktop_exe_names)
 $parentDir = Split-Path -Parent $installDir
 $backupDir = Join-Path $parentDir ((Split-Path -Leaf $installDir) + '_backup')
 $stagingDir = Join-Path $parentDir ((Split-Path -Leaf $installDir) + '_staging')
@@ -489,16 +529,30 @@ try {
   }
   Write-Log "Instalaci?n final v?lida: $targetExe"
 
-  $desktopDir = [Environment]::GetFolderPath('Desktop')
-  if ($desktopDir -and (Test-Path -LiteralPath $desktopDir)) {
-    Write-Log 'Recreando acceso directo de escritorio.'
+  $desktopDirs = @(
+    [Environment]::GetFolderPath('Desktop'),
+    [Environment]::GetFolderPath('CommonDesktopDirectory')
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+
+  foreach ($desktopDir in $desktopDirs) {
+    Write-Log "Saneando accesos directos en: $desktopDir"
     foreach ($shortcutName in $desktopNames) {
       $shortcutPath = Join-Path $desktopDir $shortcutName
       if (Test-Path -LiteralPath $shortcutPath) {
         Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
       }
     }
+    foreach ($exeFileName in $desktopExeNames) {
+      $desktopExePath = Join-Path $desktopDir $exeFileName
+      if ((Test-Path -LiteralPath $desktopExePath) -and ($desktopExePath -ne $targetExe)) {
+        Remove-Item -LiteralPath $desktopExePath -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
 
+  $desktopDir = [Environment]::GetFolderPath('Desktop')
+  if ($desktopDir -and (Test-Path -LiteralPath $desktopDir)) {
+    Write-Log 'Recreando acceso directo de escritorio.'
     $shortcutPath = Join-Path $desktopDir $desktopNames[0]
     $WshShell = New-Object -ComObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut($shortcutPath)
