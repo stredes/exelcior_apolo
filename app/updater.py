@@ -53,6 +53,14 @@ def create_update_session_dir() -> Path:
     return session_dir
 
 
+def _is_relative_to(path: Path, base: Path) -> bool:
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except Exception:
+        return False
+
+
 def get_update_log_path() -> Path:
     return get_update_runtime_dir() / UPDATE_LOG_FILE
 
@@ -343,6 +351,12 @@ def launch_portable_update(zip_path: Path, target_version: str = "") -> None:
     extract_dir.mkdir(parents=True, exist_ok=True)
     helper_path = session_root / "apply_portable_update.ps1"
     log_path = get_update_log_path()
+    if not _is_relative_to(session_root, temp_root):
+        raise RuntimeError("La sesión del actualizador quedó fuera del runtime temporal permitido.")
+    if not _is_relative_to(extract_dir, session_root):
+        raise RuntimeError("La carpeta de extracción quedó fuera de la sesión permitida.")
+    if exe_path.name.strip() == "":
+        raise RuntimeError("No se pudo resolver el ejecutable actual para la actualización portable.")
     update_config = {
         "zip_path": str(zip_path),
         "extract_dir": str(extract_dir),

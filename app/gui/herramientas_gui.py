@@ -1,8 +1,9 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog
-from pathlib import Path
 import os
+from pathlib import Path
+
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from app.core import herramientas as core
 
@@ -18,19 +19,17 @@ def abrir_herramientas(parent, df: pd.DataFrame):
     style = ttk.Style()
     style.configure("TButton", font=("Segoe UI", 11), padding=8)
 
-    # ========== FUNCIONES AUXILIARES DE GUI ==========
-
     def gui_mostrar_estadisticas():
         try:
             est = core.obtener_estadisticas(df)
             texto = (
-                f"📊 Total de filas: {est['filas']}\n"
-                f"📊 Total de columnas: {est['columnas']}\n"
-                f"📦 BULTOS: {est['bultos']}\n"
-                f"👥 Clientes únicos: {est['clientes_unicos']}\n"
-                f"📅 Fechas de envío: {est['fechas_envio']}"
+                f"Total de filas: {est['filas']}\n"
+                f"Total de columnas: {est['columnas']}\n"
+                f"BULTOS: {est['bultos']}\n"
+                f"Clientes unicos: {est['clientes_unicos']}\n"
+                f"Fechas de envio: {est['fechas_envio']}"
             )
-            messagebox.showinfo("Estadísticas del Excel", texto)
+            messagebox.showinfo("Estadisticas del Excel", texto)
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -39,7 +38,7 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         if path:
             try:
                 core.exportar_csv_a_path(df, Path(path))
-                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+                messagebox.showinfo("Exportacion", f"Archivo exportado: {path}")
             except Exception as e:
                 messagebox.showerror("Error al exportar", str(e))
 
@@ -48,7 +47,7 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         if path:
             try:
                 core.exportar_xlsx_a_path(df, Path(path))
-                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+                messagebox.showinfo("Exportacion", f"Archivo exportado: {path}")
             except Exception as e:
                 messagebox.showerror("Error al exportar", str(e))
 
@@ -57,7 +56,7 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         if path:
             try:
                 core.exportar_pdf_a_path(df, Path(path))
-                messagebox.showinfo("Exportación", f"Archivo exportado: {path}")
+                messagebox.showinfo("Exportacion", f"Archivo exportado: {path}")
             except Exception as e:
                 messagebox.showerror("Error al exportar", str(e))
 
@@ -90,7 +89,11 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         def aplicar():
             try:
                 columnas_a_mantener = [col for col in columnas if seleccionadas[col].get()]
-                nuevos = {col: nuevos_nombres[col].get() for col in columnas_a_mantener if nuevos_nombres[col].get() != col}
+                nuevos = {
+                    col: nuevos_nombres[col].get()
+                    for col in columnas_a_mantener
+                    if nuevos_nombres[col].get() != col
+                }
                 nuevo_df = core.aplicar_edicion_columnas(df.copy(), columnas_a_mantener, nuevos)
                 df.clear()
                 df.update(nuevo_df)
@@ -122,13 +125,13 @@ def abrir_herramientas(parent, df: pd.DataFrame):
                 val = entry.get()
                 resultado = core.buscar_por_columna(df, col, val)
                 if resultado.empty:
-                    messagebox.showinfo("Búsqueda", "No se encontraron resultados.")
+                    messagebox.showinfo("Busqueda", "No se encontraron resultados.")
                 else:
                     stats = core.obtener_estadisticas(resultado)
                     texto = (
-                        f"📊 Resultados: {len(resultado)} filas\n"
-                        f"👥 Clientes únicos: {stats['clientes_unicos']}\n"
-                        f"📦 BULTOS: {stats['bultos']}"
+                        f"Resultados: {len(resultado)} filas\n"
+                        f"Clientes unicos: {stats['clientes_unicos']}\n"
+                        f"BULTOS: {stats['bultos']}"
                     )
                     messagebox.showinfo("Resultados", texto)
             except Exception as e:
@@ -140,14 +143,17 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         try:
             smtp_server = os.getenv("SMTP_SERVER", "smtp.tudominio.com")
             smtp_port = int(os.getenv("SMTP_PORT", 587))
+            smtp_password = os.getenv("EXCELCIOR_SMTP_PASSWORD", "").strip() or os.getenv("SMTP_PASSWORD", "").strip()
 
             remitente = simpledialog.askstring("Email", "Correo remitente:")
             if not remitente:
                 return
 
-            password = simpledialog.askstring("Contraseña", f"Contraseña de {remitente}:", show='*')
+            password = smtp_password
             if not password:
-                return
+                password = simpledialog.askstring("Contraseña", f"Contraseña de aplicación para {remitente}:", show="*")
+                if not password:
+                    return
 
             destinatario = simpledialog.askstring("Destinatario", "Correo destino:")
             if not destinatario:
@@ -158,14 +164,12 @@ def abrir_herramientas(parent, df: pd.DataFrame):
         except Exception as e:
             messagebox.showerror("Error al enviar", str(e))
 
-    # ========== BOTONES DE FUNCIONALIDADES ==========
-    ttk.Button(tools_win, text="📊 Ver Estadísticas", command=gui_mostrar_estadisticas).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar CSV", command=gui_exportar_csv).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar XLSX", command=gui_exportar_xlsx).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📁 Exportar PDF", command=gui_exportar_pdf).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="🎨 Editor Columnas", command=gui_editor_columnas).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="🔍 Buscar Datos", command=gui_buscar_datos).pack(pady=10, fill="x", padx=20)
-    ttk.Button(tools_win, text="📧 Enviar Email", command=gui_enviar_email).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Ver Estadisticas", command=gui_mostrar_estadisticas).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Exportar CSV", command=gui_exportar_csv).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Exportar XLSX", command=gui_exportar_xlsx).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Exportar PDF", command=gui_exportar_pdf).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Editor Columnas", command=gui_editor_columnas).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Buscar Datos", command=gui_buscar_datos).pack(pady=10, fill="x", padx=20)
+    ttk.Button(tools_win, text="Enviar Email", command=gui_enviar_email).pack(pady=10, fill="x", padx=20)
 
-    # ========== ACCESIBILIDAD ==========
     tools_win.bind("<Escape>", lambda e: tools_win.destroy())

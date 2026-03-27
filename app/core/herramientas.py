@@ -2,11 +2,13 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 import tempfile
+from tempfile import NamedTemporaryFile
 import smtplib
 from email.message import EmailMessage
 from typing import Optional, Dict, List, Any
 import json
 import logging
+import os
 from app.utils.app_dirs import CONFIG_DIR, ensure_file
 
 USER_CONFIG_FILE = ensure_file(
@@ -133,9 +135,19 @@ def enviar_dataframe_por_email(
     """
     Envía un DataFrame como archivo Excel adjunto por correo.
     """
+    temp_path: Optional[Path] = None
     try:
-        # Crear archivo temporal
-        temp_path = Path(tempfile.gettempdir()) / f"datos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        smtp_password = (
+            password
+            or os.getenv("EXCELCIOR_SMTP_PASSWORD", "").strip()
+            or os.getenv("SMTP_PASSWORD", "").strip()
+        )
+        if not smtp_password:
+            raise ValueError("No se proporcionó contraseña SMTP. Usa una contraseña de aplicación o EXCELCIOR_SMTP_PASSWORD.")
+
+        # Crear archivo temporal único
+        with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
+            temp_path = Path(temp_file.name)
         df.to_excel(temp_path, index=False)
 
         # Componer mensaje
@@ -156,7 +168,7 @@ def enviar_dataframe_por_email(
         # Enviar
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
-            server.login(remitente, password)
+            server.login(remitente, smtp_password)
             server.send_message(msg)
 
         logging.info(f"Correo enviado a {destinatario}")
@@ -164,4 +176,5 @@ def enviar_dataframe_por_email(
         logging.error(f"Error al enviar correo: {e}")
         raise
     finally:
-        temp_path.unlink(missing_ok=True)
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)

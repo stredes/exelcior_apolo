@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
-from app.db.models import Base, HistorialArchivo, RegistroImpresion
+from app.db.models import Base, HistorialArchivo, RegistroImpresion, User
 from app.core.logger_eventos import log_evento
 from app.utils.paths import DB_PATH
 from pathlib import Path
@@ -20,6 +20,24 @@ DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
+
+def _upgrade_legacy_password_hashes():
+    try:
+        with SessionLocal() as session:
+            users = session.query(User).all()
+            changed = 0
+            for user in users:
+                try:
+                    if user.upgrade_password_hash_if_needed():
+                        changed += 1
+                except Exception:
+                    continue
+            if changed:
+                session.commit()
+                log_evento(f"Se protegieron {changed} contraseñas heredadas con hash seguro.", "warning")
+    except Exception as e:
+        log_evento(f"No se pudieron migrar contraseñas heredadas: {e}", "warning")
+
 # --- Inicialización de la Base de Datos ---
 def init_db():
     """
@@ -28,6 +46,7 @@ def init_db():
     try:
         log_evento("Inicializando base de datos...", "info")
         Base.metadata.create_all(bind=engine)
+        _upgrade_legacy_password_hashes()
         log_evento("Tablas creadas o verificadas correctamente.", "info")
     except OperationalError as e:
         log_evento(f"Error al inicializar base de datos: {e}", "error")
@@ -38,6 +57,7 @@ def init_db():
                 shutil.copy2(BACKUP_PATH, DATABASE_PATH)
                 log_evento("Respaldo restaurado. Reintentando creación de tablas...", "info")
                 Base.metadata.create_all(bind=engine)
+                _upgrade_legacy_password_hashes()
                 log_evento("Base restaurada e inicializada correctamente.", "info")
             except Exception as ex:
                 log_evento(f"Fallo al restaurar desde backup: {ex}", "critical")
@@ -46,6 +66,7 @@ def init_db():
             log_evento("No hay respaldo disponible. Intentando crear base vacía...", "warning")
             try:
                 Base.metadata.create_all(bind=engine)
+                _upgrade_legacy_password_hashes()
                 log_evento("Nueva base de datos creada con éxito.", "info")
             except Exception as ex:
                 log_evento(f"Fallo crítico al crear base de datos nueva: {ex}", "critical")

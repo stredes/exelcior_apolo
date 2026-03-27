@@ -288,6 +288,47 @@ function Get-AllowedReleaseCommitPaths{
   return @($allowed | Select-Object -Unique)
 }
 
+function Test-IsSensitiveReleasePath([string]$path){
+  if (-not $path) { return $false }
+  $normalized = ([string]$path).Trim() -replace '/', '\'
+  $patterns = @(
+    '^app\\config\\user_config\.json$',
+    '^app\\config\\excel_printer_config\.json$',
+    '^app\\db\\.*\.(db|sqlite|bak)$',
+    '^data\\.*\.(db|sqlite|bak)$',
+    '^data\\sra_mary_db\.json$',
+    '^vale_consumo\\app_settings\.json$',
+    '^logs\\',
+    '^temp\\',
+    '^installer\\output\\',
+    '^dist\\',
+    '^build\\',
+    '\.log$',
+    '\.tmp$'
+  )
+  foreach ($pattern in $patterns) {
+    if ($normalized -match $pattern) { return $true }
+  }
+  return $false
+}
+
+function Get-CommitableReleasePaths{
+  $dirtyPaths = Get-DirtyGitPaths
+  $commitable = @()
+  $skippedSensitive = @()
+  foreach ($path in $dirtyPaths) {
+    if (Test-IsSensitiveReleasePath $path) {
+      $skippedSensitive += $path
+      continue
+    }
+    $commitable += $path
+  }
+  return @{
+    Commitable = @($commitable | Select-Object -Unique)
+    SkippedSensitive = @($skippedSensitive | Select-Object -Unique)
+  }
+}
+
 function Invoke-WithRetry([scriptblock]$Action, [string]$Step, [int]$Attempts = 5, [int]$DelaySeconds = 2){
   $lastError = $null
   for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
@@ -339,12 +380,24 @@ function Save-ReleaseCommit([string]$version, [string]$remoteName){
   if (Test-GitWorktreeDirty) {
     Write-Info "Creando commit automático de release para v$version..."
     if ($AllowBroadReleaseCommit -or -not $StrictReleaseCommitScope) {
-      if ($AllowBroadReleaseCommit) {
-        Write-Warn "Commit amplio habilitado por -AllowBroadReleaseCommit. Se agregarán todos los cambios actuales del worktree."
-      } else {
-        Write-Info "Commit automático amplio habilitado por defecto. Usa -StrictReleaseCommitScope si quieres validar un scope reducido."
+      $commitPlan = Get-CommitableReleasePaths
+      $commitablePaths = @($commitPlan.Commitable)
+      $skippedSensitive = @($commitPlan.SkippedSensitive)
+      if ($skippedSensitive.Count -gt 0) {
+        Write-Warn ("Se omitieron archivos sensibles del commit automático: {0}" -f ($skippedSensitive -join ", "))
       }
-      Invoke-GitPassthru -Arguments @("add", "-A") -Step "git add -A"
+      if ($commitablePaths.Count -eq 0) {
+        Write-Warn "No hay cambios seguros para incluir en el commit automático."
+      } else {
+        if ($AllowBroadReleaseCommit) {
+          Write-Warn "Commit automático amplio habilitado por -AllowBroadReleaseCommit, con filtro de archivos sensibles."
+        } else {
+          Write-Info "Commit automático amplio habilitado por defecto, con exclusión de archivos sensibles."
+        }
+        foreach ($path in $commitablePaths) {
+          Invoke-GitPassthru -Arguments @("add", "--", $path) -Step "git add -- $path"
+        }
+      }
     } else {
       $dirtyPaths = Get-DirtyGitPaths
       $allowedPaths = Get-AllowedReleaseCommitPaths
@@ -364,7 +417,12 @@ function Save-ReleaseCommit([string]$version, [string]$remoteName){
         }
       }
     }
-    Invoke-GitPassthru -Arguments @("commit", "-m", "release: v$version") -Step "git commit release: v$version"
+    $stagedStatus = Invoke-GitCapture -Arguments @("diff", "--cached", "--name-only") -Step "git diff --cached --name-only"
+    if ($stagedStatus.Count -gt 0) {
+      Invoke-GitPassthru -Arguments @("commit", "-m", "release: v$version") -Step "git commit release: v$version"
+    } else {
+      Write-Warn "No se generó commit automático porque no hubo cambios seguros en staging."
+    }
   } else {
     Write-Info "No hay cambios pendientes para commit automático."
   }
