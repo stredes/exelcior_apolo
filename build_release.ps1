@@ -57,6 +57,7 @@ param(
   [switch]$SkipGitTagPush,
   [switch]$AllowDirtyWorktree,
   [switch]$AllowBroadReleaseCommit,
+  [switch]$StrictReleaseCommitScope,
   [switch]$SkipAutoVersion,
   [switch]$SkipAutoCommit
 )
@@ -337,8 +338,12 @@ function Save-ReleaseCommit([string]$version, [string]$remoteName){
   $branchName = Get-CurrentGitBranch
   if (Test-GitWorktreeDirty) {
     Write-Info "Creando commit automático de release para v$version..."
-    if ($AllowBroadReleaseCommit) {
-      Write-Warn "Commit amplio habilitado por -AllowBroadReleaseCommit. Se agregarán todos los cambios actuales del worktree."
+    if ($AllowBroadReleaseCommit -or -not $StrictReleaseCommitScope) {
+      if ($AllowBroadReleaseCommit) {
+        Write-Warn "Commit amplio habilitado por -AllowBroadReleaseCommit. Se agregarán todos los cambios actuales del worktree."
+      } else {
+        Write-Info "Commit automático amplio habilitado por defecto. Usa -StrictReleaseCommitScope si quieres validar un scope reducido."
+      }
       Invoke-GitPassthru -Arguments @("add", "-A") -Step "git add -A"
     } else {
       $dirtyPaths = Get-DirtyGitPaths

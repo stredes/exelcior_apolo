@@ -268,81 +268,113 @@ class SraMaryView(tk.Toplevel):
         except Exception:
             pass
         style.configure("SM.Bg.TFrame", background="#EAF0F8")
+        style.configure("SM.Hero.TFrame", background="#17324A")
         style.configure("SM.Card.TFrame", background="#FFFFFF")
+        style.configure("SM.Action.TFrame", background="#EAF0F8")
         style.configure("SM.Title.TLabel", background="#EAF0F8", foreground="#0D1D3A", font=("Segoe UI Semibold", 18))
         style.configure("SM.Sub.TLabel", background="#EAF0F8", foreground="#4B5F83", font=("Segoe UI", 10))
+        style.configure("SM.HeroKicker.TLabel", background="#17324A", foreground="#C7DCF4", font=("Segoe UI Semibold", 8))
+        style.configure("SM.HeroTitle.TLabel", background="#17324A", foreground="#FFFFFF", font=("Georgia", 22, "bold"))
+        style.configure("SM.HeroSub.TLabel", background="#17324A", foreground="#A9C6DF", font=("Segoe UI", 10))
         style.configure("SM.Section.TLabelframe", background="#FFFFFF")
         style.configure("SM.Section.TLabelframe.Label", background="#FFFFFF", foreground="#1B2E52", font=("Segoe UI Semibold", 10))
         style.configure("SM.Body.TLabel", background="#FFFFFF", foreground="#1E2D4A", font=("Segoe UI", 10))
         style.configure("SM.Info.TLabel", background="#FFFFFF", foreground="#5A6E90", font=("Segoe UI", 9))
+        style.configure("SM.Meta.TLabel", background="#FFFFFF", foreground="#60758F", font=("Segoe UI Semibold", 8))
+        style.configure("SM.Hint.TLabel", background="#FFFFFF", foreground="#6E8097", font=("Segoe UI", 9))
         style.configure("SM.Status.TLabel", background="#0F172A", foreground="#E2E8F0", font=("Segoe UI", 10), padding=8)
         style.configure("Treeview", rowheight=28, font=("Segoe UI", 10))
         style.configure("Treeview.Heading", font=("Segoe UI Semibold", 10))
+        style.configure("SM.Primary.TButton", font=("Segoe UI Semibold", 10), padding=(12, 8))
+        style.configure("SM.Secondary.TButton", font=("Segoe UI Semibold", 10), padding=(12, 8))
 
     def _crear_widgets(self):
         shell = ttk.Frame(self, style="SM.Bg.TFrame", padding=14)
         shell.pack(fill="both", expand=True)
 
-        ttk.Label(shell, text="Sra Mary", style="SM.Title.TLabel").pack(anchor="w")
-        ttk.Label(shell, text="Gestion de clientes y calendario de despacho", style="SM.Sub.TLabel").pack(anchor="w", pady=(2, 10))
+        hero = ttk.Frame(shell, style="SM.Hero.TFrame", padding=14)
+        hero.pack(fill="x", pady=(0, 10))
+        ttk.Label(hero, text="SRA MARY", style="SM.HeroKicker.TLabel").pack(anchor="w")
+        ttk.Label(hero, text="Gestion de Despachos", style="SM.HeroTitle.TLabel").pack(anchor="w", pady=(4, 2))
+        ttk.Label(
+            hero,
+            text="Administra clientes, completa datos base y organiza los dias preferidos de despacho para FedEx y Urbano.",
+            style="SM.HeroSub.TLabel",
+        ).pack(anchor="w")
 
-        top_card = ttk.Frame(shell, style="SM.Card.TFrame", padding=12)
+        top_card = ttk.LabelFrame(shell, text="Ficha del cliente", padding=12, style="SM.Section.TLabelframe")
         top_card.pack(fill="x")
-        # 4 bloques por fila: [label, entry] x 4
-        for col in (1, 3, 5, 7):
-            top_card.columnconfigure(col, weight=1)
-        label_w = 13
+        top_card.columnconfigure(0, weight=1)
 
-        ttk.Label(top_card, text="RUT o Nombre", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=0, column=0, padx=(4, 6), pady=4, sticky="e"
+        ttk.Label(
+            top_card,
+            text="Busca por RUT o nombre, completa los datos y deja la configuracion lista para operar.",
+            style="SM.Hint.TLabel",
+        ).grid(row=0, column=0, sticky="w", padx=4, pady=(0, 10))
+
+        quick_row = ttk.Frame(top_card, style="SM.Card.TFrame")
+        quick_row.grid(row=1, column=0, sticky="ew")
+        quick_row.columnconfigure(1, weight=3)
+        quick_row.columnconfigure(4, weight=4)
+
+        ttk.Label(quick_row, text="RUT o Nombre", style="SM.Meta.TLabel").grid(
+            row=0, column=0, padx=(4, 8), pady=4, sticky="w"
         )
-        self.entry_ref_cliente = ttk.Entry(top_card, width=30)
+        self.entry_ref_cliente = ttk.Entry(quick_row, width=34)
         self.entry_ref_cliente.grid(row=0, column=1, padx=(0, 10), pady=4, sticky="ew")
         self.entry_ref_cliente.bind("<Return>", self._cargar_cliente_desde_ref)
         self.entry_ref_cliente.bind("<KeyRelease>", self._on_ref_keyrelease)
         self.entry_ref_cliente.bind("<FocusOut>", lambda _e: self.after(180, self._hide_suggestions_popup))
         self.entry_ref_cliente.bind("<Down>", self._focus_suggestions)
-        ttk.Button(top_card, text="Cargar Cliente", command=self._cargar_cliente_desde_ref).grid(
-            row=0, column=2, padx=(0, 10), pady=4, sticky="w"
+        ttk.Button(quick_row, text="Cargar Cliente", style="SM.Primary.TButton", command=self._cargar_cliente_desde_ref).grid(
+            row=0, column=2, padx=(0, 16), pady=4, sticky="w"
         )
-
-        ttk.Label(top_card, text="Cliente", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=0, column=3, padx=(4, 6), pady=4, sticky="e"
+        ttk.Label(quick_row, text="Buscar en registros", style="SM.Meta.TLabel").grid(
+            row=0, column=3, padx=(4, 8), pady=4, sticky="w"
         )
-        self.entry_cliente = ttk.Entry(top_card, width=28)
-        self.entry_cliente.grid(row=0, column=4, padx=(0, 10), pady=4, sticky="ew")
-        self.entry_cliente.bind("<Return>", self._cargar_cliente_desde_ref)
-
-        ttk.Label(top_card, text="Dirección", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=0, column=5, padx=(4, 6), pady=4, sticky="e"
-        )
-        self.entry_direccion = ttk.Entry(top_card, width=34)
-        self.entry_direccion.grid(row=0, column=6, columnspan=2, padx=(0, 4), pady=4, sticky="ew")
-
-        ttk.Label(top_card, text="Región", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=1, column=0, padx=(4, 6), pady=4, sticky="e"
-        )
-        self.entry_region = ttk.Entry(top_card, width=22)
-        self.entry_region.grid(row=1, column=1, padx=(0, 10), pady=4, sticky="ew")
-
-        ttk.Label(top_card, text="Comuna", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=1, column=2, padx=(4, 6), pady=4, sticky="e"
-        )
-        self.entry_comuna = ttk.Entry(top_card, width=22)
-        self.entry_comuna.grid(row=1, column=3, padx=(0, 10), pady=4, sticky="ew")
-
-        ttk.Label(top_card, text="Buscar", style="SM.Body.TLabel", width=label_w, anchor="e").grid(
-            row=1, column=4, padx=(4, 6), pady=4, sticky="e"
-        )
-        self.entry_busqueda = ttk.Entry(top_card, width=40)
-        self.entry_busqueda.grid(row=1, column=5, columnspan=3, padx=(0, 4), pady=4, sticky="ew")
+        self.entry_busqueda = ttk.Entry(quick_row, width=40)
+        self.entry_busqueda.grid(row=0, column=4, padx=(0, 4), pady=4, sticky="ew")
         self.entry_busqueda.bind("<KeyRelease>", lambda e: self._filtrar_tree())
 
+        details_row = ttk.Frame(top_card, style="SM.Card.TFrame")
+        details_row.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        details_row.columnconfigure(1, weight=3)
+        details_row.columnconfigure(3, weight=2)
+        details_row.columnconfigure(5, weight=2)
+
+        ttk.Label(details_row, text="Cliente", style="SM.Meta.TLabel").grid(
+            row=0, column=0, padx=(4, 8), pady=4, sticky="w"
+        )
+        self.entry_cliente = ttk.Entry(details_row, width=28)
+        self.entry_cliente.grid(row=0, column=1, padx=(0, 12), pady=4, sticky="ew")
+        self.entry_cliente.bind("<Return>", self._cargar_cliente_desde_ref)
+
+        ttk.Label(details_row, text="Región", style="SM.Meta.TLabel").grid(
+            row=0, column=2, padx=(4, 8), pady=4, sticky="w"
+        )
+        self.entry_region = ttk.Entry(details_row, width=22)
+        self.entry_region.grid(row=0, column=3, padx=(0, 12), pady=4, sticky="ew")
+
+        ttk.Label(details_row, text="Comuna", style="SM.Meta.TLabel").grid(
+            row=0, column=4, padx=(4, 8), pady=4, sticky="w"
+        )
+        self.entry_comuna = ttk.Entry(details_row, width=22)
+        self.entry_comuna.grid(row=0, column=5, padx=(0, 4), pady=4, sticky="ew")
+
+        address_row = ttk.Frame(top_card, style="SM.Card.TFrame")
+        address_row.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        address_row.columnconfigure(1, weight=1)
+        ttk.Label(address_row, text="Dirección", style="SM.Meta.TLabel").grid(
+            row=0, column=0, padx=(4, 8), pady=4, sticky="w"
+        )
+        self.entry_direccion = ttk.Entry(address_row, width=34)
+        self.entry_direccion.grid(row=0, column=1, padx=(0, 4), pady=4, sticky="ew")
+
         ttk.Label(top_card, textvariable=self.status_var, style="SM.Info.TLabel").grid(
-            row=2, column=0, columnspan=7, sticky="w", padx=4, pady=(6, 0)
+            row=4, column=0, sticky="w", padx=4, pady=(10, 0)
         )
         ttk.Label(top_card, textvariable=self.sugerencias_var, style="SM.Info.TLabel").grid(
-            row=3, column=0, columnspan=7, sticky="w", padx=4, pady=(2, 0)
+            row=5, column=0, sticky="w", padx=4, pady=(2, 0)
         )
 
         mid = ttk.Frame(shell, style="SM.Bg.TFrame")
@@ -354,19 +386,26 @@ class SraMaryView(tk.Toplevel):
         frame_fedex.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
         frame_urbano = ttk.LabelFrame(mid, text="Urbano", padding=10, style="SM.Section.TLabelframe")
         frame_urbano.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ttk.Label(frame_fedex, text="Dias preferidos para salidas por FedEx.", style="SM.Hint.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        ttk.Label(frame_urbano, text="Dias preferidos para salidas por Urbano.", style="SM.Hint.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
         for i, dia in enumerate(self.dias_semana):
-            ttk.Checkbutton(frame_fedex, text=dia, variable=self.vars_fedex[dia]).grid(row=i, column=0, sticky="w", pady=1)
-            ttk.Checkbutton(frame_urbano, text=dia, variable=self.vars_urbano[dia]).grid(row=i, column=0, sticky="w", pady=1)
+            ttk.Checkbutton(frame_fedex, text=dia, variable=self.vars_fedex[dia]).grid(row=i + 1, column=0, sticky="w", pady=1)
+            ttk.Checkbutton(frame_urbano, text=dia, variable=self.vars_urbano[dia]).grid(row=i + 1, column=0, sticky="w", pady=1)
 
-        actions = ttk.Frame(shell, style="SM.Bg.TFrame")
+        actions = ttk.Frame(shell, style="SM.Action.TFrame")
         actions.pack(fill="x", pady=(0, 8))
-        ttk.Button(actions, text="Guardar Cliente", command=self._guardar).pack(side="left", padx=(0, 6))
-        ttk.Button(actions, text="Actualizar Seleccion", command=self._actualizar).pack(side="left", padx=(0, 6))
-        ttk.Button(actions, text="Eliminar Seleccion", command=self._eliminar).pack(side="left", padx=(0, 6))
-        ttk.Button(actions, text="Importar Frecuencias", command=self._importar_frecuencias).pack(side="left")
+        ttk.Button(actions, text="Guardar Cliente", style="SM.Primary.TButton", command=self._guardar).pack(side="left", padx=(0, 6))
+        ttk.Button(actions, text="Actualizar Seleccion", style="SM.Secondary.TButton", command=self._actualizar).pack(side="left", padx=(0, 6))
+        ttk.Button(actions, text="Eliminar Seleccion", style="SM.Secondary.TButton", command=self._eliminar).pack(side="left", padx=(0, 6))
+        ttk.Button(actions, text="Importar Frecuencias", style="SM.Secondary.TButton", command=self._importar_frecuencias).pack(side="left")
 
-        table_card = ttk.Frame(shell, style="SM.Card.TFrame", padding=8)
+        table_card = ttk.LabelFrame(shell, text="Clientes registrados", style="SM.Section.TLabelframe", padding=8)
         table_card.pack(fill="both", expand=True)
+        ttk.Label(
+            table_card,
+            text="Doble clic sobre una fila para cargarla en edicion y actualizar sus datos.",
+            style="SM.Hint.TLabel",
+        ).pack(anchor="w", padx=4, pady=(0, 8))
 
         table_container = ttk.Frame(table_card, style="SM.Card.TFrame")
         table_container.pack(fill="both", expand=True)

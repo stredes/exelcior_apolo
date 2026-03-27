@@ -25,6 +25,11 @@ from app.services.file_service import (
     build_preview_dataframe,
     compute_preview_stats,
 )
+from app.services.daily_listados_service import (
+    archive_printed_listado,
+    export_daily_listados,
+    load_daily_listados_dataframe,
+)
 from app.db.database import init_db, save_file_history, save_print_history
 from app.config.config_dialog import ConfigDialog  # ConfiguraciÃ³n por MODO
 from app.core.autoloader import find_latest_file_by_mode, set_carpeta_descarga_personalizada
@@ -91,6 +96,8 @@ class ExcelPrinterApp(tk.Tk):
         self.sidebar = None
         self._mode_buttons = {}
         self._active_print_context = "report"
+        self.current_history_path = None
+        self._fin_dia_df = None
         self._update_release_info = None
         self._update_download_thread = None
         self._update_button = None
@@ -379,6 +386,7 @@ class ExcelPrinterApp(tk.Tk):
 
         self._add_sidebar_button(sidebar, "Seleccionar Excel", self._threaded_select_file)
         self._add_sidebar_button(sidebar, "Carga Automatica", self._threaded_auto_load)
+        self._add_sidebar_button(sidebar, "Fin de Dia Listados", self._open_daily_listados_close)
         self._add_sidebar_button(sidebar, "Configurar Modo", self._open_config_menu)
         self._add_sidebar_button(sidebar, "Impresoras", self._abrir_admin_impresoras)
         self._add_sidebar_button(sidebar, "Ver Logs", self._view_logs)
@@ -782,6 +790,7 @@ class ExcelPrinterApp(tk.Tk):
         """Aplica resultado de procesamiento y refresca vista previa/UI de forma uniforme."""
         self.df = df
         self.transformed_df = transformed
+        self.current_history_path = history_path
         save_file_history(history_path, self.mode)
         self._ui_set_status_preview_totals(self.transformed_df, self.mode)
         if self._ui_alive():
@@ -1109,6 +1118,16 @@ class ExcelPrinterApp(tk.Tk):
         future = self.executor.submit(self._print_document)
         future.add_done_callback(self._print_complete_callback)
 
+    def _threaded_print_daily_close(self):
+        if self.processing or self._fin_dia_df is None or self._fin_dia_df.empty:
+            self.safe_messagebox("warning", "Fin de dia", "No hay consolidado del dia para imprimir.")
+            return
+        self._switch_print_context("report")
+        self.processing = True
+        self._set_controls_enabled(False)
+        future = self.executor.submit(self._print_daily_close_document)
+        future.add_done_callback(self._print_complete_callback)
+
     def _print_complete_callback(self, future):
         try:
             future.result()
@@ -1129,12 +1148,18 @@ class ExcelPrinterApp(tk.Tk):
         try:
             # Imprime exactamente lo que estÃ¡ en la vista previa/CRUD
             print_document(self.mode, self.transformed_df, self.config_columns, None)
+            if self.mode == "listados" and self.transformed_df is not None and not self.transformed_df.empty:
+                archive_printed_listado(
+                    self.transformed_df,
+                    source_name=self.current_history_path,
+                )
             save_print_history(
                 archivo=f"{self.mode}_impresion.xlsx",
                 observacion=f"ImpresiÃ³n realizada en modo '{self.mode}'"
             )
             self.df = None
             self.transformed_df = None
+            self.current_history_path = None
         except Exception as e:
             logging.error(f"Error en impresiÃ³n: {e}")
             capturar_log_bod1(f"Error al imprimir: {e}", "error")
@@ -1142,6 +1167,57 @@ class ExcelPrinterApp(tk.Tk):
                 msg = f"Error al imprimir:\n{e}"
                 self.after(0, lambda m=msg: self.safe_messagebox("error", "Error", m))
             raise
+
+    def _print_daily_close_document(self):
+        try:
+            print_document("listados", self._fin_dia_df, self.config_columns, None)
+            save_print_history(
+                archivo="listados_fin_dia.xlsx",
+                observacion="ImpresiÃ³n consolidada de fin de dia para listados",
+            )
+        except Exception as e:
+            logging.error(f"Error en impresiÃ³n fin de dÃ­a: {e}")
+            capturar_log_bod1(f"Error al imprimir fin de dia: {e}", "error")
+            if self._ui_alive():
+                msg = f"Error al imprimir fin de dia:\n{e}"
+                self.after(0, lambda m=msg: self.safe_messagebox("error", "Fin de dia", m))
+            raise
+
+    def _open_daily_listados_close(self):
+        try:
+            df = load_daily_listados_dataframe()
+            if df is None or df.empty:
+                self.safe_messagebox(
+                    "info",
+                    "Fin de dia",
+                    "Hoy todavia no hay listados impresos para consolidar.",
+                )
+                return
+
+            self._fin_dia_df = df.copy(deep=True)
+            export_path = export_daily_listados()
+            self._update_status(f"Fin de dia listo: {len(self._fin_dia_df)} filas consolidadas")
+
+            def _on_fin_dia_change(df_actual):
+                self._fin_dia_df = df_actual
+
+            open_preview_crud(
+                self,
+                self._fin_dia_df,
+                "listados",
+                on_print=self._threaded_print_daily_close,
+                on_df_change=_on_fin_dia_change,
+            )
+
+            if export_path is not None:
+                self.safe_messagebox(
+                    "info",
+                    "Fin de dia",
+                    f"Planilla consolidada generada en:\n{export_path}",
+                )
+        except Exception as e:
+            logging.exception("Error abriendo fin de dia de listados")
+            self.safe_messagebox("error", "Fin de dia", f"No se pudo consolidar el dia:\n{e}")
 
     # ---------------- ConfiguraciÃ³n ----------------
 
