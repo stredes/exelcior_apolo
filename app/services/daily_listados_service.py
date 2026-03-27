@@ -26,6 +26,15 @@ def _daily_dir(date_key: str | None = None) -> Path:
     return path
 
 
+def _safe_daily_file(day_dir: Path, file_name: str) -> Path | None:
+    candidate = (day_dir / file_name).resolve()
+    try:
+        candidate.relative_to(day_dir.resolve())
+    except Exception:
+        return None
+    return candidate
+
+
 def _manifest_path(date_key: str | None = None) -> Path:
     return _daily_dir(date_key) / "manifest.json"
 
@@ -106,7 +115,9 @@ def load_daily_listados_dataframe(date_key: str | None = None) -> pd.DataFrame:
         file_name = str(entry.get("file", "")).strip()
         if not file_name:
             continue
-        excel_path = day_dir / file_name
+        excel_path = _safe_daily_file(day_dir, file_name)
+        if excel_path is None:
+            continue
         if not excel_path.exists():
             continue
         try:
