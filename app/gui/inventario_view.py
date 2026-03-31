@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, filedialog, messagebox
 import unicodedata
 from difflib import SequenceMatcher
@@ -22,6 +23,7 @@ VISIBLE_COLUMNS = [
     "Código", "Producto", "Bodega", "Ubicación",
     "N° Serie", "Lote", "Fecha Vencimiento", "Saldo Stock"
 ]
+TREE_COLUMNS = ["Sel"] + VISIBLE_COLUMNS
 
 # Sinonimos (normalizados a minusculas y sin acentos) -> nombre objetivo
 COL_SYNONYMS: Dict[str, str] = {
@@ -106,12 +108,19 @@ def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
 
 
 class InventarioView(tk.Toplevel):
+    PRODUCT_MIN_WIDTH = 280
+    PRODUCT_MAX_WIDTH = 620
+
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Inventario - Consulta")
         self.geometry("1280x760")
         self.minsize(1080, 640)
         self.config(bg="#EEF2F8")
+        try:
+            self.transient(parent)
+        except Exception:
+            pass
 
         self.df = pd.DataFrame()
         self.df_filtrado = pd.DataFrame()
@@ -120,13 +129,19 @@ class InventarioView(tk.Toplevel):
         self.sort_ascending = True
         self.ubicaciones_disponibles = []
         self.ubicaciones_seleccionadas = set()
+        self.bodegas_disponibles = []
+        self.selected_row_ids = set()
         self._ubic_popup = None
         self._archivo_actual = ""
         self.status_var = tk.StringVar(value="Carga un archivo de inventario para comenzar.")
         self.summary_var = tk.StringVar(value="Registros: 0")
         self.ubicaciones_var = tk.StringVar(value="Ubicaciones: todas")
+        self.printer_info_var = tk.StringVar(value="Impresora inventario: sin configurar")
+        self.bodega_var = tk.StringVar(value="Todas")
+        self.stock_cero_var = tk.BooleanVar(value=False)
 
         self._crear_widgets()
+        self._present_window()
         self._cargar_o_pedir_archivo()
 
     # ------------------------------- UI ---------------------------------
@@ -138,8 +153,21 @@ class InventarioView(tk.Toplevel):
                 "info": messagebox.showinfo,
                 "error": messagebox.showerror,
                 "warning": messagebox.showwarning,
-            }[tipo](titulo, mensaje),
+            }[tipo](titulo, mensaje, parent=self),
         )
+
+    def _present_window(self):
+        try:
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            self.after(350, lambda: self.attributes("-topmost", False))
+            try:
+                self.state("zoomed")
+            except Exception:
+                self.attributes("-zoomed", True)
+        except Exception:
+            pass
 
     def _crear_widgets(self):
         style = ttk.Style(self)
@@ -163,7 +191,7 @@ class InventarioView(tk.Toplevel):
         shell.pack(fill="both", expand=True)
 
         ttk.Label(shell, text="Inventario", style="InvTitle.TLabel").pack(anchor="w")
-        ttk.Label(shell, text="Busqueda por texto, codigo de producto, ubicacion, columna y fila.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
+        ttk.Label(shell, text="Busqueda por texto, codigo de producto, bodega, stock 0, ubicacion, columna y fila.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
 
         top_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
         top_card.pack(fill="x")
@@ -179,27 +207,36 @@ class InventarioView(tk.Toplevel):
         self.entry_codigo.grid(row=0, column=3, padx=(6, 12), sticky="w")
         self.entry_codigo.bind("<Return>", lambda e: self._filtrar())
 
-        tk.Label(top_card, text="Columna:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=4, sticky="w")
+        tk.Label(top_card, text="Bodega:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=4, sticky="w")
+        self.combo_bodega = ttk.Combobox(top_card, textvariable=self.bodega_var, state="readonly", width=18)
+        self.combo_bodega.grid(row=0, column=5, padx=(6, 12), sticky="w")
+        self.combo_bodega.bind("<<ComboboxSelected>>", lambda e: self._filtrar())
+        self.combo_bodega["values"] = ["Todas"]
+
+        tk.Label(top_card, text="Columna:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=6, sticky="w")
         self.entry_columna = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
-        self.entry_columna.grid(row=0, column=5, padx=(6, 12), sticky="w")
+        self.entry_columna.grid(row=0, column=7, padx=(6, 12), sticky="w")
         self.entry_columna.bind("<Return>", lambda e: self._filtrar())
 
-        tk.Label(top_card, text="Fila:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=6, sticky="w")
+        tk.Label(top_card, text="Fila:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=8, sticky="w")
         self.entry_fila = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
-        self.entry_fila.grid(row=0, column=7, padx=(6, 12), sticky="w")
+        self.entry_fila.grid(row=0, column=9, padx=(6, 12), sticky="w")
         self.entry_fila.bind("<Return>", lambda e: self._filtrar())
 
-        ttk.Button(top_card, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=8, padx=(0, 6))
-        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=9, padx=(0, 6))
-        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=10, padx=(0, 6))
-        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=11, padx=(0, 6))
-        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=12)
-        top_card.columnconfigure(13, weight=1)
+        ttk.Checkbutton(top_card, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=10, padx=(0, 12), sticky="w")
+        ttk.Button(top_card, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=11, padx=(0, 6))
+        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=12, padx=(0, 6))
+        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=13, padx=(0, 6))
+        ttk.Button(top_card, text="Seleccionar todo", command=self._toggle_select_all).grid(row=0, column=14, padx=(0, 6))
+        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=15, padx=(0, 6))
+        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=16)
+        top_card.columnconfigure(17, weight=1)
 
         info_row = ttk.Frame(top_card, style="Card.TFrame")
-        info_row.grid(row=1, column=0, columnspan=14, sticky="ew", pady=(10, 0))
+        info_row.grid(row=1, column=0, columnspan=18, sticky="ew", pady=(10, 0))
         ttk.Label(info_row, textvariable=self.summary_var, style="InvLabel.TLabel").pack(side="left")
         ttk.Label(info_row, textvariable=self.ubicaciones_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
+        ttk.Label(info_row, textvariable=self.printer_info_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
         ttk.Label(info_row, textvariable=self.status_var, style="InvHint.TLabel").pack(side="left", padx=(16, 0))
 
         self.sugerencias_var = tk.StringVar(value="")
@@ -211,7 +248,9 @@ class InventarioView(tk.Toplevel):
         tree_container = ttk.Frame(table_card, style="Card.TFrame")
         tree_container.pack(fill="both", expand=True)
 
-        self.tree = ttk.Treeview(tree_container, columns=VISIBLE_COLUMNS, show="headings", height=25)
+        self.tree = ttk.Treeview(tree_container, columns=TREE_COLUMNS, show="headings", height=25)
+        self.tree.heading("Sel", text="✓")
+        self.tree.column("Sel", width=48, anchor="center", stretch=False)
         for col in VISIBLE_COLUMNS:
             self.tree.heading(col, text=col, command=lambda c=col: self._sort_by_column(c))
             width = 140
@@ -232,6 +271,7 @@ class InventarioView(tk.Toplevel):
         xscroll.grid(row=1, column=0, sticky="ew")
         tree_container.rowconfigure(0, weight=1)
         tree_container.columnconfigure(0, weight=1)
+        self.tree.bind("<Button-1>", self._on_tree_click)
 
         status_bar = ttk.Frame(shell, style="InvBg.TFrame")
         status_bar.pack(fill="x")
@@ -255,6 +295,7 @@ class InventarioView(tk.Toplevel):
 
     def _cargar_o_pedir_archivo(self):
         config = load_config() or {}
+        self._actualizar_info_impresora(config)
         ruta = config.get("archivo_inventario")
         if ruta and Path(ruta).exists():
             self._leer_excel(Path(ruta))
@@ -266,6 +307,7 @@ class InventarioView(tk.Toplevel):
 
     def _buscar_y_cargar_archivo(self):
         ruta_archivo = filedialog.askopenfilename(
+            parent=self,
             title="Selecciona el archivo de inventario",
             filetypes=[("Archivos Excel", "*.xlsx *.xls")],
         )
@@ -299,11 +341,17 @@ class InventarioView(tk.Toplevel):
             self.sort_ascending = True
             self.ubicaciones_disponibles = sorted(df["Ubicación"].dropna().astype(str).str.strip().unique().tolist())
             self.ubicaciones_seleccionadas = set()
+            self.bodegas_disponibles = sorted(df["Bodega"].dropna().astype(str).str.strip().unique().tolist())
+            self.combo_bodega["values"] = ["Todas"] + self.bodegas_disponibles
+            self.combo_bodega.current(0)
+            self.selected_row_ids = set()
             self._actualizar_label_ubicaciones()
+            self._actualizar_info_impresora(load_config() or {})
             self._archivo_actual = path.name
             self._actualizar_tree(self.df)
             self.status_var.set(f"Archivo cargado: {path.name}")
             self.entry_busqueda.focus_set()
+            self.after(50, self._present_window)
 
             capturar_log_bod1(f"[Inventario] Archivo cargado: {path}", "info")
             self.safe_messagebox("info", "Inventario", f"Archivo cargado correctamente: {path.name}")
@@ -318,7 +366,12 @@ class InventarioView(tk.Toplevel):
             self.sort_ascending = True
             self.ubicaciones_disponibles = []
             self.ubicaciones_seleccionadas = set()
+            self.bodegas_disponibles = []
+            self.combo_bodega["values"] = ["Todas"]
+            self.bodega_var.set("Todas")
+            self.selected_row_ids = set()
             self._actualizar_label_ubicaciones()
+            self._actualizar_info_impresora(load_config() or {})
             self._archivo_actual = ""
             self.status_var.set("No se pudo cargar el archivo.")
             self._actualizar_tree(self.df)
@@ -334,11 +387,13 @@ class InventarioView(tk.Toplevel):
         term_raw = self.entry_busqueda.get()
         termino = self._norm_text(term_raw)
         codigo_producto = self._norm_text(self.entry_codigo.get())
+        bodega = self._norm_text(self.bodega_var.get())
         columna = self._norm_text(self.entry_columna.get())
         fila = self._norm_text(self.entry_fila.get())
+        solo_stock_cero = bool(self.stock_cero_var.get())
 
-        if not termino and not codigo_producto and not columna and not fila and not self.ubicaciones_seleccionadas:
-            self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, columna/fila o seleccione ubicaciones.")
+        if not termino and not codigo_producto and not columna and not fila and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
+            self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, bodega, stock 0, columna/fila o seleccione ubicaciones.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -350,6 +405,7 @@ class InventarioView(tk.Toplevel):
         m_ubi = df["Ubicación"].astype(str).map(self._norm_text)
         m_cod = df["Código"].astype(str).map(self._norm_text)
         m_prod = df["Producto"].astype(str).map(self._norm_text)
+        m_bodega = df["Bodega"].astype(str).map(self._norm_text)
 
         if terminos:
             mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos))
@@ -384,18 +440,27 @@ class InventarioView(tk.Toplevel):
         if codigo_producto:
             mask_codigo_directo = m_cod.apply(lambda val: codigo_producto in val)
 
+        mask_bodega = pd.Series([True] * len(df), index=df.index)
+        if bodega and bodega != "todas":
+            mask_bodega = m_bodega == bodega
+
+        mask_stock_cero = pd.Series([True] * len(df), index=df.index)
+        if solo_stock_cero:
+            stock_values = pd.to_numeric(df["Saldo Stock"], errors="coerce").fillna(0)
+            mask_stock_cero = stock_values <= 0
+
         mask_sel_ubic = pd.Series([True] * len(df), index=df.index)
         if self.ubicaciones_seleccionadas:
             sel_norm = {self._norm_text(v) for v in self.ubicaciones_seleccionadas}
             mask_sel_ubic = m_ubi.isin(sel_norm)
 
-        mask_total = mask_texto & mask_codigo_directo & mask_col & mask_fila & mask_sel_ubic
+        mask_total = mask_texto & mask_codigo_directo & mask_bodega & mask_stock_cero & mask_col & mask_fila & mask_sel_ubic
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
             if codigo_producto:
                 self.tipo_busqueda = "codigo"
-            elif self.ubicaciones_seleccionadas or columna or fila or mask_ubi.any():
+            elif self.ubicaciones_seleccionadas or bodega not in ("", "todas") or solo_stock_cero or columna or fila or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
@@ -409,17 +474,21 @@ class InventarioView(tk.Toplevel):
             self.tipo_busqueda = None
             self.status_var.set("Sin resultados para el filtro aplicado.")
 
+        self.selected_row_ids = set()
         self._actualizar_tree(self.df_filtrado)
         self._actualizar_sugerencias()
 
     def _limpiar_busqueda(self):
         self.entry_busqueda.delete(0, "end")
         self.entry_codigo.delete(0, "end")
+        self.bodega_var.set("Todas")
+        self.stock_cero_var.set(False)
         self.entry_columna.delete(0, "end")
         self.entry_fila.delete(0, "end")
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
         self.ubicaciones_seleccionadas = set()
+        self.selected_row_ids = set()
         self._actualizar_label_ubicaciones()
         self.sugerencias_var.set("")
         self.status_var.set("Filtros limpiados.")
@@ -483,16 +552,73 @@ class InventarioView(tk.Toplevel):
         self.tree.delete(*self.tree.get_children())
         if df is None or df.empty:
             self.summary_var.set("Registros: 0")
+            self._autoajustar_columna_producto()
             return
 
         for i, row in enumerate(df[VISIBLE_COLUMNS].itertuples(index=False)):
             tag = "even" if i % 2 == 0 else "odd"
-            self.tree.insert("", "end", values=row, tags=(tag,))
+            marker = "☑" if i in self.selected_row_ids else "☐"
+            self.tree.insert("", "end", iid=str(i), values=(marker, *row), tags=(tag,))
 
         self.tree.tag_configure("even", background="#FFFFFF")
         self.tree.tag_configure("odd", background="#F6F8FD")
+        self._autoajustar_columna_producto(df)
         origen = self._archivo_actual or "sin archivo"
         self.summary_var.set(f"Registros: {len(df)} | Fuente: {origen}")
+
+    def _autoajustar_columna_producto(self, df: pd.DataFrame | None = None):
+        try:
+            font = tkfont.nametofont(str(self.tree.cget("font")))
+        except Exception:
+            font = tkfont.Font(family="Segoe UI", size=10)
+
+        width_px = font.measure("Producto") + 36
+        source_df = df if df is not None and not df.empty else self._current_view_df()
+        if source_df is not None and not source_df.empty and "Producto" in source_df.columns:
+            muestras = source_df["Producto"].astype(str).fillna("").head(300)
+            for value in muestras:
+                width_px = max(width_px, font.measure(value) + 36)
+
+        width_px = max(self.PRODUCT_MIN_WIDTH, min(width_px, self.PRODUCT_MAX_WIDTH))
+        self.tree.column("Producto", width=width_px)
+
+    def _current_view_df(self) -> pd.DataFrame:
+        return self.df_filtrado if not self.df_filtrado.empty else self.df
+
+    def _selected_view_df(self) -> pd.DataFrame:
+        current = self._current_view_df()
+        if current is None or current.empty or not self.selected_row_ids:
+            return pd.DataFrame()
+        valid_indexes = [idx for idx in sorted(self.selected_row_ids) if 0 <= idx < len(current)]
+        if not valid_indexes:
+            return pd.DataFrame()
+        return current.iloc[valid_indexes].reset_index(drop=True)
+
+    def _toggle_select_all(self):
+        current = self._current_view_df()
+        if current is None or current.empty:
+            self.safe_messagebox("info", "Inventario", "No hay registros visibles para seleccionar.")
+            return
+        if len(self.selected_row_ids) == len(current):
+            self.selected_row_ids.clear()
+            self.status_var.set("Seleccion completa limpiada.")
+        else:
+            self.selected_row_ids = set(range(len(current)))
+            self.status_var.set(f"Seleccionados {len(self.selected_row_ids)} registros visibles.")
+        self._actualizar_tree(current)
+
+    def _on_tree_click(self, event):
+        region = self.tree.identify("region", event.x, event.y)
+        column = self.tree.identify_column(event.x)
+        row_id = self.tree.identify_row(event.y)
+        if region == "cell" and column == "#1" and row_id:
+            idx = int(row_id)
+            if idx in self.selected_row_ids:
+                self.selected_row_ids.remove(idx)
+            else:
+                self.selected_row_ids.add(idx)
+            self._actualizar_tree(self._current_view_df())
+            return "break"
 
     def _update_heading_texts(self):
         for col in VISIBLE_COLUMNS:
@@ -504,28 +630,32 @@ class InventarioView(tk.Toplevel):
     # ------------------------------ Print -------------------------------
 
     def _imprimir_resultado(self):
-        df_to_print = self.df_filtrado if not self.df_filtrado.empty else self.df
+        df_selected = self._selected_view_df()
+        df_to_print = df_selected if not df_selected.empty else self._current_view_df()
         if df_to_print.empty:
             self.safe_messagebox("warning", "Sin datos", "No hay datos para imprimir.")
             return
 
         try:
+            cfg = load_config() or {}
+            inventory_printer = self._get_inventory_printer_name(cfg)
+            self._actualizar_info_impresora(cfg)
             capturar_log_bod1(
                 f"[Inventario] Impresion solicitada (tipo={self.tipo_busqueda or 'completo'}) "
-                f"con {len(df_to_print)} registros.",
+                f"con {len(df_to_print)} registros. Impresora: {inventory_printer or 'predeterminada SO'}.",
                 "info",
             )
 
             if self.tipo_busqueda == "ubicacion":
                 printer_inventario_ubicacion.print_inventario_ubicacion(
                     file_path=self._archivo_actual or "inventario.xlsx",
-                    config={},
+                    config={"printer_name": inventory_printer},
                     df=df_to_print,
                 )
             else:
                 printer_inventario_codigo.print_inventario_codigo(
                     file_path=self._archivo_actual or "inventario.xlsx",
-                    config={},
+                    config={"printer_name": inventory_printer},
                     df=df_to_print,
                 )
 
@@ -642,12 +772,40 @@ class InventarioView(tk.Toplevel):
 
     def _filtrar_desde_selector(self):
         tiene_texto = bool(self._norm_text(self.entry_busqueda.get()))
+        tiene_codigo = bool(self._norm_text(self.entry_codigo.get()))
+        tiene_bodega = self._norm_text(self.bodega_var.get()) not in ("", "todas")
+        tiene_stock_cero = bool(self.stock_cero_var.get())
         tiene_col = bool(self._norm_text(self.entry_columna.get()))
         tiene_fila = bool(self._norm_text(self.entry_fila.get()))
-        if self.ubicaciones_seleccionadas or tiene_texto or tiene_col or tiene_fila:
+        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_bodega or tiene_stock_cero or tiene_col or tiene_fila:
             self._filtrar()
         else:
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
             self.status_var.set("Sin ubicaciones seleccionadas. Mostrando todos los registros.")
             self._actualizar_tree(self.df)
+
+    def _get_inventory_printer_name(self, cfg: dict | None = None) -> str:
+        cfg = cfg if isinstance(cfg, dict) else {}
+        mode_printers = cfg.get("mode_printers", {})
+        if isinstance(mode_printers, dict):
+            inventory = mode_printers.get("inventario")
+            if isinstance(inventory, str) and inventory.strip():
+                return inventory.strip()
+
+        for candidate in (
+            cfg.get("report_printer_name"),
+            cfg.get("paper_printer_name"),
+            cfg.get("default_printer"),
+            (cfg.get("paths", {}) or {}).get("default_printer"),
+        ):
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+        return ""
+
+    def _actualizar_info_impresora(self, cfg: dict | None = None):
+        printer = self._get_inventory_printer_name(cfg)
+        if printer:
+            self.printer_info_var.set(f"Impresora inventario: {printer}")
+        else:
+            self.printer_info_var.set("Impresora inventario: predeterminada del sistema")

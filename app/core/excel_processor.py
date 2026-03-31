@@ -71,6 +71,36 @@ def _build_column_map(columns: List[str]) -> Dict[str, str]:
     return {_normalize_name(c): c for c in columns}
 
 
+def _is_blank_header(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return True
+    return text.lower().startswith("unnamed:")
+
+
+def _drop_blank_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Elimina columnas realmente vacias:
+      - encabezado vacio / Unnamed
+      - todas sus celdas vacias o NaN
+    """
+    if df is None or df.empty:
+        return df
+
+    cols_to_drop: List[str] = []
+    for col in list(df.columns):
+        series = df[col]
+        normalized = series.map(lambda v: "" if pd.isna(v) else str(v).strip())
+        if _is_blank_header(col) or (normalized == "").all():
+            cols_to_drop.append(col)
+
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop, errors="ignore")
+        log_evento(f"Columnas vacias eliminadas automaticamente: {cols_to_drop}", "info")
+
+    return df
+
+
 # ==========================
 # Helpers de config (soporta v2 y legacy)
 # ==========================
@@ -171,6 +201,7 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
             .map(lambda c: str(c).replace(_ZWSP, ""))
             .map(lambda c: " ".join(c.strip().split()))
         )
+        df = _drop_blank_columns(df)
 
         log_evento(f"Archivo cargado: {file_path}", "info")
         return df

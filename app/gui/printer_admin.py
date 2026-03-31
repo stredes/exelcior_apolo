@@ -42,22 +42,33 @@ class PrinterAdminDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Administracion de Dispositivos de Impresion")
-        self.geometry("820x620")
-        self.minsize(760, 560)
+        self.geometry("1140x760")
+        self.minsize(980, 680)
         self.configure(bg="#EEF2F8")
         self.transient(parent)
 
         self.printers: List[str] = []
         self.status_var = tk.StringVar(value="Cargando impresoras...")
         self.report_var = tk.StringVar(value="")
+        self.inventory_var = tk.StringVar(value="")
         self.listados_var = tk.StringVar(value="")
         self.fedex_var = tk.StringVar(value="")
         self.urbano_var = tk.StringVar(value="")
         self.label_var = tk.StringVar(value="")
 
         self._build_ui()
+        self._present_window()
         self._load_initial_values()
         self._refresh_printers()
+
+    def _present_window(self) -> None:
+        try:
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            self.after(250, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
 
     def _build_ui(self) -> None:
         style = ttk.Style(self)
@@ -91,7 +102,7 @@ class PrinterAdminDialog(tk.Toplevel):
         ttk.Label(hero, text="Administracion de dispositivos", style="PrinterHeroTitle.TLabel").pack(anchor="w", pady=(4, 2))
         ttk.Label(
             hero,
-            text="Define que impresora se usa para reportes, modos operativos y etiquetado desde una sola pantalla.",
+            text="Define que impresora se usa para reportes, inventario, modos operativos y etiquetado desde una sola pantalla.",
             style="PrinterHeroSub.TLabel",
         ).pack(anchor="w")
 
@@ -102,8 +113,8 @@ class PrinterAdminDialog(tk.Toplevel):
 
         body = ttk.Frame(shell, style="PrinterShell.TFrame")
         body.grid(row=2, column=0, sticky="nsew")
-        body.columnconfigure(0, weight=1)
-        body.columnconfigure(1, weight=1)
+        body.columnconfigure(0, weight=4)
+        body.columnconfigure(1, weight=5)
         body.rowconfigure(0, weight=1)
 
         left = ttk.LabelFrame(body, text="Impresoras detectadas", padding=10, style="PrinterSection.TLabelframe")
@@ -116,7 +127,7 @@ class PrinterAdminDialog(tk.Toplevel):
             left,
             text="Estas son las impresoras detectadas en el equipo. Puedes usarlas como referencia al configurar cada destino.",
             style="PrinterHint.TLabel",
-            wraplength=320,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(0, 8))
 
@@ -141,18 +152,19 @@ class PrinterAdminDialog(tk.Toplevel):
 
         ttk.Label(
             right,
-            text="Cada modo puede heredar la impresora general o usar una distinta cuando la operación lo requiera.",
+            text="Cada area puede heredar la impresora general o usar una distinta cuando la operacion lo requiera.",
             style="PrinterHint.TLabel",
-            wraplength=320,
+            wraplength=500,
             justify="left",
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
         assignments = [
             ("Reportes (general):", "Se usa como impresora principal de respaldo.", self.report_var),
+            ("Inventario:", "Destino para informes de inventario por codigo, bodega o ubicacion.", self.inventory_var),
             ("Listados:", "Destino para documentos generales del modo listados.", self.listados_var),
-            ("FedEx:", "Destino de impresión para salidas operativas FedEx.", self.fedex_var),
-            ("Urbano:", "Destino de impresión para planillas y cierres Urbano.", self.urbano_var),
-            ("Etiquetadora:", "Impresora dedicada a etiquetas y códigos.", self.label_var),
+            ("FedEx:", "Destino de impresion para salidas operativas FedEx.", self.fedex_var),
+            ("Urbano:", "Destino de impresion para planillas y cierres Urbano.", self.urbano_var),
+            ("Etiquetadora:", "Impresora dedicada a etiquetas y codigos.", self.label_var),
         ]
 
         for idx, (label, hint, var) in enumerate(assignments):
@@ -161,7 +173,7 @@ class PrinterAdminDialog(tk.Toplevel):
             card = tk.Frame(block, bg="#FFFFFF", highlightthickness=1, highlightbackground="#D8E4EF")
             card.pack(fill="x")
             ttk.Label(card, text=label, style="PrinterBody.TLabel").pack(anchor="w", padx=10, pady=(10, 2))
-            ttk.Label(card, text=hint, style="PrinterHint.TLabel", wraplength=320, justify="left").pack(anchor="w", padx=10)
+            ttk.Label(card, text=hint, style="PrinterHint.TLabel", wraplength=500, justify="left").pack(anchor="w", padx=10)
             combo = ttk.Combobox(card, textvariable=var, state="readonly", font=("Segoe UI", 10))
             combo.pack(fill="x", padx=10, pady=(8, 10))
             setattr(self, f"combo_{idx}", combo)
@@ -170,7 +182,7 @@ class PrinterAdminDialog(tk.Toplevel):
         footer.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         ttk.Label(
             footer,
-            text="La configuración se guarda de inmediato para los reportes, modos y etiquetadora.",
+            text="La configuracion se guarda para reportes, inventario, modos operativos y etiquetadora.",
             style="PrinterShellHint.TLabel",
         ).pack(side="left")
         ttk.Button(footer, text="Cerrar", style="PrinterSecondary.TButton", command=self.destroy).pack(side="right")
@@ -186,6 +198,7 @@ class PrinterAdminDialog(tk.Toplevel):
             or cfg.get("paths", {}).get("default_printer", "")
         )
         self.report_var.set(str(report or ""))
+        self.inventory_var.set(str(mode_printers.get("inventario", report or "")))
         self.listados_var.set(str(mode_printers.get("listados", report or "")))
         self.fedex_var.set(str(mode_printers.get("fedex", report or "")))
         self.urbano_var.set(str(mode_printers.get("urbano", report or "")))
@@ -208,7 +221,7 @@ class PrinterAdminDialog(tk.Toplevel):
             self.listbox.insert(tk.END, p)
 
         values = printers
-        for i in range(5):
+        for i in range(6):
             combo = getattr(self, f"combo_{i}")
             combo["values"] = values
 
@@ -219,16 +232,17 @@ class PrinterAdminDialog(tk.Toplevel):
 
     def _save(self) -> None:
         report = self.report_var.get().strip()
+        inventory = self.inventory_var.get().strip() or report
         listados = self.listados_var.get().strip() or report
         fedex = self.fedex_var.get().strip() or report
         urbano = self.urbano_var.get().strip() or report
         label = self.label_var.get().strip()
 
         if not report:
-            messagebox.showerror("Impresoras", "Debes seleccionar una impresora para reportes.")
+            messagebox.showerror("Impresoras", "Debes seleccionar una impresora para reportes.", parent=self)
             return
         if not label:
-            messagebox.showerror("Impresoras", "Debes seleccionar una impresora etiquetadora.")
+            messagebox.showerror("Impresoras", "Debes seleccionar una impresora etiquetadora.", parent=self)
             return
 
         cfg = load_config() or {}
@@ -236,6 +250,7 @@ class PrinterAdminDialog(tk.Toplevel):
         cfg["paper_printer_name"] = report
         cfg["default_printer"] = report
         cfg["mode_printers"] = {
+            "inventario": inventory,
             "listados": listados,
             "fedex": fedex,
             "urbano": urbano,
@@ -246,7 +261,7 @@ class PrinterAdminDialog(tk.Toplevel):
         cfg["paths"]["default_printer"] = report
 
         if not save_config(cfg):
-            messagebox.showerror("Impresoras", "No se pudo guardar la configuracion.")
+            messagebox.showerror("Impresoras", "No se pudo guardar la configuracion.", parent=self)
             return
 
         label_cfg = cargar_config_etiquetas() or {}
@@ -257,5 +272,5 @@ class PrinterAdminDialog(tk.Toplevel):
         except Exception:
             pass
 
-        messagebox.showinfo("Impresoras", "Configuracion de impresoras guardada.")
+        messagebox.showinfo("Impresoras", "Configuracion de impresoras guardada.", parent=self)
         self.destroy()

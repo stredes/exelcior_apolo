@@ -6,6 +6,8 @@ from __future__ import annotations
 import os
 import platform
 import subprocess
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -14,7 +16,22 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
 
+from app.core.impression_tools import enviar_a_impresora_configurable
 from app.core.logger_eventos import log_evento
+
+
+def _cleanup_temp_file_later(file_path: Path, delay_seconds: int = 180):
+    def _cleanup():
+        time.sleep(delay_seconds)
+        try:
+            file_path.unlink(missing_ok=True)
+        except Exception as cleanup_error:
+            log_evento(
+                f"No se pudo eliminar temporal de inventario por codigo: {cleanup_error}",
+                "warning",
+            )
+
+    threading.Thread(target=_cleanup, daemon=True).start()
 
 
 def print_inventario_codigo(file_path=None, config=None, df: pd.DataFrame = None):
@@ -83,7 +100,7 @@ def print_inventario_codigo(file_path=None, config=None, df: pd.DataFrame = None
             sheet.print_options.horizontalCentered = True
 
         log_evento(f"Archivo temporal generado para impresion por codigo: {temp_path}", "info")
-        _enviar_a_impresora(temp_path)
+        _enviar_a_impresora(temp_path, config=config)
         log_evento("Impresion de inventario por codigo completada correctamente.", "info")
 
     except Exception as e:
@@ -91,21 +108,18 @@ def print_inventario_codigo(file_path=None, config=None, df: pd.DataFrame = None
         raise RuntimeError(f"Error al imprimir inventario por codigo: {e}")
     finally:
         if temp_path is not None:
-            try:
-                temp_path.unlink(missing_ok=True)
-            except Exception as cleanup_error:
-                log_evento(f"No se pudo eliminar temporal de inventario por codigo: {cleanup_error}", "warning")
+            _cleanup_temp_file_later(temp_path)
 
 
-def _enviar_a_impresora(file_path: Path):
+def _enviar_a_impresora(file_path: Path, config=None):
     sistema = platform.system()
     try:
         if sistema == "Windows":
-            os.startfile(str(file_path), "print")
+            enviar_a_impresora_configurable(file_path, config=config, default_timeout_s=120)
         elif sistema == "Linux":
-            subprocess.run(["libreoffice", "--headless", "--pt", "Default", str(file_path)], check=True)
+            enviar_a_impresora_configurable(file_path, config=config, default_timeout_s=120)
         elif sistema == "Darwin":
-            subprocess.run(["lp", str(file_path)], check=True)
+            enviar_a_impresora_configurable(file_path, config=config, default_timeout_s=120)
         else:
             raise OSError("Sistema operativo no compatible para impresion automatica.")
     except Exception as e:
