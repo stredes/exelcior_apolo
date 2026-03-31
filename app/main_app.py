@@ -44,6 +44,7 @@ from app.updater import (
     fetch_latest_release,
     get_local_version,
     get_update_startup_notice,
+    is_installed_in_program_files,
     is_newer_version,
     launch_installer,
     launch_portable_update,
@@ -623,6 +624,12 @@ class ExcelPrinterApp(tk.Tk):
         current_version = get_local_version()
         asset_kind = release_info.get("asset_kind", "setup")
         asset_label = "instalador oficial" if asset_kind == "setup" else "paquete portable"
+        admin_note = ""
+        if asset_kind == "setup" and is_installed_in_program_files():
+            admin_note = (
+                "\n\nEsta instalacion esta en Program Files, por lo que Windows pedira permisos "
+                "de administrador para completar la actualizacion."
+            )
         wants_update = messagebox.askyesno(
             "Actualizacion disponible",
             (
@@ -630,6 +637,7 @@ class ExcelPrinterApp(tk.Tk):
                 f"Version actual: {current_version}\n"
                 f"Ultima version: {release_info['version']}\n\n"
                 f"Se descargara el {asset_label} desde GitHub Releases."
+                f"{admin_note}"
             ),
             parent=self,
         )
@@ -660,7 +668,10 @@ class ExcelPrinterApp(tk.Tk):
                 )
             else:
                 launch_installer(installer_path)
-            self._update_status("Instalador lanzado. Cerrando aplicacion...")
+            if is_installed_in_program_files():
+                self._update_status("Instalador lanzado con elevacion. Acepta el aviso de Windows para continuar.")
+            else:
+                self._update_status("Instalador lanzado. Cerrando aplicacion...")
             self.after(500, self._on_close)
         except Exception as exc:
             self._handle_update_error(exc)

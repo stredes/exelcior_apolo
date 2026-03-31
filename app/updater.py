@@ -67,6 +67,13 @@ def should_prefer_portable_asset() -> bool:
     return True
 
 
+def is_installed_in_program_files() -> bool:
+    if not getattr(sys, "frozen", False):
+        return False
+    exe_path = _get_runtime_exe_path()
+    return _is_program_files_path(exe_path.parent)
+
+
 def get_update_runtime_dir() -> Path:
     path = Path(tempfile.gettempdir()) / UPDATE_RUNTIME_DIRNAME
     path.mkdir(parents=True, exist_ok=True)
@@ -354,10 +361,21 @@ def launch_installer(installer_path: Path) -> None:
         raise FileNotFoundError(f"No se encontro el instalador descargado: {installer_path}")
 
     if sys.platform.startswith("win"):
-        subprocess.Popen(
-            [str(installer_path), "/SP-", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS"],
-            close_fds=True,
-        )
+        args = ["/SP-", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS"]
+        if is_installed_in_program_files():
+            ps_command = (
+                "Start-Process -FilePath $args[0] -ArgumentList $args[1..($args.Length-1)] "
+                "-Verb RunAs"
+            )
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-Command", ps_command, str(installer_path), *args],
+                close_fds=True,
+            )
+        else:
+            subprocess.Popen(
+                [str(installer_path), *args],
+                close_fds=True,
+            )
         return
 
     raise RuntimeError("La instalacion automatica solo esta soportada en Windows.")
