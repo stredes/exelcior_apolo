@@ -522,13 +522,33 @@ class ExcelPrinterApp(tk.Tk):
             tk.Label(visual_panel, text=f"[Error cargando logo: {e}]", bg="#FFFFFF", fg="#c00").pack(pady=18)
 
         ttk.Label(visual_panel, text="Recorrido recomendado", style="PanelTitle.TLabel").pack(anchor="w", padx=24, pady=(8, 4))
-        for step in (
-            "1. Selecciona el canal operativo correcto para la carga",
-            "2. Carga manual o automática del Excel",
-            "3. Revisa la vista previa y valida impresoras antes de emitir",
-            "4. Publica releases y replica cambios a todos los puestos",
-        ):
-            tk.Label(visual_panel, text=step, bg="#FFFFFF", fg="#51606F", font=("Segoe UI", 10)).pack(anchor="w", padx=24, pady=4)
+        steps_shell = tk.Frame(visual_panel, bg="#FFFFFF")
+        steps_shell.pack(fill="x", padx=20, pady=(4, 8))
+        steps_canvas = tk.Canvas(steps_shell, bg="#FFFFFF", bd=0, highlightthickness=0, height=290)
+        steps_scroll = ttk.Scrollbar(steps_shell, orient="vertical", command=steps_canvas.yview)
+        steps_frame = tk.Frame(steps_canvas, bg="#FFFFFF")
+        steps_window = steps_canvas.create_window((0, 0), window=steps_frame, anchor="nw")
+        steps_canvas.configure(yscrollcommand=steps_scroll.set)
+
+        def _sync_recommended_steps(_event=None):
+            try:
+                steps_canvas.configure(scrollregion=steps_canvas.bbox("all"))
+                steps_canvas.itemconfigure(steps_window, width=steps_canvas.winfo_width())
+            except Exception:
+                pass
+
+        steps_frame.bind("<Configure>", _sync_recommended_steps)
+        steps_canvas.bind("<Configure>", _sync_recommended_steps)
+        steps_canvas.pack(side="left", fill="x", expand=True)
+        steps_scroll.pack(side="right", fill="y")
+        recommended_steps = (
+            ("01", "Elige el modo correcto", "Listados, FedEx, Urbano, Inventario o Vale de Consumo segun la operacion."),
+            ("02", "Carga el archivo", "Abre el Excel manualmente o usa la carga automatica si ya esta disponible."),
+            ("03", "Valida antes de emitir", "Revisa la vista previa y confirma impresoras, filtros y destino de salida."),
+            ("04", "Imprime y cierra", "Emite los documentos, registra el cierre del dia y luego actualiza si corresponde."),
+        )
+        for step_no, title, detail in recommended_steps:
+            self._build_recommended_step(steps_frame, step_no, title, detail).pack(fill="x", pady=6)
 
         ttk.Label(side_panel, text="Salud operativa", style="PanelTitle.TLabel").pack(anchor="w", padx=20, pady=(22, 10))
         self._build_info_row(side_panel, "Canal de actualizacion", self.update_badge_var).pack(fill="x", padx=20, pady=6)
@@ -562,6 +582,39 @@ class ExcelPrinterApp(tk.Tk):
         tk.Label(row, text=title, bg="#F8FBFD", fg="#34495E", font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=12, pady=(10, 2))
         tk.Label(row, textvariable=value_var, bg="#F8FBFD", fg="#637381", font=("Segoe UI", 9), wraplength=260, justify="left").pack(anchor="w", padx=12, pady=(0, 10))
         return row
+
+    def _build_recommended_step(self, parent, step_no: str, title: str, detail: str):
+        card = tk.Frame(parent, bg="#F8FBFD", bd=0, highlightthickness=1, highlightbackground="#E2E8F0")
+        badge = tk.Frame(card, bg="#17324A", width=46, height=46)
+        badge.pack(side="left", padx=(12, 10), pady=12)
+        badge.pack_propagate(False)
+        tk.Label(
+            badge,
+            text=step_no,
+            bg="#17324A",
+            fg="#FFFFFF",
+            font=("Segoe UI Semibold", 11),
+        ).pack(expand=True)
+
+        body = tk.Frame(card, bg="#F8FBFD")
+        body.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=10)
+        tk.Label(
+            body,
+            text=title,
+            bg="#F8FBFD",
+            fg="#17324A",
+            font=("Segoe UI Semibold", 10),
+        ).pack(anchor="w")
+        tk.Label(
+            body,
+            text=detail,
+            bg="#F8FBFD",
+            fg="#5D6B7A",
+            font=("Segoe UI", 9),
+            wraplength=320,
+            justify="left",
+        ).pack(anchor="w", pady=(3, 0))
+        return card
 
     def _refresh_mode_buttons(self):
         active_mode = self.mode_var.get().strip().lower()

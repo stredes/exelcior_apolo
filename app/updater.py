@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import hashlib
+import ctypes
 import subprocess
 import sys
 import tempfile
@@ -72,6 +73,41 @@ def is_installed_in_program_files() -> bool:
         return False
     exe_path = _get_runtime_exe_path()
     return _is_program_files_path(exe_path.parent)
+
+
+def _windows_quote_arg(value: str) -> str:
+    text = str(value or "")
+    if not text:
+        return '""'
+    if not any(ch in text for ch in ' \t"'):
+        return text
+    return '"' + text.replace('"', '\\"') + '"'
+
+
+def _launch_windows_installer_elevated(installer_path: Path, args: list[str]) -> None:
+    parameters = " ".join(_windows_quote_arg(arg) for arg in args)
+    result = ctypes.windll.shell32.ShellExecuteW(
+        None,
+        "runas",
+        str(installer_path),
+        parameters,
+        str(installer_path.parent),
+        1,
+    )
+    if result <= 32:
+        error_map = {
+            2: "No se encontro el archivo del instalador.",
+            3: "No se encontro la ruta del instalador.",
+            5: "Windows denego el acceso al instalador.",
+            27: "La asociacion del archivo no es valida.",
+            31: "No hay una aplicacion asociada para ejecutar el instalador.",
+            1223: "La elevacion fue cancelada por el usuario.",
+        }
+        detail = error_map.get(int(result), f"Codigo de ShellExecuteW: {int(result)}")
+        raise RuntimeError(
+            "No se pudo iniciar la actualizacion con permisos de administrador. "
+            f"{detail}"
+        )
 
 
 def get_update_runtime_dir() -> Path:
@@ -363,14 +399,7 @@ def launch_installer(installer_path: Path) -> None:
     if sys.platform.startswith("win"):
         args = ["/SP-", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS"]
         if is_installed_in_program_files():
-            ps_command = (
-                "Start-Process -FilePath $args[0] -ArgumentList $args[1..($args.Length-1)] "
-                "-Verb RunAs"
-            )
-            subprocess.Popen(
-                ["powershell", "-NoProfile", "-Command", ps_command, str(installer_path), *args],
-                close_fds=True,
-            )
+            _launch_windows_installer_elevated(installer_path, args)
         else:
             subprocess.Popen(
                 [str(installer_path), *args],
