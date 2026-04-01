@@ -1,5 +1,5 @@
 ﻿#define AppName "Exelcior Apolo"
-#define AppVersion "1.4.1"
+#define AppVersion "1.0.26"
 #define AppPublisher "AMILAB / Exelcior"
 #define AppExeName "ExelciorApolo.exe"
 
@@ -11,8 +11,8 @@ AppPublisher={#AppPublisher}
 DefaultDirName={pf}\{#AppName}
 DefaultGroupName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
-LicenseFile=installer\LICENSE.txt
-OutputDir=installer\output
+LicenseFile=LICENSE.txt
+OutputDir=output
 OutputBaseFilename=ExelciorApolo_{#AppVersion}_Setup
 Compression=lzma2
 SolidCompression=yes
@@ -26,7 +26,7 @@ CloseApplicationsFilter=*.exe
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
-Source: "dist\ExelciorApolo\*"; DestDir: "{app}"; Flags: recursesubdirs
+Source: "..\dist\ExelciorApolo\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -37,6 +37,20 @@ Name: "desktopicon"; Description: "Crear acceso directo en el Escritorio"; Group
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Flags: nowait postinstall skipifsilent
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

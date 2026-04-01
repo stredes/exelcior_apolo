@@ -350,11 +350,28 @@ def parse_release_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
             portable_asset = {"name": name, "url": url}
 
     prefer_portable = should_prefer_portable_asset()
-    selected_asset = portable_asset if prefer_portable and portable_asset else (setup_asset or portable_asset)
-    if not selected_asset:
-        return None
-
-    selected_kind = "portable_zip" if selected_asset == portable_asset else "setup"
+    requires_setup = is_installed_in_program_files()
+    if requires_setup:
+        if not setup_asset:
+            return {
+                "version": version,
+                "tag_name": tag_name,
+                "asset_name": "",
+                "asset_url": "",
+                "asset_kind": "setup_missing",
+                "checksum_name": str((checksum_asset or {}).get("name") or ""),
+                "checksum_url": str((checksum_asset or {}).get("url") or ""),
+                "html_url": str(payload.get("html_url") or ""),
+                "published_at": str(payload.get("published_at") or ""),
+                "body": str(payload.get("body") or ""),
+            }
+        selected_asset = setup_asset
+        selected_kind = "setup"
+    else:
+        selected_asset = portable_asset if prefer_portable and portable_asset else (setup_asset or portable_asset)
+        if not selected_asset:
+            return None
+        selected_kind = "portable_zip" if selected_asset == portable_asset else "setup"
     return {
         "version": version,
         "tag_name": tag_name,

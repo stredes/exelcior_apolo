@@ -676,6 +676,18 @@ class ExcelPrinterApp(tk.Tk):
             return
         current_version = get_local_version()
         asset_kind = release_info.get("asset_kind", "setup")
+        if asset_kind == "setup_missing":
+            self.safe_messagebox(
+                "error",
+                "Actualizacion",
+                (
+                    "La release disponible no incluye el instalador requerido para instalaciones "
+                    "en Program Files.\n\nPublica una release que incluya el archivo Setup.exe "
+                    "y vuelve a intentarlo."
+                ),
+            )
+            self._update_status("Release incompatible: falta instalador Setup para Program Files.")
+            return
         asset_label = "instalador oficial" if asset_kind == "setup" else "paquete portable"
         admin_note = ""
         if asset_kind == "setup" and is_installed_in_program_files():

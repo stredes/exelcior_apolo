@@ -217,9 +217,9 @@ function Get-NextPatchVersion([string]$baseVersion){
 function Update-IssVersionDefines([string]$issPath, [string]$version, [string]$appName, [string]$exeName){
   Assert-File $issPath "Falta script de Inno Setup."
   $content = Get-Content -LiteralPath $issPath -Raw -Encoding UTF8
-  $content = [regex]::Replace($content, '(?m)^#define AppName ".*"$', ('#define AppName "{0}"' -f $appName))
-  $content = [regex]::Replace($content, '(?m)^#define AppVersion ".*"$', ('#define AppVersion "{0}"' -f $version))
-  $content = [regex]::Replace($content, '(?m)^#define AppExeName ".*"$', ('#define AppExeName "{0}"' -f $exeName))
+  $content = [regex]::Replace($content, '(?m)^#define AppName ".*"\r?$', ('#define AppName "{0}"' -f $appName))
+  $content = [regex]::Replace($content, '(?m)^#define AppVersion ".*"\r?$', ('#define AppVersion "{0}"' -f $version))
+  $content = [regex]::Replace($content, '(?m)^#define AppExeName ".*"\r?$', ('#define AppExeName "{0}"' -f $exeName))
   Set-Content -LiteralPath $issPath -Value $content -Encoding UTF8
 }
 
@@ -593,6 +593,24 @@ $Signtool = Get-CommandPath "signtool"
 if (-not $Signtool) { Write-Warn "signtool.exe no estÃ¡ en PATH. La firma se omitirÃ¡ si no se configura." }
 
 if (-not (Test-Path -LiteralPath $IsccPath)) {
+  $isccCandidates = @()
+  $programFilesX86 = [Environment]::GetEnvironmentVariable("ProgramFiles(x86)")
+  foreach ($candidate in @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 5\ISCC.exe"),
+    (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
+    ($(if ($programFilesX86) { Join-Path $programFilesX86 "Inno Setup 6\ISCC.exe" } else { $null }))
+  )) {
+    if ($candidate -and (Test-Path -LiteralPath $candidate)) {
+      $isccCandidates += [string]$candidate
+    }
+  }
+  if ($isccCandidates.Count -gt 0) {
+    $IsccPath = $isccCandidates[0]
+    Write-Info "Usando ISCC detectado localmente: $IsccPath"
+  }
+}
+if (-not (Test-Path -LiteralPath $IsccPath)) {
   $isccTry = Get-CommandPath "iscc"
   if ($isccTry) {
     $IsccPath = $isccTry
@@ -673,8 +691,8 @@ AppPublisher={#AppPublisher}
 DefaultDirName={pf}\{#AppName}
 DefaultGroupName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
-LicenseFile=installer\LICENSE.txt
-OutputDir=installer\output
+LicenseFile=LICENSE.txt
+OutputDir=output
 OutputBaseFilename=ExelciorApolo_{#AppVersion}_Setup
 Compression=lzma2
 SolidCompression=yes
@@ -688,7 +706,7 @@ CloseApplicationsFilter=*.exe
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
-Source: "dist\ExelciorApolo\*"; DestDir: "{app}"; Flags: recursesubdirs
+Source: "..\dist\ExelciorApolo\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -702,6 +720,19 @@ Filename: "{app}\{#AppExeName}"; Flags: nowait postinstall skipifsilent
 "@
 }
 
+function Repair-IssPaths([string]$issPath){
+  if (-not (Test-Path -LiteralPath $issPath)) { return }
+  $content = Get-Content -LiteralPath $issPath -Raw -Encoding UTF8
+  $updated = $content
+  $updated = $updated -replace '(?m)^LicenseFile\s*=.*$', 'LicenseFile=LICENSE.txt'
+  $updated = $updated -replace '(?m)^OutputDir\s*=.*$', 'OutputDir=output'
+  $updated = $updated -replace '(?m)^Source:\s*"dist\\ExelciorApolo\\\*";', 'Source: "..\dist\ExelciorApolo\*";'
+  if ($updated -ne $content) {
+    $updated | Out-File -LiteralPath $issPath -Encoding UTF8 -Force
+    Write-Info "Rutas del script Inno Setup normalizadas: $issPath"
+  }
+}
+
 if ($CreateIssIfMissing -or -not (Test-Path -LiteralPath $InnoScript)) {
   Write-Info "Generando script Inno Setup: $InnoScript"
   (New-IssContent) | Out-File -LiteralPath $InnoScript -Encoding UTF8 -Force
@@ -712,6 +743,7 @@ if ($CreateIssIfMissing -or -not (Test-Path -LiteralPath $InnoScript)) {
 }
 Assert-File $InnoScript "Falta el script de Inno Setup. Ejecuta con -CreateIssIfMissing para crearlo."
 Update-IssVersionDefines -issPath $InnoScript -version $Version -appName $AppName -exeName $ExeName
+Repair-IssPaths -issPath $InnoScript
 $lic = "installer\LICENSE.txt"
 Assert-File $lic "Falta installer\LICENSE.txt (requerido por el script .iss)."
 
@@ -957,6 +989,10 @@ $hashLines | Out-File -LiteralPath $hashFile -Encoding ascii -Force
 
 $publishedRelease = $null
 if (-not $SkipGitHubPublish) {
+  if (-not ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName))) {
+    throw "No se publicara la release porque falta el instalador Setup.exe. Genera el instalador antes de publicar."
+  }
+
   if (-not $SkipAutoCommit) {
     Save-ReleaseCommit -version $Version -remoteName $GitRemote
   } elseif (-not $AllowDirtyWorktree) {
@@ -994,11 +1030,7 @@ if (-not $SkipGitHubPublish) {
     -isDraft ([bool]$DraftRelease) `
     -isPrerelease ([bool]$Prerelease)
 
-  if ($CanBuildInstaller -and $setupName -and (Test-Path -LiteralPath $setupName)) {
-    Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $setupName
-  } else {
-    Write-Warn "No hay instalador para subir al release."
-  }
+  Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $setupName
   if (Test-Path -LiteralPath $portableZip) {
     Send-ReleaseAsset -repo $repoValue -token $tokenValue -release $publishedRelease -filePath $portableZip
   }
