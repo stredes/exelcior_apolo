@@ -129,6 +129,7 @@ class InventarioView(tk.Toplevel):
         self.sort_ascending = True
         self.ubicaciones_disponibles = []
         self.ubicaciones_seleccionadas = set()
+        self.ubicaciones_principales_seleccionadas = set()
         self.bodegas_disponibles = []
         self.selected_row_ids = set()
         self._ubic_popup = None
@@ -136,6 +137,7 @@ class InventarioView(tk.Toplevel):
         self.status_var = tk.StringVar(value="Carga un archivo de inventario para comenzar.")
         self.summary_var = tk.StringVar(value="Registros: 0")
         self.ubicaciones_var = tk.StringVar(value="Ubicaciones: todas")
+        self.ubicaciones_principales_var = tk.StringVar(value="Ubicaciones: todas")
         self.printer_info_var = tk.StringVar(value="Impresora inventario: sin configurar")
         self.bodega_var = tk.StringVar(value="Todas")
         self.stock_cero_var = tk.BooleanVar(value=False)
@@ -183,58 +185,92 @@ class InventarioView(tk.Toplevel):
         style.configure("InvLabel.TLabel", font=("Segoe UI", 10), background="#FFFFFF", foreground="#263754")
         style.configure("InvHint.TLabel", font=("Segoe UI", 9), background="#FFFFFF", foreground="#5B6C89")
         style.configure("InvStatus.TLabel", font=("Segoe UI", 10), background="#0F172A", foreground="#E2E8F0", padding=8)
-        style.configure("Treeview", rowheight=28, font=("Segoe UI", 10))
-        style.configure("Treeview.Heading", font=("Segoe UI Semibold", 10))
+        style.configure("Treeview", rowheight=28, font=("Segoe UI", 10), background="#FFFFFF", fieldbackground="#FFFFFF", foreground="#14213D")
+        style.configure(
+            "Treeview.Heading",
+            font=("Segoe UI Semibold", 10),
+            background="#DCE7F8",
+            foreground="#0F1F3D",
+            relief="solid",
+            borderwidth=1,
+            padding=(8, 6),
+        )
+        style.map(
+            "Treeview.Heading",
+            background=[("active", "#C8DBF4")],
+            foreground=[("active", "#0B1730")],
+        )
         style.map("Treeview", background=[("selected", "#C9D8FF")], foreground=[("selected", "#0F1F3D")])
 
         shell = ttk.Frame(self, style="InvBg.TFrame", padding=14)
         shell.pack(fill="both", expand=True)
 
         ttk.Label(shell, text="Inventario", style="InvTitle.TLabel").pack(anchor="w")
-        ttk.Label(shell, text="Busqueda por texto, codigo de producto, bodega, stock 0, ubicacion, columna y fila.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
+        ttk.Label(shell, text="Busqueda por texto, codigo de producto, bodega, ubicacion principal, fila y posicion.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
 
         top_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
         top_card.pack(fill="x")
 
-        tk.Label(top_card, text="Buscar:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
-        self.entry_busqueda = tk.Entry(top_card, width=34, font=("Segoe UI", 10))
+        filter_shell = ttk.Frame(top_card, style="Card.TFrame")
+        filter_shell.pack(fill="x")
+
+        search_block = ttk.LabelFrame(filter_shell, text="Busqueda", padding=10)
+        search_block.pack(fill="x", pady=(0, 8))
+
+        tk.Label(search_block, text="Buscar:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
+        self.entry_busqueda = tk.Entry(search_block, width=34, font=("Segoe UI", 10))
         self.entry_busqueda.grid(row=0, column=1, padx=(6, 12), sticky="w")
         self.entry_busqueda.bind("<Return>", lambda e: self._filtrar())
         self.entry_busqueda.bind("<KeyRelease>", lambda e: self._actualizar_sugerencias())
 
-        tk.Label(top_card, text="Codigo producto:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=2, sticky="w")
-        self.entry_codigo = tk.Entry(top_card, width=18, font=("Segoe UI", 10))
+        tk.Label(search_block, text="Codigo producto:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=2, sticky="w")
+        self.entry_codigo = tk.Entry(search_block, width=18, font=("Segoe UI", 10))
         self.entry_codigo.grid(row=0, column=3, padx=(6, 12), sticky="w")
         self.entry_codigo.bind("<Return>", lambda e: self._filtrar())
 
-        tk.Label(top_card, text="Bodega:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=4, sticky="w")
-        self.combo_bodega = ttk.Combobox(top_card, textvariable=self.bodega_var, state="readonly", width=18)
+        tk.Label(search_block, text="Bodega:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=4, sticky="w")
+        self.combo_bodega = ttk.Combobox(search_block, textvariable=self.bodega_var, state="readonly", width=18)
         self.combo_bodega.grid(row=0, column=5, padx=(6, 12), sticky="w")
         self.combo_bodega.bind("<<ComboboxSelected>>", lambda e: self._filtrar())
         self.combo_bodega["values"] = ["Todas"]
+        search_block.columnconfigure(6, weight=1)
 
-        tk.Label(top_card, text="Columna:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=6, sticky="w")
-        self.entry_columna = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
-        self.entry_columna.grid(row=0, column=7, padx=(6, 12), sticky="w")
-        self.entry_columna.bind("<Return>", lambda e: self._filtrar())
+        location_block = ttk.LabelFrame(filter_shell, text="Ubicacion Fisica", padding=10)
+        location_block.pack(fill="x", pady=(0, 8))
 
-        tk.Label(top_card, text="Fila:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=8, sticky="w")
-        self.entry_fila = tk.Entry(top_card, width=8, font=("Segoe UI", 10))
-        self.entry_fila.grid(row=0, column=9, padx=(6, 12), sticky="w")
-        self.entry_fila.bind("<Return>", lambda e: self._filtrar())
+        tk.Label(location_block, text="Ubicación principal:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
+        self.entry_ubicacion_selector = tk.Entry(location_block, width=12, font=("Segoe UI", 10))
+        self.entry_ubicacion_selector.grid(row=0, column=1, padx=(6, 12), sticky="w")
+        self.entry_ubicacion_selector.bind("<Return>", lambda e: self._seleccionar_por_ubicacion_principal())
 
-        ttk.Checkbutton(top_card, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=10, padx=(0, 12), sticky="w")
-        ttk.Button(top_card, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=11, padx=(0, 6))
-        ttk.Button(top_card, text="Buscar", command=self._filtrar).grid(row=0, column=12, padx=(0, 6))
-        ttk.Button(top_card, text="Limpiar", command=self._limpiar_busqueda).grid(row=0, column=13, padx=(0, 6))
-        ttk.Button(top_card, text="Seleccionar todo", command=self._toggle_select_all).grid(row=0, column=14, padx=(0, 6))
-        ttk.Button(top_card, text="Abrir Excel", command=self._recargar_archivo).grid(row=0, column=15, padx=(0, 6))
-        ttk.Button(top_card, text="Imprimir Resultado", command=self._imprimir_resultado).grid(row=0, column=16)
-        top_card.columnconfigure(17, weight=1)
+        ttk.Button(location_block, text="Aplicar ubicación", command=self._seleccionar_por_ubicacion_principal).grid(row=0, column=2, padx=(0, 12), sticky="w")
+
+        tk.Label(location_block, text="Fila:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=3, sticky="w")
+        self.entry_fila_letra = tk.Entry(location_block, width=8, font=("Segoe UI", 10))
+        self.entry_fila_letra.grid(row=0, column=4, padx=(6, 12), sticky="w")
+        self.entry_fila_letra.bind("<Return>", lambda e: self._filtrar())
+
+        tk.Label(location_block, text="Posición:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=5, sticky="w")
+        self.entry_posicion = tk.Entry(location_block, width=8, font=("Segoe UI", 10))
+        self.entry_posicion.grid(row=0, column=6, padx=(6, 12), sticky="w")
+        self.entry_posicion.bind("<Return>", lambda e: self._filtrar())
+
+        ttk.Checkbutton(location_block, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=7, padx=(0, 12), sticky="w")
+        ttk.Button(location_block, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=8, padx=(0, 6), sticky="w")
+        location_block.columnconfigure(9, weight=1)
+
+        actions_block = ttk.LabelFrame(filter_shell, text="Acciones", padding=10)
+        actions_block.pack(fill="x")
+        ttk.Button(actions_block, text="Buscar", command=self._filtrar).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Seleccionar todo", command=self._toggle_select_all).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Abrir Excel", command=self._recargar_archivo).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Imprimir Resultado", command=self._imprimir_resultado).pack(side="left")
 
         info_row = ttk.Frame(top_card, style="Card.TFrame")
-        info_row.grid(row=1, column=0, columnspan=18, sticky="ew", pady=(10, 0))
+        info_row.pack(fill="x", pady=(12, 0))
         ttk.Label(info_row, textvariable=self.summary_var, style="InvLabel.TLabel").pack(side="left")
+        ttk.Label(info_row, textvariable=self.ubicaciones_principales_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
         ttk.Label(info_row, textvariable=self.ubicaciones_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
         ttk.Label(info_row, textvariable=self.printer_info_var, style="InvLabel.TLabel").pack(side="left", padx=(16, 0))
         ttk.Label(info_row, textvariable=self.status_var, style="InvHint.TLabel").pack(side="left", padx=(16, 0))
@@ -249,18 +285,8 @@ class InventarioView(tk.Toplevel):
         tree_container.pack(fill="both", expand=True)
 
         self.tree = ttk.Treeview(tree_container, columns=TREE_COLUMNS, show="headings", height=25)
-        self.tree.heading("Sel", text="✓")
-        self.tree.column("Sel", width=48, anchor="center", stretch=False)
-        for col in VISIBLE_COLUMNS:
-            self.tree.heading(col, text=col, command=lambda c=col: self._sort_by_column(c))
-            width = 140
-            if col in ("Producto",):
-                width = 280
-            elif col in ("Bodega", "Ubicación"):
-                width = 160
-            elif col in ("Fecha Vencimiento", "Saldo Stock"):
-                width = 130
-            self.tree.column(col, width=width, anchor="center")
+        self.tree["displaycolumns"] = TREE_COLUMNS
+        self._configure_tree_columns()
 
         yscroll = ttk.Scrollbar(tree_container, orient="vertical", command=self.tree.yview)
         xscroll = ttk.Scrollbar(tree_container, orient="horizontal", command=self.tree.xview)
@@ -341,10 +367,12 @@ class InventarioView(tk.Toplevel):
             self.sort_ascending = True
             self.ubicaciones_disponibles = sorted(df["Ubicación"].dropna().astype(str).str.strip().unique().tolist())
             self.ubicaciones_seleccionadas = set()
+            self.ubicaciones_principales_seleccionadas = set()
             self.bodegas_disponibles = sorted(df["Bodega"].dropna().astype(str).str.strip().unique().tolist())
             self.combo_bodega["values"] = ["Todas"] + self.bodegas_disponibles
             self.combo_bodega.current(0)
             self.selected_row_ids = set()
+            self._actualizar_label_ubicaciones_principales()
             self._actualizar_label_ubicaciones()
             self._actualizar_info_impresora(load_config() or {})
             self._archivo_actual = path.name
@@ -366,10 +394,12 @@ class InventarioView(tk.Toplevel):
             self.sort_ascending = True
             self.ubicaciones_disponibles = []
             self.ubicaciones_seleccionadas = set()
+            self.ubicaciones_principales_seleccionadas = set()
             self.bodegas_disponibles = []
             self.combo_bodega["values"] = ["Todas"]
             self.bodega_var.set("Todas")
             self.selected_row_ids = set()
+            self._actualizar_label_ubicaciones_principales()
             self._actualizar_label_ubicaciones()
             self._actualizar_info_impresora(load_config() or {})
             self._archivo_actual = ""
@@ -385,15 +415,17 @@ class InventarioView(tk.Toplevel):
 
     def _filtrar(self):
         term_raw = self.entry_busqueda.get()
-        termino = self._norm_text(term_raw)
         codigo_producto = self._norm_text(self.entry_codigo.get())
+        ubicaciones_principales = self._parse_selector_tokens(self.entry_ubicacion_selector.get())
+        self.ubicaciones_principales_seleccionadas = set(ubicaciones_principales)
+        self._actualizar_label_ubicaciones_principales()
         bodega = self._norm_text(self.bodega_var.get())
-        columna = self._norm_text(self.entry_columna.get())
-        fila = self._norm_text(self.entry_fila.get())
+        fila_letra = self._norm_text(self.entry_fila_letra.get())
+        posicion = self._norm_text(self.entry_posicion.get())
         solo_stock_cero = bool(self.stock_cero_var.get())
 
-        if not termino and not codigo_producto and not columna and not fila and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
-            self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, bodega, stock 0, columna/fila o seleccione ubicaciones.")
+        if not term_raw.strip() and not codigo_producto and not ubicaciones_principales and not fila_letra and not posicion and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
+            self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, ubicacion principal, fila, posicion, bodega, stock 0 o seleccione ubicaciones.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -406,6 +438,9 @@ class InventarioView(tk.Toplevel):
         m_cod = df["Código"].astype(str).map(self._norm_text)
         m_prod = df["Producto"].astype(str).map(self._norm_text)
         m_bodega = df["Bodega"].astype(str).map(self._norm_text)
+        m_ubicacion_principal = df["Ubicación"].astype(str).map(self._extract_main_row)
+        m_fila_letra = df["Ubicación"].astype(str).map(self._extract_letter_row)
+        m_posicion = df["Ubicación"].astype(str).map(self._extract_position)
 
         if terminos:
             mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos))
@@ -418,27 +453,21 @@ class InventarioView(tk.Toplevel):
             mask_prod = pd.Series([False] * len(df), index=df.index)
             mask_texto = pd.Series([True] * len(df), index=df.index)
 
-        mask_col = pd.Series([True] * len(df), index=df.index)
-        if columna:
-            token_col = columna.lower()
-            mask_col = m_ubi.apply(
-                lambda val: (
-                    f"-{token_col}" in val
-                    or f" {token_col}" in val
-                    or val.startswith(token_col)
-                )
-            )
+        mask_fila_letra = pd.Series([True] * len(df), index=df.index)
+        if fila_letra:
+            mask_fila_letra = m_fila_letra == fila_letra
 
-        mask_fila = pd.Series([True] * len(df), index=df.index)
-        if fila:
-            token_fila = fila.strip()
-            mask_fila = m_ubi.apply(
-                lambda val: any(token_fila == frag[-1] for frag in val.split("-") if frag and frag[-1].isdigit())
-            )
+        mask_posicion = pd.Series([True] * len(df), index=df.index)
+        if posicion:
+            mask_posicion = m_posicion == posicion
 
         mask_codigo_directo = pd.Series([True] * len(df), index=df.index)
         if codigo_producto:
             mask_codigo_directo = m_cod.apply(lambda val: codigo_producto in val)
+
+        mask_ubicacion_principal = pd.Series([True] * len(df), index=df.index)
+        if ubicaciones_principales:
+            mask_ubicacion_principal = m_ubicacion_principal.isin(ubicaciones_principales)
 
         mask_bodega = pd.Series([True] * len(df), index=df.index)
         if bodega and bodega != "todas":
@@ -454,13 +483,13 @@ class InventarioView(tk.Toplevel):
             sel_norm = {self._norm_text(v) for v in self.ubicaciones_seleccionadas}
             mask_sel_ubic = m_ubi.isin(sel_norm)
 
-        mask_total = mask_texto & mask_codigo_directo & mask_bodega & mask_stock_cero & mask_col & mask_fila & mask_sel_ubic
+        mask_total = mask_texto & mask_codigo_directo & mask_ubicacion_principal & mask_bodega & mask_stock_cero & mask_fila_letra & mask_posicion & mask_sel_ubic
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
             if codigo_producto:
                 self.tipo_busqueda = "codigo"
-            elif self.ubicaciones_seleccionadas or bodega not in ("", "todas") or solo_stock_cero or columna or fila or mask_ubi.any():
+            elif self.ubicaciones_seleccionadas or ubicaciones_principales or bodega not in ("", "todas") or solo_stock_cero or fila_letra or posicion or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
@@ -468,7 +497,12 @@ class InventarioView(tk.Toplevel):
                 self.tipo_busqueda = "producto"
             else:
                 self.tipo_busqueda = None
-            self.status_var.set(f"Filtro aplicado. Resultados: {len(self.df_filtrado)}")
+            if ubicaciones_principales:
+                self.status_var.set(
+                    f"Ubicaciones {', '.join(sorted(ubicaciones_principales))}: {len(self.df_filtrado)} productos en {self.df_filtrado['Ubicación'].nunique()} posiciones."
+                )
+            else:
+                self.status_var.set(f"Filtro aplicado. Resultados: {len(self.df_filtrado)}")
         else:
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
@@ -481,14 +515,17 @@ class InventarioView(tk.Toplevel):
     def _limpiar_busqueda(self):
         self.entry_busqueda.delete(0, "end")
         self.entry_codigo.delete(0, "end")
+        self.entry_ubicacion_selector.delete(0, "end")
         self.bodega_var.set("Todas")
         self.stock_cero_var.set(False)
-        self.entry_columna.delete(0, "end")
-        self.entry_fila.delete(0, "end")
+        self.entry_fila_letra.delete(0, "end")
+        self.entry_posicion.delete(0, "end")
         self.df_filtrado = pd.DataFrame()
         self.tipo_busqueda = None
+        self.ubicaciones_principales_seleccionadas = set()
         self.ubicaciones_seleccionadas = set()
         self.selected_row_ids = set()
+        self._actualizar_label_ubicaciones_principales()
         self._actualizar_label_ubicaciones()
         self.sugerencias_var.set("")
         self.status_var.set("Filtros limpiados.")
@@ -566,6 +603,21 @@ class InventarioView(tk.Toplevel):
         origen = self._archivo_actual or "sin archivo"
         self.summary_var.set(f"Registros: {len(df)} | Fuente: {origen}")
 
+    def _configure_tree_columns(self):
+        self.tree.heading("Sel", text="Sel", anchor="center")
+        self.tree.column("Sel", width=52, minwidth=52, anchor="center", stretch=False)
+        for col in VISIBLE_COLUMNS:
+            self.tree.heading(col, text=col, anchor="center", command=lambda c=col: self._sort_by_column(c))
+            width = 140
+            if col == "Producto":
+                width = 280
+            elif col in ("Bodega", "Ubicación"):
+                width = 160
+            elif col in ("Fecha Vencimiento", "Saldo Stock"):
+                width = 130
+            self.tree.column(col, width=width, minwidth=110, anchor="center", stretch=True)
+        self._update_heading_texts()
+
     def _autoajustar_columna_producto(self, df: pd.DataFrame | None = None):
         try:
             font = tkfont.nametofont(str(self.tree.cget("font")))
@@ -621,11 +673,12 @@ class InventarioView(tk.Toplevel):
             return "break"
 
     def _update_heading_texts(self):
+        self.tree.heading("Sel", text="Sel", anchor="center")
         for col in VISIBLE_COLUMNS:
             arrow = ""
             if self.sort_column == col:
                 arrow = " ▲" if self.sort_ascending else " ▼"
-            self.tree.heading(col, text=f"{col}{arrow}", command=lambda c=col: self._sort_by_column(c))
+            self.tree.heading(col, text=f"{col}{arrow}", anchor="center", command=lambda c=col: self._sort_by_column(c))
 
     # ------------------------------ Print -------------------------------
 
@@ -676,6 +729,86 @@ class InventarioView(tk.Toplevel):
             self.ubicaciones_var.set(f"Ubicaciones: {muestra}")
             return
         self.ubicaciones_var.set(f"Ubicaciones seleccionadas: {sel} de {total}")
+
+    def _actualizar_label_ubicaciones_principales(self):
+        if not self.ubicaciones_principales_seleccionadas:
+            self.ubicaciones_principales_var.set("Ubicaciones: todas")
+            return
+        ubicaciones = sorted(self.ubicaciones_principales_seleccionadas)
+        self.ubicaciones_principales_var.set(f"Ubicaciones: {', '.join(ubicaciones)}")
+
+    def _parse_selector_tokens(self, text: str):
+        tokens = []
+        for chunk in str(text or "").replace(";", ",").split(","):
+            token = self._norm_text(chunk)
+            if token:
+                tokens.append(token)
+        return set(tokens)
+
+    def _extract_main_row(self, ubicacion: str) -> str:
+        value = str(ubicacion or "").strip()
+        if not value:
+            return ""
+        main = value.split("-", 1)[0].strip()
+        return self._norm_text(main)
+
+    def _extract_letter_row(self, ubicacion: str) -> str:
+        value = str(ubicacion or "").strip()
+        if "-" not in value:
+            return ""
+        suffix = value.split("-", 1)[1].strip()
+        letters = "".join(ch for ch in suffix if ch.isalpha())
+        return self._norm_text(letters)
+
+    def _extract_position(self, ubicacion: str) -> str:
+        value = str(ubicacion or "").strip()
+        if "-" not in value:
+            return ""
+        suffix = value.split("-", 1)[1].strip()
+        digits = "".join(ch for ch in suffix if ch.isdigit())
+        return self._norm_text(digits)
+
+    def _seleccionar_por_ubicacion_principal(self):
+        if self.df.empty:
+            self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
+            return
+
+        ubicaciones_principales = self._parse_selector_tokens(self.entry_ubicacion_selector.get())
+        if not ubicaciones_principales:
+            self.ubicaciones_principales_seleccionadas = set()
+            self._actualizar_label_ubicaciones_principales()
+            self.status_var.set("Seleccion por ubicacion limpiada.")
+            self._filtrar()
+            return
+
+        ubicaciones_match = sorted(
+            {
+                ubicacion
+                for ubicacion in self.ubicaciones_disponibles
+                if self._extract_main_row(ubicacion) in ubicaciones_principales
+            }
+        )
+
+        if not ubicaciones_match:
+            self.safe_messagebox("info", "Seleccionar ubicación", "No se encontraron ubicaciones para la ubicación indicada.")
+            return
+
+        self.ubicaciones_principales_seleccionadas = set(ubicaciones_principales)
+        self.ubicaciones_seleccionadas = set(ubicaciones_match)
+        self.selected_row_ids = set()
+        self._actualizar_label_ubicaciones_principales()
+        self._actualizar_label_ubicaciones()
+
+        counts = (
+            self.df.assign(__ubicacion_principal=self.df["Ubicación"].map(self._extract_main_row))
+            .loc[lambda d: d["__ubicacion_principal"].isin(ubicaciones_principales)]
+            .groupby("__ubicacion_principal")
+            .size()
+            .to_dict()
+        )
+        resumen = ", ".join(f"{ubicacion}: {counts.get(ubicacion, 0)}" for ubicacion in sorted(ubicaciones_principales))
+        self.status_var.set(f"Ubicaciones aplicadas. {resumen}")
+        self._filtrar()
 
     def _abrir_selector_ubicaciones(self):
         if self.df.empty:
