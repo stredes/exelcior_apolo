@@ -26,7 +26,7 @@ def _estimate_total_piezas(df: pd.DataFrame) -> int:
     Busca columnas candidatas y suma sus valores numéricos,
     limpiando textos como '3 piezas' o '2,0'.
     """
-    candidatos = ("PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
+    candidatos = ("N° BULTOS", "PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
     for nombre in candidatos:
         if nombre in df.columns:
             serie = pd.to_numeric(df[nombre], errors="coerce")
@@ -76,7 +76,7 @@ def print_urbano(file_path, config, df: pd.DataFrame):
 
         # 2) Título
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
-        titulo = f"FIN DE DÍA URBANO - {fecha_actual}"
+        titulo = f"CNTINT - FIN DE DIA URBANO - {fecha_actual}"
 
         # 3) Excel temporal base
         tmp_path: Path = generar_excel_temporal(df_out, titulo, sheet_name="Urbano")

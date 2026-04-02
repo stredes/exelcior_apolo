@@ -189,11 +189,38 @@ def load_excel(file_path: str, config: dict, mode: str, max_rows: Optional[int] 
     start_row = get_start_row(mode, config)
     skiprows = list(range(start_row)) if start_row and start_row > 0 else None
 
-    try:
+    def _read_df(local_skiprows):
         if ext == ".csv":
-            df = pd.read_csv(path, skiprows=skiprows, nrows=max_rows)
+            return pd.read_csv(path, skiprows=local_skiprows, nrows=max_rows)
+        return pd.read_excel(path, engine=engine, skiprows=local_skiprows, nrows=max_rows)
+
+    def _looks_like_urbano(df_candidate: pd.DataFrame) -> bool:
+        colmap = _build_column_map(list(df_candidate.columns))
+        return "guia" in colmap and ("cliente" in colmap or "shipper" in colmap)
+
+    def _detect_urbano_header_row() -> Optional[int]:
+        if ext == ".csv":
+            probe = pd.read_csv(path, header=None, nrows=20)
         else:
-            df = pd.read_excel(path, engine=engine, skiprows=skiprows, nrows=max_rows)
+            probe = pd.read_excel(path, engine=engine, header=None, nrows=20)
+        for idx, row in probe.iterrows():
+            values = {_normalize_name(v) for v in row.tolist() if str(v).strip() and str(v).lower() != "nan"}
+            if "guia" in values and ("cliente" in values or "shipper" in values):
+                return int(idx)
+        return None
+
+    try:
+        df = _read_df(skiprows)
+
+        if _normalize_name(mode) == "urbano" and not _looks_like_urbano(df):
+            urbano_header_row = _detect_urbano_header_row()
+            if urbano_header_row is not None and urbano_header_row != start_row:
+                log_evento(
+                    f"[Urbano] Fila de encabezado detectada automaticamente: {urbano_header_row}. "
+                    f"Se ignora start_row={start_row} de config para este archivo.",
+                    "warning",
+                )
+                df = _read_df(list(range(urbano_header_row)) if urbano_header_row > 0 else None)
 
         # Limpieza de nombres de columnas (visible)
         df.columns = (

@@ -30,7 +30,7 @@ from app.printer import (
 )
 
 # >>> NUEVO: para que la vista previa FedEx consolide igual que la impresión
-from app.printer.printer_tools import prepare_fedex_dataframe
+from app.printer.printer_tools import prepare_fedex_dataframe, prepare_urbano_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -215,9 +215,8 @@ def build_preview_dataframe(df: pd.DataFrame, config_columns: dict, mode: str) -
     Pipeline único de negocio para construir DataFrame de vista previa.
     """
     mode_norm = _normalize_mode(mode)
-    base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
-
     if mode_norm == "fedex":
+        base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
         try:
             # Fuente única: transformación base + consolidación FedEx
             preview_df, _id_col, _total = prepare_fedex_dataframe(base_transformed)
@@ -228,7 +227,17 @@ def build_preview_dataframe(df: pd.DataFrame, config_columns: dict, mode: str) -
         except Exception:
             logger.exception("[preview] FedEx: error en prepare_fedex_dataframe; usando base_transformed")
             preview_df = base_transformed
+    elif mode_norm == "urbano":
+        base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
+        try:
+            preview_df, _total = prepare_urbano_dataframe(df.copy())
+            if preview_df is None or preview_df.empty:
+                preview_df, _total = prepare_urbano_dataframe(base_transformed)
+        except Exception:
+            logger.exception("[preview] Urbano: error en prepare_urbano_dataframe; usando base_transformed")
+            preview_df = base_transformed
     else:
+        base_transformed = apply_transformation(df.copy(), config_columns, mode_norm)
         preview_df = base_transformed
 
     return _sanitize_preview_dataframe(preview_df, mode_norm)
@@ -252,10 +261,12 @@ def compute_preview_stats(df: Optional[pd.DataFrame], mode: str) -> Dict[str, An
         total = int(pd.to_numeric(df["BULTOS"], errors="coerce").fillna(0).sum())
         stats["metric_label"] = "BULTOS"
         stats["metric_value"] = total
-    elif mode_norm == "urbano" and "PIEZAS" in df.columns:
-        total = int(pd.to_numeric(df["PIEZAS"], errors="coerce").fillna(0).sum())
-        stats["metric_label"] = "PIEZAS"
-        stats["metric_value"] = total
+    elif mode_norm == "urbano":
+        qty_col = "N° BULTOS" if "N° BULTOS" in df.columns else "PIEZAS" if "PIEZAS" in df.columns else None
+        if qty_col:
+            total = int(pd.to_numeric(df[qty_col], errors="coerce").fillna(0).sum())
+            stats["metric_label"] = qty_col
+            stats["metric_value"] = total
 
     return stats
 

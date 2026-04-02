@@ -1,5 +1,5 @@
 ﻿#define AppName "Exelcior Apolo"
-#define AppVersion "1.0.27"
+#define AppVersion "1.0.28"
 #define AppPublisher "AMILAB / Exelcior"
 #define AppExeName "ExelciorApolo.exe"
 
@@ -37,6 +37,11 @@ Name: "desktopicon"; Description: "Crear acceso directo en el Escritorio"; Group
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Flags: nowait postinstall skipifsilent
+
+
+
+
+
 
 
 
