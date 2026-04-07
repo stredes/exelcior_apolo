@@ -13,6 +13,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import pandas as pd
+from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -50,6 +51,14 @@ def _prepare_inventory_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
 
     total_cantidad = int(prepared["Saldo Stock"].sum())
     return prepared, total_cantidad
+
+
+def _prepare_duplicate_groups(df: pd.DataFrame) -> tuple[list[tuple[str, str, pd.DataFrame]], int]:
+    prepared, total_cantidad = _prepare_inventory_dataframe(df)
+    groups: list[tuple[str, str, pd.DataFrame]] = []
+    for (codigo, producto), group in prepared.groupby(["Código", "Producto"], sort=False):
+        groups.append((str(codigo), str(producto), group.reset_index(drop=True)))
+    return groups, total_cantidad
 
 
 def _format_inventory_sheet(sheet, df: pd.DataFrame, total_cantidad: int, titulo: str) -> None:
@@ -131,6 +140,108 @@ def _format_inventory_sheet(sheet, df: pd.DataFrame, total_cantidad: int, titulo
     sheet.print_options.horizontalCentered = True
 
 
+def _format_duplicate_inventory_sheet(sheet, groups: list[tuple[str, str, pd.DataFrame]], total_cantidad: int, titulo: str) -> None:
+    total_columnas = len(PRINT_COLUMN_ORDER)
+    sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_columnas)
+
+    title_cell = sheet.cell(row=1, column=1)
+    title_cell.value = titulo
+    title_cell.font = Font(name="Segoe UI", bold=True, size=12)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    header_font = Font(name="Segoe UI", bold=True, size=10)
+    body_font = Font(name="Segoe UI", size=10)
+    group_font = Font(name="Segoe UI", bold=True, size=10)
+    highlight_font = Font(name="Segoe UI", bold=True, size=10)
+    borde_fino = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    total_fill = PatternFill(fill_type="solid", fgColor="E2E8F0")
+    header_fill = PatternFill(fill_type="solid", fgColor="D9E2F3")
+    group_fill = PatternFill(fill_type="solid", fgColor="DCE7F8")
+
+    width_map = {
+        "Código": 16,
+        "Producto": 38,
+        "Bodega": 16,
+        "Ubicación": 18,
+        "N° Serie": 18,
+        "Lote": 14,
+        "Fecha Vencimiento": 18,
+        "Saldo Stock": 12,
+    }
+
+    for col_idx, header in enumerate(PRINT_COLUMN_ORDER, start=1):
+        col_letter = get_column_letter(col_idx)
+        sheet.column_dimensions[col_letter].width = width_map.get(header, 18)
+
+        header_cell = sheet.cell(row=2, column=col_idx, value=header)
+        header_cell.font = header_font
+        header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        header_cell.border = borde_fino
+        header_cell.fill = header_fill
+
+    current_row = 3
+    for codigo, producto, group in groups:
+        total_stock = int(pd.to_numeric(group["Saldo Stock"], errors="coerce").fillna(0).sum())
+        ubic_count = group["Ubicación"].astype(str).str.strip().replace("", pd.NA).dropna().nunique()
+
+        group_values = [
+            codigo,
+            producto,
+            "",
+            f"Producto con {ubic_count} ubicaciones",
+            "",
+            "",
+            "",
+            total_stock,
+        ]
+        for col_idx, value in enumerate(group_values, start=1):
+            cell = sheet.cell(row=current_row, column=col_idx, value=value)
+            cell.font = group_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = borde_fino
+            cell.fill = group_fill
+        current_row += 1
+
+        for _, row in group.iterrows():
+            for col_idx, header in enumerate(PRINT_COLUMN_ORDER, start=1):
+                cell = sheet.cell(row=current_row, column=col_idx, value=row[header])
+                cell.font = body_font
+                cell.border = borde_fino
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            current_row += 1
+
+    label_cell = sheet.cell(row=current_row, column=max(1, total_columnas - 1), value="Total")
+    label_cell.font = highlight_font
+    label_cell.alignment = Alignment(horizontal="right", vertical="center")
+    label_cell.border = borde_fino
+    label_cell.fill = total_fill
+
+    total_cell = sheet.cell(row=current_row, column=total_columnas, value=total_cantidad)
+    total_cell.font = highlight_font
+    total_cell.alignment = Alignment(horizontal="center", vertical="center")
+    total_cell.border = borde_fino
+    total_cell.fill = total_fill
+
+    sheet.freeze_panes = "A3"
+    sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+    sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.page_margins.left = 0.2
+    sheet.page_margins.right = 0.2
+    sheet.page_margins.top = 0.3
+    sheet.page_margins.bottom = 0.3
+    sheet.page_margins.header = 0.1
+    sheet.page_margins.footer = 0.1
+    sheet.print_options.horizontalCentered = True
+
+
 def _cleanup_temp_file_later(file_path: Path, delay_seconds: int = 180):
     def _cleanup():
         time.sleep(delay_seconds)
@@ -160,16 +271,28 @@ def print_inventario_codigo(file_path=None, config=None, df: pd.DataFrame = None
             raise ValueError("El DataFrame del inventario por codigo esta vacio.")
 
         fecha = datetime.now().strftime("%d/%m/%Y")
-        titulo = f"INVENTARIO POR CODIGO - {fecha}"
+        cfg = config if isinstance(config, dict) else {}
+        print_mode = str(cfg.get("inventory_print_mode", "")).strip().lower()
+        is_duplicate_mode = print_mode == "duplicados"
+
+        titulo = f"INVENTARIO POR DUPLICADOS - {fecha}" if is_duplicate_mode else f"INVENTARIO POR CODIGO - {fecha}"
         df_to_export, total_cantidad = _prepare_inventory_dataframe(df)
 
         with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
             temp_path = Path(temp_file.name)
 
-        with pd.ExcelWriter(temp_path, engine="openpyxl") as writer:
-            df_to_export.to_excel(writer, index=False, sheet_name="Inventario", startrow=1)
-            sheet = writer.book["Inventario"]
-            _format_inventory_sheet(sheet, df_to_export, total_cantidad, titulo)
+        if is_duplicate_mode:
+            groups, total_cantidad = _prepare_duplicate_groups(df)
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Inventario"
+            _format_duplicate_inventory_sheet(sheet, groups, total_cantidad, titulo)
+            workbook.save(temp_path)
+        else:
+            with pd.ExcelWriter(temp_path, engine="openpyxl") as writer:
+                df_to_export.to_excel(writer, index=False, sheet_name="Inventario", startrow=1)
+                sheet = writer.book["Inventario"]
+                _format_inventory_sheet(sheet, df_to_export, total_cantidad, titulo)
 
         log_evento(f"Archivo temporal generado para impresion por codigo: {temp_path}", "info")
         _enviar_a_impresora(temp_path, config=config)

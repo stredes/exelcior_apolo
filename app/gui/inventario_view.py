@@ -107,9 +107,39 @@ def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
     return df2
 
 
+def _join_unique_values(series: pd.Series) -> str:
+    values = []
+    seen = set()
+    for raw in series.fillna("").astype(str):
+        value = raw.strip()
+        if not value:
+            continue
+        key = value.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        values.append(value)
+    return " | ".join(values)
+
+
+def _is_bioplates_bodega(value: str) -> bool:
+    text = _norm_key(value)
+    return "bioplates" in text
+
+
 class InventarioView(tk.Toplevel):
     PRODUCT_MIN_WIDTH = 280
     PRODUCT_MAX_WIDTH = 620
+    DUPLICATE_DETAIL_COLUMNS = [
+        "Código",
+        "Producto",
+        "Bodega",
+        "Ubicación",
+        "N° Serie",
+        "Lote",
+        "Fecha Vencimiento",
+        "Saldo Stock",
+    ]
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -264,6 +294,7 @@ class InventarioView(tk.Toplevel):
         ttk.Button(actions_block, text="Buscar", command=self._filtrar).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Seleccionar todo", command=self._toggle_select_all).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Duplicados ubicación", command=self._mostrar_duplicados_ubicacion).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Abrir Excel", command=self._recargar_archivo).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Imprimir Resultado", command=self._imprimir_resultado).pack(side="left")
 
@@ -531,6 +562,100 @@ class InventarioView(tk.Toplevel):
         self.status_var.set("Filtros limpiados.")
         self._actualizar_tree(self.df)
 
+    def _build_duplicate_locations_report(self, source_df: pd.DataFrame) -> pd.DataFrame:
+        if source_df is None or source_df.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        base = source_df.loc[
+            ~source_df["Bodega"].fillna("").astype(str).map(_is_bioplates_bodega)
+        ].copy()
+        if base.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        base["__ubic_count"] = (
+            base["Ubicación"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .groupby([base["Código"], base["Producto"]])
+            .transform(lambda s: s[s != ""].nunique())
+        )
+
+        duplicates = base.loc[base["__ubic_count"] > 1].copy()
+        if duplicates.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        report = (
+            duplicates.groupby(["Código", "Producto"], as_index=False)
+            .agg(
+                {
+                    "Bodega": _join_unique_values,
+                    "Ubicación": _join_unique_values,
+                    "N° Serie": _join_unique_values,
+                    "Lote": _join_unique_values,
+                    "Fecha Vencimiento": _join_unique_values,
+                    "Saldo Stock": "sum",
+                }
+            )
+        )
+
+        report["Saldo Stock"] = pd.to_numeric(report["Saldo Stock"], errors="coerce").fillna(0).astype(int)
+        return report.loc[:, VISIBLE_COLUMNS].reset_index(drop=True)
+
+    def _mostrar_duplicados_ubicacion(self):
+        if self.df.empty:
+            self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
+            return
+
+        source_df = self._current_view_df()
+        detail_df = self._build_duplicate_locations_detail(source_df)
+        self.selected_row_ids = set()
+        if detail_df.empty:
+            self.df_filtrado = pd.DataFrame()
+            self.tipo_busqueda = "duplicados"
+            self._actualizar_tree(self.df_filtrado)
+            self.status_var.set("No se encontraron productos con más de una ubicación en la vista actual.")
+            self.safe_messagebox("info", "Duplicados", "No se encontraron productos con más de una ubicación.")
+            return
+
+        self.df_filtrado = detail_df
+        self.tipo_busqueda = "duplicados"
+        self._actualizar_tree(self.df_filtrado)
+        total_productos = detail_df.groupby(["Código", "Producto"]).ngroups
+        self.status_var.set(
+            f"Listado de duplicados generado: {total_productos} productos con más de una ubicación."
+        )
+        capturar_log_bod1(
+            f"[Inventario] Listado de duplicados por ubicación generado con {total_productos} productos.",
+            "info",
+        )
+
+    def _build_duplicate_locations_detail(self, source_df: pd.DataFrame) -> pd.DataFrame:
+        if source_df is None or source_df.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        base = source_df.loc[
+            ~source_df["Bodega"].fillna("").astype(str).map(_is_bioplates_bodega)
+        ].copy()
+        if base.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        duplicate_counts = (
+            base.assign(__ubic_clean=base["Ubicación"].fillna("").astype(str).str.strip())
+            .groupby(["Código", "Producto"])["__ubic_clean"]
+            .transform(lambda s: s[s != ""].nunique())
+        )
+        detail = base.loc[duplicate_counts > 1, VISIBLE_COLUMNS].copy()
+        if detail.empty:
+            return pd.DataFrame(columns=VISIBLE_COLUMNS)
+
+        detail["__fecha_sort"] = pd.to_datetime(detail["Fecha Vencimiento"], format="%d/%m/%Y", errors="coerce")
+        detail = detail.sort_values(
+            by=["Código", "Producto", "Ubicación", "__fecha_sort", "Lote", "N° Serie"],
+            kind="mergesort",
+        ).drop(columns=["__fecha_sort"])
+        return detail.reset_index(drop=True)
+
     def _sort_by_column(self, column: str):
         if self.df.empty:
             return
@@ -592,6 +717,10 @@ class InventarioView(tk.Toplevel):
             self._autoajustar_columna_producto()
             return
 
+        if self.tipo_busqueda == "duplicados":
+            self._actualizar_tree_duplicados(df)
+            return
+
         for i, row in enumerate(df[VISIBLE_COLUMNS].itertuples(index=False)):
             tag = "even" if i % 2 == 0 else "odd"
             marker = "☑" if i in self.selected_row_ids else "☐"
@@ -602,6 +731,43 @@ class InventarioView(tk.Toplevel):
         self._autoajustar_columna_producto(df)
         origen = self._archivo_actual or "sin archivo"
         self.summary_var.set(f"Registros: {len(df)} | Fuente: {origen}")
+
+    def _actualizar_tree_duplicados(self, df: pd.DataFrame):
+        row_index = 0
+        total_productos = df.groupby(["Código", "Producto"]).ngroups if not df.empty else 0
+        for (codigo, producto), group in df.groupby(["Código", "Producto"], sort=False):
+            total_stock = int(pd.to_numeric(group["Saldo Stock"], errors="coerce").fillna(0).sum())
+            ubic_count = group["Ubicación"].astype(str).str.strip().replace("", pd.NA).dropna().nunique()
+            resumen = f"Producto con {ubic_count} ubicaciones"
+            self.tree.insert(
+                "",
+                "end",
+                iid=f"group-{row_index}",
+                values=("", codigo, producto, "", resumen, "", "", "", total_stock),
+                tags=("group",),
+            )
+            row_index += 1
+
+            for data_index, row in group.iterrows():
+                tag = "even" if row_index % 2 == 0 else "odd"
+                marker = "☑" if data_index in self.selected_row_ids else "☐"
+                self.tree.insert(
+                    "",
+                    "end",
+                    iid=f"data-{data_index}",
+                    values=(marker, *(row[col] for col in VISIBLE_COLUMNS)),
+                    tags=(tag,),
+                )
+                row_index += 1
+
+        self.tree.tag_configure("group", background="#DCE7F8", font=("Segoe UI Semibold", 10))
+        self.tree.tag_configure("even", background="#FFFFFF")
+        self.tree.tag_configure("odd", background="#F6F8FD")
+        self._autoajustar_columna_producto(df)
+        origen = self._archivo_actual or "sin archivo"
+        self.summary_var.set(
+            f"Duplicados: {total_productos} productos | Registros: {len(df)} | Fuente: {origen}"
+        )
 
     def _configure_tree_columns(self):
         self.tree.heading("Sel", text="Sel", anchor="center")
@@ -664,7 +830,9 @@ class InventarioView(tk.Toplevel):
         column = self.tree.identify_column(event.x)
         row_id = self.tree.identify_row(event.y)
         if region == "cell" and column == "#1" and row_id:
-            idx = int(row_id)
+            if not row_id.startswith("data-"):
+                return "break"
+            idx = int(row_id.split("-", 1)[1])
             if idx in self.selected_row_ids:
                 self.selected_row_ids.remove(idx)
             else:
@@ -702,13 +870,13 @@ class InventarioView(tk.Toplevel):
             if self.tipo_busqueda == "ubicacion":
                 printer_inventario_ubicacion.print_inventario_ubicacion(
                     file_path=self._archivo_actual or "inventario.xlsx",
-                    config={"printer_name": inventory_printer},
+                    config={"printer_name": inventory_printer, "inventory_print_mode": self.tipo_busqueda or ""},
                     df=df_to_print,
                 )
             else:
                 printer_inventario_codigo.print_inventario_codigo(
                     file_path=self._archivo_actual or "inventario.xlsx",
-                    config={"printer_name": inventory_printer},
+                    config={"printer_name": inventory_printer, "inventory_print_mode": self.tipo_busqueda or ""},
                     df=df_to_print,
                 )
 
