@@ -10,7 +10,9 @@ from tkinter import filedialog, messagebox, ttk
 import unicodedata
 
 import pandas as pd
+from app.gui.inventario_view import _clean_for_view, _normalize_headers
 from app.utils.app_dirs import CONFIG_DIR, ensure_file
+from app.utils.utils import guardar_ultimo_path, load_config as load_app_config
 from app.printer.printer_etiquetas import generar_etiqueta_excel, imprimir_excel
 
 CONFIG_PATH = ensure_file(
@@ -21,6 +23,7 @@ CONFIG_PATH = ensure_file(
     ),
 )
 CLIENTES_PATH_KEY = "clientes_proveedores_path"
+INVENTORY_PATH_KEY = "archivo_inventario"
 
 
 def cargar_config():
@@ -50,6 +53,11 @@ def _normalizar_rut(rut: str) -> str:
 def _normalizar_columna(valor: str) -> str:
     txt = unicodedata.normalize("NFKD", str(valor)).encode("ascii", "ignore").decode("ascii")
     return txt.strip().lower().replace("_", " ")
+
+
+def _normalizar_texto(valor: str) -> str:
+    txt = unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii")
+    return " ".join(txt.strip().lower().split())
 
 
 def _buscar_columna(columnas_lower, *opciones):
@@ -116,6 +124,19 @@ def obtener_impresoras_disponibles():
     return impresoras
 
 
+def cargar_inventario_productos(path_excel):
+    suffix = Path(path_excel).suffix.lower()
+    if suffix == ".xlsx":
+        df = pd.read_excel(path_excel, engine="openpyxl")
+    elif suffix == ".xls":
+        df = pd.read_excel(path_excel, engine="xlrd")
+    else:
+        raise ValueError("Extension de archivo no soportada. Usa .xlsx o .xls")
+
+    df = _normalize_headers(df)
+    return _clean_for_view(df)
+
+
 def _set_windows_default_printer(printer_alias: str) -> None:
     if platform.system() != "Windows" or not (printer_alias or "").strip():
         return
@@ -168,14 +189,16 @@ def _cleanup_temp_files_later(paths, delay_seconds=180):
 
 def crear_editor_etiqueta(df_clientes=None, parent=None):
     config = cargar_config()
+    app_config = load_app_config() or {}
     printer_name_default = config.get("label_printer_name") or config.get("printer_name", "")
     clientes_path_guardado = config.get(CLIENTES_PATH_KEY, "")
-    estado = {"df_clientes": df_clientes}
+    inventario_path_guardado = app_config.get(INVENTORY_PATH_KEY, "")
+    estado = {"df_clientes": df_clientes, "df_inventario": pd.DataFrame()}
 
     ventana = tk.Toplevel(parent)
     ventana.title("Editor de Etiquetas 10x10 cm")
-    ventana.geometry("700x620")
-    ventana.resizable(False, False)
+    ventana.geometry("1280x860")
+    ventana.minsize(1120, 760)
     ventana.configure(bg="#EEF2F9")
 
     style = ttk.Style(ventana)
@@ -201,12 +224,21 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     ttk.Label(header, text="Editor de Etiquetas", style="HeaderTitle.TLabel").pack(anchor="w")
     ttk.Label(
         header,
-        text="Completa datos del cliente y envia etiquetas 10x10 a la impresora seleccionada.",
+        text="Trabaja etiquetas de despacho o etiquetas de producto desde una sola pantalla.",
         style="HeaderSub.TLabel",
     ).pack(anchor="w", pady=(2, 0))
 
+    mode_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
+    mode_card.pack(fill="x")
+    ttk.Label(mode_card, text="Modo de etiqueta", style="CardTitle.TLabel").pack(anchor="w")
+    mode_var = tk.StringVar(value="despacho")
+    mode_row = ttk.Frame(mode_card, style="Card.TFrame")
+    mode_row.pack(fill="x", pady=(8, 0))
+    ttk.Radiobutton(mode_row, text="Despacho", variable=mode_var, value="despacho").pack(side="left")
+    ttk.Radiobutton(mode_row, text="Etiqueta productos", variable=mode_var, value="producto").pack(side="left", padx=(14, 0))
+
     source_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
-    source_card.pack(fill="x")
+    source_card.pack(fill="x", pady=(12, 0))
     ttk.Label(source_card, text="Origen de clientes", style="CardTitle.TLabel").grid(
         row=0, column=0, columnspan=2, sticky="w", pady=(0, 6)
     )
@@ -227,6 +259,8 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     lbl_excel = ttk.Label(source_card, text="Archivo clientes: No cargado", style="Path.TLabel")
     lbl_excel.grid(row=1, column=0, sticky="w", pady=(0, 8))
     source_card.columnconfigure(0, weight=1)
+    lbl_inventory = ttk.Label(source_card, text="Archivo inventario: No cargado", style="Path.TLabel")
+    lbl_inventory.grid(row=2, column=0, sticky="w", pady=(0, 4))
 
     def _short_path(p):
         if not p:
@@ -257,14 +291,40 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         row=1, column=1, sticky="e", pady=(0, 8)
     )
 
+    def cargar_excel_inventario(path):
+        try:
+            estado["df_inventario"] = cargar_inventario_productos(path)
+            lbl_inventory.config(text=f"Archivo inventario: {_short_path(path)}")
+            guardar_ultimo_path(str(path), clave=INVENTORY_PATH_KEY)
+            status_var.set(f"Inventario cargado: {Path(path).name}")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el Excel de inventario:\n{e}")
+
+    def seleccionar_excel_inventario():
+        path = filedialog.askopenfilename(
+            title="Selecciona archivo de inventario",
+            filetypes=[("Excel Files", "*.xlsx *.xls")],
+        )
+        if not path:
+            return
+        cargar_excel_inventario(path)
+
+    ttk.Button(source_card, text="Cargar Excel Inventario", style="Secondary.TButton", command=seleccionar_excel_inventario).grid(
+        row=2, column=1, sticky="e", pady=(0, 4)
+    )
+
     if df_clientes is not None:
         lbl_excel.config(text="Archivo clientes: Cargado en memoria")
     elif clientes_path_guardado and Path(clientes_path_guardado).exists():
         cargar_excel_clientes(clientes_path_guardado)
+    if inventario_path_guardado and Path(inventario_path_guardado).exists():
+        cargar_excel_inventario(inventario_path_guardado)
 
-    form_card = ttk.Frame(shell, style="Card.TFrame", padding=14)
-    form_card.pack(fill="x", pady=(12, 0))
-    ttk.Label(form_card, text="Datos de etiqueta", style="CardTitle.TLabel").grid(
+    forms_host = ttk.Frame(shell, style="EditorBg.TFrame")
+    forms_host.pack(fill="x", expand=False, pady=(12, 0))
+
+    form_card = ttk.Frame(forms_host, style="Card.TFrame", padding=14)
+    ttk.Label(form_card, text="Datos de etiqueta de despacho", style="CardTitle.TLabel").grid(
         row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
     )
     form_card.columnconfigure(1, weight=1)
@@ -275,18 +335,108 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         entry.grid(row=idx, column=1, pady=5, sticky="ew")
         entradas[key] = entry
 
+    producto_card = ttk.Frame(forms_host, style="Card.TFrame", padding=14)
+    ttk.Label(producto_card, text="Etiquetas de producto", style="CardTitle.TLabel").grid(
+        row=0, column=0, columnspan=4, sticky="w", pady=(0, 8)
+    )
+    ttk.Label(
+        producto_card,
+        text="Busca por código o nombre del producto, selecciónalo y genera su etiqueta con datos de inventario.",
+        style="Body.TLabel",
+    ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(0, 10))
+    producto_card.columnconfigure(1, weight=1)
+    producto_card.columnconfigure(2, weight=1)
+    producto_card.columnconfigure(3, weight=1)
+    producto_card.columnconfigure(4, weight=1)
+
+    producto_entries = {}
+    producto_labels = {}
+    product_search_var = tk.StringVar(value="")
+
+    ttk.Label(producto_card, text="Buscar producto:", style="Body.TLabel").grid(row=2, column=0, sticky="e", padx=(0, 10), pady=5)
+    product_search_entry = ttk.Entry(producto_card, textvariable=product_search_var, width=50)
+    product_search_entry.grid(row=2, column=1, columnspan=2, sticky="ew", pady=5)
+
+    product_results = ttk.Treeview(
+        producto_card,
+        columns=("Código", "Producto", "Ubicación", "Lote", "N° Serie", "Fecha Vencimiento", "Saldo Stock"),
+        show="headings",
+        height=8,
+    )
+    result_widths = {
+        "Código": 100,
+        "Producto": 240,
+        "Ubicación": 120,
+        "Lote": 110,
+        "N° Serie": 120,
+        "Fecha Vencimiento": 120,
+        "Saldo Stock": 100,
+    }
+    for col in product_results["columns"]:
+        product_results.heading(col, text=col, anchor="center")
+        product_results.column(col, width=result_widths.get(col, 120), minwidth=90, anchor="center", stretch=True)
+
+    result_scroll = ttk.Scrollbar(producto_card, orient="vertical", command=product_results.yview)
+    product_results.configure(yscrollcommand=result_scroll.set)
+    product_results.grid(row=3, column=0, columnspan=4, sticky="nsew", pady=(6, 10))
+    result_scroll.grid(row=3, column=4, sticky="ns", pady=(6, 10))
+    producto_card.rowconfigure(3, weight=1)
+
+    producto_campos = {
+        "codigo": "Código",
+        "producto": "Producto",
+        "bodega": "Bodega",
+        "ubicacion": "Ubicación",
+        "lote_serie": "Lote / Serie",
+        "fecha_vencimiento": "Fecha vencimiento",
+        "cantidad": "Cantidad",
+        "copias": "Etiquetas",
+    }
+    for idx, (key, label) in enumerate(producto_campos.items(), start=4):
+        label_widget = ttk.Label(producto_card, text=label + ":", style="Body.TLabel")
+        label_widget.grid(
+            row=idx, column=0, sticky="e", padx=(0, 10), pady=5
+        )
+        entry = ttk.Entry(producto_card, width=48)
+        entry.grid(row=idx, column=1, columnspan=3, sticky="ew", pady=5)
+        producto_labels[key] = label_widget
+        producto_entries[key] = entry
+
+    producto_layout = {
+        "codigo": (4, 0),
+        "producto": (5, 0),
+        "bodega": (6, 0),
+        "ubicacion": (7, 0),
+        "lote_serie": (4, 2),
+        "fecha_vencimiento": (5, 2),
+        "cantidad": (6, 2),
+        "copias": (7, 2),
+    }
+    for key, (row, col) in producto_layout.items():
+        producto_labels[key].grid_configure(row=row, column=col, padx=(0, 10), pady=4, sticky="e")
+        producto_entries[key].configure(width=30)
+        producto_entries[key].grid_configure(row=row, column=col + 1, columnspan=1, padx=(0, 12), pady=4, sticky="ew")
+
+    producto_entries["copias"].insert(0, "1")
+
     fila_impresora = len(campos) + 1
-    ttk.Label(form_card, text="Impresora:", style="Body.TLabel").grid(row=fila_impresora, column=0, sticky="e", pady=5, padx=(0, 10))
     impresoras = obtener_impresoras_disponibles()
-    combo_impresoras = ttk.Combobox(form_card, values=impresoras, width=46, state="readonly")
+    printer_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
+    printer_card.pack(fill="x", pady=(12, 0))
+    ttk.Label(printer_card, text="Impresora y acciones", style="CardTitle.TLabel").grid(
+        row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
+    )
+    printer_card.columnconfigure(1, weight=1)
+    ttk.Label(printer_card, text="Impresora:", style="Body.TLabel").grid(row=1, column=0, sticky="e", pady=5, padx=(0, 10))
+    combo_impresoras = ttk.Combobox(printer_card, values=impresoras, width=60, state="readonly")
     if printer_name_default:
         combo_impresoras.set(printer_name_default)
     elif impresoras:
         combo_impresoras.set(impresoras[0])
-    combo_impresoras.grid(row=fila_impresora, column=1, pady=5, sticky="ew")
+    combo_impresoras.grid(row=1, column=1, pady=5, sticky="ew")
 
-    actions = ttk.Frame(shell, style="EditorBg.TFrame")
-    actions.pack(fill="x", pady=(14, 0))
+    actions = ttk.Frame(printer_card, style="Card.TFrame")
+    actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
     ttk.Label(actions, textvariable=status_var, style="HeaderSub.TLabel").pack(anchor="w", pady=(0, 10))
 
     def cargar_datos_cliente(event=None):
@@ -321,18 +471,108 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
             return False
         return True
 
+    def validar_campos_producto(data):
+        obligatorios = ["codigo", "producto", "ubicacion"]
+        faltantes = [campo for campo in obligatorios if not str(data.get(campo, "")).strip()]
+        if faltantes:
+            messagebox.showerror(
+                "Campos faltantes",
+                "Selecciona un producto valido antes de imprimir.",
+            )
+            return False
+        try:
+            total_copias = int(str(data.get("copias", "0")).strip())
+            if total_copias <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Etiquetas invalido", "El campo Etiquetas debe ser entero mayor a 0.")
+            return False
+        return True
+
     def limpiar_formulario():
         for entry in entradas.values():
             entry.delete(0, tk.END)
+        for entry in producto_entries.values():
+            entry.delete(0, tk.END)
+        producto_entries["copias"].insert(0, "1")
+        product_search_var.set("")
+        product_results.delete(*product_results.get_children())
         status_var.set("Formulario limpio.")
+
+    def buscar_productos(event=None):
+        product_results.delete(*product_results.get_children())
+        df_inventario = estado.get("df_inventario")
+        term = _normalizar_texto(product_search_var.get())
+        if df_inventario is None or df_inventario.empty:
+            status_var.set("Carga un archivo de inventario para usar etiquetas de producto.")
+            return
+        if not term:
+            status_var.set("Escribe un código o nombre para buscar productos.")
+            return
+
+        code_series = df_inventario["Código"].astype(str).map(_normalizar_texto)
+        prod_series = df_inventario["Producto"].astype(str).map(_normalizar_texto)
+        terms = [t for t in term.split() if t]
+        mask = code_series.apply(lambda value: all(t in value for t in terms)) | prod_series.apply(lambda value: all(t in value for t in terms))
+        results = df_inventario.loc[mask, ["Código", "Producto", "Ubicación", "Lote", "N° Serie", "Fecha Vencimiento", "Saldo Stock", "Bodega"]].head(200).reset_index(drop=True)
+        for idx, row in results.iterrows():
+            product_results.insert(
+                "",
+                "end",
+                iid=str(idx),
+                values=(
+                    row["Código"],
+                    row["Producto"],
+                    row["Ubicación"],
+                    row["Lote"],
+                    row["N° Serie"],
+                    row["Fecha Vencimiento"],
+                    row["Saldo Stock"],
+                ),
+            )
+        estado["producto_resultados"] = results
+        status_var.set(f"Productos encontrados: {len(results)}")
+
+    def seleccionar_producto(event=None):
+        selection = product_results.selection()
+        if not selection:
+            return
+        results = estado.get("producto_resultados")
+        if results is None or results.empty:
+            return
+        row = results.iloc[int(selection[0])]
+        lote = str(row.get("Lote", "") or "").strip()
+        serie = str(row.get("N° Serie", "") or "").strip()
+        if lote and serie:
+            lote_serie = f"Lote: {lote} | Serie: {serie}"
+        elif lote:
+            lote_serie = f"Lote: {lote}"
+        elif serie:
+            lote_serie = f"Serie: {serie}"
+        else:
+            lote_serie = ""
+
+        values_map = {
+            "codigo": row.get("Código", ""),
+            "producto": row.get("Producto", ""),
+            "bodega": row.get("Bodega", ""),
+            "ubicacion": row.get("Ubicación", ""),
+            "lote_serie": lote_serie,
+            "fecha_vencimiento": row.get("Fecha Vencimiento", ""),
+            "cantidad": row.get("Saldo Stock", ""),
+        }
+        for key, value in values_map.items():
+            producto_entries[key].delete(0, tk.END)
+            producto_entries[key].insert(0, str(value))
+        status_var.set(f"Producto seleccionado: {row.get('Producto', '')}")
+
+    product_search_entry.bind("<Return>", buscar_productos)
+    product_results.bind("<<TreeviewSelect>>", seleccionar_producto)
+    product_results.bind("<Double-1>", seleccionar_producto)
 
     def generar_y_imprimir():
         try:
-            data = {k: v.get() for k, v in entradas.items()}
             printer_name = combo_impresoras.get().strip()
-
-            if not validar_campos(data):
-                return
             if not printer_name:
                 messagebox.showerror("Impresora requerida", "Selecciona una etiquetadora antes de imprimir.")
                 return
@@ -348,6 +588,47 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
             guardar_config(config)
             _set_windows_default_printer(printer_name)
 
+            archivos_temporales = []
+
+            if mode_var.get() == "producto":
+                data = {k: v.get() for k, v in producto_entries.items()}
+                if not validar_campos_producto(data):
+                    return
+                total_bultos = int(data["copias"])
+                if total_bultos > 10:
+                    continuar = messagebox.askyesno(
+                        "Confirmar impresion",
+                        f"Vas a imprimir {total_bultos} etiquetas. Deseas continuar?",
+                    )
+                    if not continuar:
+                        status_var.set("Impresion cancelada por el usuario.")
+                        return
+
+                for _ in range(total_bultos):
+                    etiqueta_data = {
+                        "label_mode": "producto",
+                        "codigo": data["codigo"],
+                        "producto": data["producto"],
+                        "bodega": data["bodega"],
+                        "ubicacion": data["ubicacion"],
+                        "lote_serie": data["lote_serie"],
+                        "fecha_vencimiento": data["fecha_vencimiento"],
+                        "cantidad": data["cantidad"],
+                    }
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_xlsx:
+                        output_path = Path(temp_xlsx.name)
+                    archivos_temporales.append(str(output_path))
+                    generar_etiqueta_excel(etiqueta_data, output_path)
+                    imprimir_excel(output_path, printer_name or None)
+                _cleanup_temp_files_later(archivos_temporales, delay_seconds=180)
+                status_var.set(f"Se enviaron {total_bultos} etiquetas de producto a impresion.")
+                messagebox.showinfo("Listo", f"Se enviaron {total_bultos} etiquetas de producto a impresion.")
+                return
+
+            data = {k: v.get() for k, v in entradas.items()}
+            if not validar_campos(data):
+                return
+
             total_bultos = int(data["bultos"])
             if total_bultos > 10:
                 continuar = messagebox.askyesno(
@@ -358,7 +639,6 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
                     status_var.set("Impresion cancelada por el usuario.")
                     return
 
-            archivos_temporales = []
             for indice in range(1, total_bultos + 1):
                 etiqueta_data = dict(data)
                 etiqueta_data["bultos"] = f"{indice}/{total_bultos}"
@@ -383,6 +663,19 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         side="left", padx=(10, 0)
     )
 
-    entradas["rut"].focus_set()
+    def actualizar_modo(*_args):
+        if mode_var.get() == "producto":
+            form_card.pack_forget()
+            producto_card.pack(fill="both", expand=True)
+            product_search_entry.focus_set()
+            status_var.set("Modo etiqueta productos activo. Busca por código o nombre del producto.")
+        else:
+            producto_card.pack_forget()
+            form_card.pack(fill="x", pady=(0, 0))
+            entradas["rut"].focus_set()
+            status_var.set("Modo despacho activo. Completa el formulario para imprimir.")
+
+    mode_var.trace_add("write", actualizar_modo)
+    actualizar_modo()
 
     return ventana

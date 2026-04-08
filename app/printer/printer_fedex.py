@@ -48,10 +48,29 @@ def _agg_mode() -> str:
     """
     return os.environ.get("EXCELCIOR_FEDEX_BULTOS_AGG", "last").lower()
 
+
+def _parse_quantity_series(series: pd.Series, default: int = 0) -> pd.Series:
+    """Convierte cantidades a enteros preservando el valor real del Excel."""
+    if series is None:
+        return pd.Series([], dtype=int)
+
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.isna().any():
+        extracted = (
+            series.astype("string")
+            .fillna("")
+            .str.replace(",", ".", regex=False)
+            .str.extract(r"(-?\d+\.?\d*)")[0]
+        )
+        fallback_numeric = pd.to_numeric(extracted, errors="coerce")
+        numeric = numeric.fillna(fallback_numeric)
+
+    numeric = numeric.fillna(default)
+    return numeric.round().astype(int)
+
 def _agg_series_bultos(series: pd.Series) -> int:
     """Agrega una serie de BULTOS de forma robusta según _agg_mode()."""
-    b = pd.to_numeric(series, errors="coerce").fillna(0).astype(int)
-    b.loc[b <= 0] = 1
+    b = _parse_quantity_series(series, default=0)
     if b.empty:
         return 0
     mode = _agg_mode()
@@ -85,8 +104,7 @@ def _heur_total_piezas(df: pd.DataFrame) -> int:
     )
 
     if bultos_col is not None:
-        b = pd.to_numeric(df[bultos_col], errors="coerce").fillna(0).astype(int)
-        b.loc[b <= 0] = 1
+        b = _parse_quantity_series(df[bultos_col], default=0)
         if tracking_col:
             # Consolidar por tracking para NO inflar por duplicados
             tmp = (

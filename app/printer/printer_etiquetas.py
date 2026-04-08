@@ -45,7 +45,7 @@ except Exception:
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# Mapa de celdas por campo
+# Mapa de celdas por campo para despacho
 CELDAS_MAP: Dict[str, str] = {
     "rut": "B2",
     "razsoc": "B3",
@@ -54,6 +54,16 @@ CELDAS_MAP: Dict[str, str] = {
     "guia": "B6",
     "bultos": "B7",
     "transporte": "B8",
+}
+
+PRODUCT_CELDAS_MAP: Dict[str, str] = {
+    "codigo": "B2",
+    "producto": "B3",
+    "bodega": "B4",
+    "ubicacion": "B5",
+    "lote_serie": "B6",
+    "fecha_vencimiento": "B7",
+    "cantidad": "B8",
 }
 
 # Impresora por defecto (puedes sobreescribir con EXCELCIOR_PRINTER)
@@ -352,17 +362,33 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         ws.column_dimensions["A"].width = 16
         ws.column_dimensions["B"].width = 38
 
-        field_labels = {
-            "rut": "RUT",
-            "razsoc": "Cliente",
-            "dir": "Direccion",
-            "comuna": "Comuna",
-            "guia": "Guia",
-            "bultos": "Bultos",
-            "transporte": "Transporte",
-        }
+        label_mode = str(data.get("label_mode", "despacho")).strip().lower()
+        if label_mode == "producto":
+            field_labels = {
+                "codigo": "Codigo",
+                "producto": "Producto",
+                "bodega": "Bodega",
+                "ubicacion": "Ubicacion",
+                "lote_serie": "Lote / Serie",
+                "fecha_vencimiento": "Vencimiento",
+                "cantidad": "Cantidad",
+            }
+            celdas_map = PRODUCT_CELDAS_MAP
+            header_text = "Bodega Amilab\nEtiqueta de Producto"
+        else:
+            field_labels = {
+                "rut": "RUT",
+                "razsoc": "Cliente",
+                "dir": "Direccion",
+                "comuna": "Comuna",
+                "guia": "Guia",
+                "bultos": "Bultos",
+                "transporte": "Transporte",
+            }
+            celdas_map = CELDAS_MAP
+            header_text = "Bodega Amilab\nEtiqueta de Despacho"
 
-        for campo, celda in CELDAS_MAP.items():
+        for campo, celda in celdas_map.items():
             row = ws[celda].row
             label_cell = ws[f"A{row}"]
             value_cell = ws[celda]
@@ -380,7 +406,7 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
 
         ws.merge_cells("A1:B1")
         header = ws["A1"]
-        header.value = "Bodega Amilab\nEtiqueta de Despacho"
+        header.value = header_text
         header.font = Font(name="Calibri", size=18, bold=True, color="111827")
         # Header sin fondo, segÃºn requerimiento.
         header.fill = PatternFill(fill_type=None)

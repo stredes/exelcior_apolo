@@ -19,6 +19,7 @@ Novedades (FedEx):
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime
 from typing import Tuple, Optional
 
@@ -97,6 +98,29 @@ def _normalize_date(series: pd.Series) -> pd.Series:
     return out
 
 
+def _parse_quantity_series(series: pd.Series, default: int = 0) -> pd.Series:
+    """
+    Convierte cantidades a enteros preservando el valor real del Excel.
+    Soporta números como texto y celdas mixtas como "3 bultos".
+    """
+    if series is None:
+        return pd.Series([], dtype=int)
+
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.isna().any():
+        extracted = (
+            series.astype("string")
+            .fillna("")
+            .str.replace(",", ".", regex=False)
+            .str.extract(r"(-?\d+\.?\d*)")[0]
+        )
+        fallback_numeric = pd.to_numeric(extracted, errors="coerce")
+        numeric = numeric.fillna(fallback_numeric)
+
+    numeric = numeric.fillna(default)
+    return numeric.round().astype(int)
+
+
 # ======================================================================
 #                  Utilidades de resolución de columnas
 # ======================================================================
@@ -113,6 +137,37 @@ def _pick_ci(df: pd.DataFrame, *names: str) -> Optional[str]:
     return None
 
 
+def _normalize_header_token(value: object) -> str:
+    return str(value or "").strip().lower().replace("_", " ")
+
+
+def _normalize_urbano_header_token(value: object) -> str:
+    token = _normalize_header_token(value)
+    token = re.sub(r"[^a-z0-9 ]+", "", token)
+    token = " ".join(token.split()).strip()
+    return token
+
+
+def _repair_urbano_header(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
+    current_headers = {_normalize_header_token(col) for col in df.columns}
+    if "guia" in current_headers and ("cliente" in current_headers or "shipper" in current_headers):
+        return df
+
+    probe_rows = min(len(df), 5)
+    for row_idx in range(probe_rows):
+        row_values = [_normalize_header_token(v) for v in df.iloc[row_idx].tolist()]
+        token_set = {v for v in row_values if v and v != "nan"}
+        if "guia" in token_set and ("cliente" in token_set or "shipper" in token_set) and "piezas" in token_set:
+            repaired = df.iloc[row_idx + 1 :].copy()
+            repaired.columns = [str(v).strip() for v in df.iloc[row_idx].tolist()]
+            repaired = repaired.reset_index(drop=True)
+            return repaired
+    return df
+
+
 # ======================================================================
 #                  Agregación robusta para BULTOS (FedEx)
 # ======================================================================
@@ -124,8 +179,7 @@ def _agg_bultos(series: pd.Series) -> int:
       - max/min/last/sum: forzados.
     """
     mode = os.environ.get("EXCELCIOR_FEDEX_BULTOS_AGG", "smart").lower()
-    b = pd.to_numeric(series, errors="coerce").fillna(0).astype(int)
-    b.loc[b <= 0] = 1
+    b = _parse_quantity_series(series, default=0)
     if b.empty:
         return 0
 
@@ -160,7 +214,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
     if df is None or df.empty:
         return pd.DataFrame(columns=cols_final), "", 0
 
-    df = df.copy()
+    df = _repair_urbano_header(df.copy())
     cmap = _cimap(df)
 
     # ----------------- CASO 1: DF ya trae columnas finales -----------------
@@ -190,9 +244,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
         out["Ciudad"]          = _clean_text_series(out["Ciudad"])
         out["Receptor"]        = _clean_text_series(out["Receptor"])
 
-        b = pd.to_numeric(out["BULTOS"], errors="coerce").fillna(0).astype(int)
-        b.loc[b <= 0] = 1
-        out["BULTOS"] = b
+        out["BULTOS"] = _parse_quantity_series(out["BULTOS"], default=0)
 
         out = out.sort_values(["Tracking Number", "Fecha"], kind="stable")
         grouped = (
@@ -224,8 +276,7 @@ def prepare_fedex_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, str, int]:
         "pieces", "pieceCount", "packages"
     )
     if b_col:
-        b = pd.to_numeric(df[b_col], errors="coerce").fillna(0).astype(int)
-        b.loc[b <= 0] = 1
+        b = _parse_quantity_series(df[b_col], default=0)
     else:
         b = pd.Series(1, index=df.index, dtype=int)
 
@@ -283,19 +334,28 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     if df is None or df.empty:
         return pd.DataFrame(columns=cols_final), 0
 
-    df = df.copy()
+    df = _repair_urbano_header(df.copy())
 
     def pick(*names):
+        normalized_cols = {
+            _normalize_urbano_header_token(col): col
+            for col in df.columns
+        }
         for n in names:
-            if n in df.columns:
-                return n
+            key = _normalize_urbano_header_token(n)
+            if key in normalized_cols:
+                return normalized_cols[key]
         return None
 
     guia_col  = pick("GUIA", "guia", "Guia")
     cli_col   = pick("CLIENTE", "cliente", "Cliente")
     loc_col   = pick("LOCALIDAD", "localidad", "Localidad")
     city_col  = pick("CIUDAD", "ciudad", "Ciudad", "AGENCIA", "agencia", "Agencia")
-    piezas_c  = pick("PIEZAS", "piezas", "Piezas", "BULTOS", "bultos")
+    piezas_c  = pick(
+        "N° BULTOS", "Nº BULTOS", "NÂ° BULTOS", "N BULTOS",
+        "PIEZAS", "piezas", "Piezas",
+        "BULTOS", "bultos"
+    )
     rastreo_c = pick("COD RASTREO", "COD_RASTREO", "codRastreo", "TRACKING", "tracking")
     out = pd.DataFrame(index=df.index)
     txt_guia  = _clean_text_series(df[guia_col])  if guia_col  else pd.Series("", index=df.index, dtype="string")
@@ -313,21 +373,7 @@ def prepare_urbano_dataframe(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     out["COD RASTREO"] = _stringify_tracking(df[rastreo_c]) if rastreo_c else pd.Series("", index=df.index, dtype="string")
 
     if piezas_c:
-        raw_piezas = df[piezas_c]
-        numeric = pd.to_numeric(raw_piezas, errors="coerce")
-
-        if numeric.isna().any():
-            extracted = (
-                raw_piezas.astype(str)
-                .str.replace(",", ".", regex=False)
-                .str.extract(r"(\d+\.?\d*)")[0]
-            )
-            fallback_numeric = pd.to_numeric(extracted, errors="coerce")
-            numeric = numeric.fillna(fallback_numeric)
-
-        numeric = numeric.fillna(0)
-        numeric = numeric.clip(lower=0)
-        p = numeric.round().astype(int)
+        p = _parse_quantity_series(df[piezas_c], default=0).clip(lower=0)
     else:
         p = pd.Series(1, index=df.index, dtype=int)
     out["N° BULTOS"] = p
