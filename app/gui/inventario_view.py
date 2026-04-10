@@ -830,9 +830,15 @@ class InventarioView(tk.Toplevel):
         column = self.tree.identify_column(event.x)
         row_id = self.tree.identify_row(event.y)
         if region == "cell" and column == "#1" and row_id:
-            if not row_id.startswith("data-"):
+            if row_id.startswith("group-"):
                 return "break"
-            idx = int(row_id.split("-", 1)[1])
+            if row_id.startswith("data-"):
+                idx = int(row_id.split("-", 1)[1])
+            else:
+                try:
+                    idx = int(row_id)
+                except (TypeError, ValueError):
+                    return "break"
             if idx in self.selected_row_ids:
                 self.selected_row_ids.remove(idx)
             else:
@@ -1076,9 +1082,9 @@ class InventarioView(tk.Toplevel):
         tiene_codigo = bool(self._norm_text(self.entry_codigo.get()))
         tiene_bodega = self._norm_text(self.bodega_var.get()) not in ("", "todas")
         tiene_stock_cero = bool(self.stock_cero_var.get())
-        tiene_col = bool(self._norm_text(self.entry_columna.get()))
-        tiene_fila = bool(self._norm_text(self.entry_fila.get()))
-        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_bodega or tiene_stock_cero or tiene_col or tiene_fila:
+        tiene_fila_letra = bool(self._norm_text(self.entry_fila_letra.get()))
+        tiene_posicion = bool(self._norm_text(self.entry_posicion.get()))
+        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_bodega or tiene_stock_cero or tiene_fila_letra or tiene_posicion:
             self._filtrar()
         else:
             self.df_filtrado = pd.DataFrame()
