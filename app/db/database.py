@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
-from app.db.models import Base, HistorialArchivo, RegistroImpresion, User
+from app.db.models import Base, HistorialArchivo, InventarioDiferencia, RegistroImpresion, User
 from app.core.logger_eventos import log_evento
 from app.utils.paths import DB_PATH
 from pathlib import Path
@@ -109,3 +109,106 @@ def save_print_history(archivo: str, observacion: str = "", usuario_id: int = No
             log_evento(f"Impresión registrada: {archivo}", "info")
     except Exception as e:
         log_evento(f"Error al registrar impresión: {e}", "error")
+
+
+def upsert_inventory_difference(
+    *,
+    codigo: str,
+    producto: str,
+    bodega: str,
+    ubicacion: str,
+    numero_serie: str,
+    lote: str,
+    fecha_vencimiento: str = "",
+    stock_sistema: int = 0,
+    diferencia_cantidad: int = 0,
+    observacion: str = "",
+    archivo_origen: str = "",
+):
+    """
+    Crea o actualiza una diferencia de inventario identificada por:
+    codigo + bodega + ubicacion + numero_serie + lote.
+    """
+    try:
+        with SessionLocal() as session:
+            registro = (
+                session.query(InventarioDiferencia)
+                .filter_by(
+                    codigo=str(codigo or "").strip(),
+                    bodega=str(bodega or "").strip(),
+                    ubicacion=str(ubicacion or "").strip(),
+                    numero_serie=str(numero_serie or "").strip(),
+                    lote=str(lote or "").strip(),
+                )
+                .one_or_none()
+            )
+
+            stock_sistema_int = int(stock_sistema or 0)
+            diferencia_int = int(diferencia_cantidad or 0)
+            stock_contado = stock_sistema_int + diferencia_int
+
+            if registro is None:
+                registro = InventarioDiferencia(
+                    codigo=str(codigo or "").strip(),
+                    producto=str(producto or "").strip(),
+                    bodega=str(bodega or "").strip(),
+                    ubicacion=str(ubicacion or "").strip(),
+                    numero_serie=str(numero_serie or "").strip(),
+                    lote=str(lote or "").strip(),
+                    fecha_vencimiento=str(fecha_vencimiento or "").strip(),
+                    stock_sistema=stock_sistema_int,
+                    diferencia_cantidad=diferencia_int,
+                    stock_contado=stock_contado,
+                    observacion=str(observacion or "").strip(),
+                    archivo_origen=str(archivo_origen or "").strip(),
+                )
+                session.add(registro)
+            else:
+                registro.producto = str(producto or "").strip()
+                registro.fecha_vencimiento = str(fecha_vencimiento or "").strip()
+                registro.stock_sistema = stock_sistema_int
+                registro.diferencia_cantidad = diferencia_int
+                registro.stock_contado = stock_contado
+                registro.observacion = str(observacion or "").strip()
+                registro.archivo_origen = str(archivo_origen or "").strip()
+                registro.actualizado_en = datetime.utcnow()
+
+            session.commit()
+            log_evento(
+                f"Diferencia de inventario guardada: codigo={codigo}, ubicacion={ubicacion}, lote={lote}, diferencia={diferencia_int}",
+                "info",
+            )
+            session.refresh(registro)
+            return registro
+    except Exception as e:
+        log_evento(f"Error al guardar diferencia de inventario: {e}", "error")
+        raise
+
+
+def list_inventory_differences():
+    try:
+        with SessionLocal() as session:
+            registros = (
+                session.query(InventarioDiferencia)
+                .order_by(InventarioDiferencia.actualizado_en.desc(), InventarioDiferencia.id.desc())
+                .all()
+            )
+            return registros
+    except Exception as e:
+        log_evento(f"Error listando diferencias de inventario: {e}", "error")
+        raise
+
+
+def delete_inventory_difference(record_id: int) -> bool:
+    try:
+        with SessionLocal() as session:
+            registro = session.get(InventarioDiferencia, int(record_id))
+            if registro is None:
+                return False
+            session.delete(registro)
+            session.commit()
+            log_evento(f"Diferencia de inventario eliminada: id={record_id}", "info")
+            return True
+    except Exception as e:
+        log_evento(f"Error eliminando diferencia de inventario: {e}", "error")
+        raise

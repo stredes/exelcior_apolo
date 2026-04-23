@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 from app.security.passwords import hash_password, verify_password, looks_hashed
@@ -81,3 +81,33 @@ class RegistroImpresion(Base):
 
     # Relación inversa
     usuario = relationship("User", back_populates="impresiones")
+
+
+class InventarioDiferencia(Base):
+    __tablename__ = "inventario_diferencias"
+    __table_args__ = (
+        UniqueConstraint(
+            "codigo",
+            "bodega",
+            "ubicacion",
+            "numero_serie",
+            "lote",
+            name="uq_inventario_diferencia_item",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    codigo = Column(String(120), nullable=False, default="")
+    producto = Column(String(255), nullable=False, default="")
+    bodega = Column(String(120), nullable=False, default="")
+    ubicacion = Column(String(120), nullable=False, default="")
+    numero_serie = Column(String(255), nullable=False, default="")
+    lote = Column(String(255), nullable=False, default="")
+    fecha_vencimiento = Column(String(50), nullable=True)
+    stock_sistema = Column(Integer, nullable=False, default=0)
+    diferencia_cantidad = Column(Integer, nullable=False, default=0)
+    stock_contado = Column(Integer, nullable=False, default=0)
+    observacion = Column(Text, nullable=True)
+    archivo_origen = Column(String(255), nullable=True)
+    creado_en = Column(DateTime, default=datetime.utcnow)
+    actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

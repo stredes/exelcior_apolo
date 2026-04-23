@@ -13,16 +13,24 @@ from typing import Dict
 import pandas as pd
 import numpy as np
 
+from app.services.inventory_difference_service import (
+    export_inventory_difference_report,
+    get_inventory_differences_df,
+    merge_inventory_differences,
+    remove_inventory_difference,
+    save_inventory_difference,
+)
 from app.utils.utils import guardar_ultimo_path, load_config
 from app.core.logger_eventos import capturar_log_bod1
 from app.printer import printer_inventario_codigo, printer_inventario_ubicacion
 
 
 # Columnas visibles y orden final en la grilla / impresion
-VISIBLE_COLUMNS = [
+BASE_INVENTORY_COLUMNS = [
     "Código", "Producto", "Bodega", "Ubicación",
     "N° Serie", "Lote", "Fecha Vencimiento", "Saldo Stock"
 ]
+VISIBLE_COLUMNS = BASE_INVENTORY_COLUMNS + ["Dif. Stock", "Stock Contado"]
 TREE_COLUMNS = ["Sel"] + VISIBLE_COLUMNS
 
 # Sinonimos (normalizados a minusculas y sin acentos) -> nombre objetivo
@@ -84,7 +92,7 @@ def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
     """Limpia tipos/NaN para UI y posterior impresion."""
     df2 = df.copy()
 
-    faltantes = [c for c in VISIBLE_COLUMNS if c not in df2.columns]
+    faltantes = [c for c in BASE_INVENTORY_COLUMNS if c not in df2.columns]
     if faltantes:
         raise ValueError(f"Faltan columnas requeridas: {faltantes}")
 
@@ -101,8 +109,8 @@ def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
 
     df2["Saldo Stock"] = pd.to_numeric(df2["Saldo Stock"], errors="coerce").fillna(0).astype(int)
 
-    mask_any = df2[VISIBLE_COLUMNS].astype(str).apply(lambda s: s.str.strip() != "").any(axis=1)
-    df2 = df2.loc[mask_any, VISIBLE_COLUMNS].reset_index(drop=True)
+    mask_any = df2[BASE_INVENTORY_COLUMNS].astype(str).apply(lambda s: s.str.strip() != "").any(axis=1)
+    df2 = df2.loc[mask_any, BASE_INVENTORY_COLUMNS].reset_index(drop=True)
 
     return df2
 
@@ -153,7 +161,9 @@ class InventarioView(tk.Toplevel):
             pass
 
         self.df = pd.DataFrame()
+        self.df_base = pd.DataFrame()
         self.df_filtrado = pd.DataFrame()
+        self.diff_df = pd.DataFrame()
         self.tipo_busqueda = None
         self.sort_column = None
         self.sort_ascending = True
@@ -236,7 +246,7 @@ class InventarioView(tk.Toplevel):
         shell.pack(fill="both", expand=True)
 
         ttk.Label(shell, text="Inventario", style="InvTitle.TLabel").pack(anchor="w")
-        ttk.Label(shell, text="Busqueda por texto, codigo de producto, bodega, ubicacion principal, fila y posicion.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
+        ttk.Label(shell, text="Busqueda por texto, codigo, nombre, lote/serie, bodega y ubicacion fisica; tambien permite registrar diferencias de stock.", style="InvSub.TLabel").pack(anchor="w", pady=(2, 10))
 
         top_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
         top_card.pack(fill="x")
@@ -263,6 +273,16 @@ class InventarioView(tk.Toplevel):
         self.combo_bodega.grid(row=0, column=5, padx=(6, 12), sticky="w")
         self.combo_bodega.bind("<<ComboboxSelected>>", lambda e: self._filtrar())
         self.combo_bodega["values"] = ["Todas"]
+
+        tk.Label(search_block, text="Lote / Serie:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self.entry_lote_serie = tk.Entry(search_block, width=34, font=("Segoe UI", 10))
+        self.entry_lote_serie.grid(row=1, column=1, padx=(6, 12), sticky="w", pady=(8, 0))
+        self.entry_lote_serie.bind("<Return>", lambda e: self._filtrar())
+        ttk.Label(
+            search_block,
+            text="Selecciona una fila para guardar una diferencia positiva o negativa.",
+            style="InvHint.TLabel",
+        ).grid(row=1, column=2, columnspan=4, sticky="w", pady=(8, 0))
         search_block.columnconfigure(6, weight=1)
 
         location_block = ttk.LabelFrame(filter_shell, text="Ubicacion Fisica", padding=10)
@@ -294,6 +314,9 @@ class InventarioView(tk.Toplevel):
         ttk.Button(actions_block, text="Buscar", command=self._filtrar).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Seleccionar todo", command=self._toggle_select_all).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Registrar diferencia", command=self._abrir_dialogo_diferencia).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Ver diferencias", command=self._abrir_historial_diferencias).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Informe diferencias", command=self._exportar_informe_diferencias).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Duplicados ubicación", command=self._mostrar_duplicados_ubicacion).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Abrir Excel", command=self._recargar_archivo).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Imprimir Resultado", command=self._imprimir_resultado).pack(side="left")
@@ -391,7 +414,9 @@ class InventarioView(tk.Toplevel):
             df = _normalize_headers(df)
             df = _clean_for_view(df)
 
-            self.df = df
+            self.df_base = df
+            self.diff_df = get_inventory_differences_df()
+            self.df = merge_inventory_differences(self.df_base, self.diff_df)
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
             self.sort_column = None
@@ -419,7 +444,9 @@ class InventarioView(tk.Toplevel):
             capturar_log_bod1(f"[Inventario] Error al cargar inventario: {e}", "error")
             self.safe_messagebox("error", "Error", f"No se pudo cargar el archivo:\n{e}")
             self.df = pd.DataFrame()
+            self.df_base = pd.DataFrame()
             self.df_filtrado = pd.DataFrame()
+            self.diff_df = pd.DataFrame()
             self.tipo_busqueda = None
             self.sort_column = None
             self.sort_ascending = True
@@ -444,9 +471,10 @@ class InventarioView(tk.Toplevel):
         s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
         return " ".join(s.split())
 
-    def _filtrar(self):
+    def _filtrar(self, silent_no_filters: bool = False):
         term_raw = self.entry_busqueda.get()
         codigo_producto = self._norm_text(self.entry_codigo.get())
+        lote_serie = self._norm_text(self.entry_lote_serie.get())
         ubicaciones_principales = self._parse_selector_tokens(self.entry_ubicacion_selector.get())
         self.ubicaciones_principales_seleccionadas = set(ubicaciones_principales)
         self._actualizar_label_ubicaciones_principales()
@@ -455,8 +483,9 @@ class InventarioView(tk.Toplevel):
         posicion = self._norm_text(self.entry_posicion.get())
         solo_stock_cero = bool(self.stock_cero_var.get())
 
-        if not term_raw.strip() and not codigo_producto and not ubicaciones_principales and not fila_letra and not posicion and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
-            self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, ubicacion principal, fila, posicion, bodega, stock 0 o seleccione ubicaciones.")
+        if not term_raw.strip() and not codigo_producto and not lote_serie and not ubicaciones_principales and not fila_letra and not posicion and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
+            if not silent_no_filters:
+                self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, lote/serie, ubicacion principal, fila, posicion, bodega, stock 0 o seleccione ubicaciones.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -468,6 +497,8 @@ class InventarioView(tk.Toplevel):
         m_ubi = df["Ubicación"].astype(str).map(self._norm_text)
         m_cod = df["Código"].astype(str).map(self._norm_text)
         m_prod = df["Producto"].astype(str).map(self._norm_text)
+        m_lote = df["Lote"].astype(str).map(self._norm_text)
+        m_serie = df["N° Serie"].astype(str).map(self._norm_text)
         m_bodega = df["Bodega"].astype(str).map(self._norm_text)
         m_ubicacion_principal = df["Ubicación"].astype(str).map(self._extract_main_row)
         m_fila_letra = df["Ubicación"].astype(str).map(self._extract_letter_row)
@@ -477,11 +508,15 @@ class InventarioView(tk.Toplevel):
             mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos))
             mask_cod = m_cod.apply(lambda val: all(term in val for term in terminos))
             mask_prod = m_prod.apply(lambda val: all(term in val for term in terminos))
-            mask_texto = mask_ubi | mask_cod | mask_prod
+            mask_lote = m_lote.apply(lambda val: all(term in val for term in terminos))
+            mask_serie = m_serie.apply(lambda val: all(term in val for term in terminos))
+            mask_texto = mask_ubi | mask_cod | mask_prod | mask_lote | mask_serie
         else:
             mask_ubi = pd.Series([False] * len(df), index=df.index)
             mask_cod = pd.Series([False] * len(df), index=df.index)
             mask_prod = pd.Series([False] * len(df), index=df.index)
+            mask_lote = pd.Series([False] * len(df), index=df.index)
+            mask_serie = pd.Series([False] * len(df), index=df.index)
             mask_texto = pd.Series([True] * len(df), index=df.index)
 
         mask_fila_letra = pd.Series([True] * len(df), index=df.index)
@@ -495,6 +530,10 @@ class InventarioView(tk.Toplevel):
         mask_codigo_directo = pd.Series([True] * len(df), index=df.index)
         if codigo_producto:
             mask_codigo_directo = m_cod.apply(lambda val: codigo_producto in val)
+
+        mask_lote_serie = pd.Series([True] * len(df), index=df.index)
+        if lote_serie:
+            mask_lote_serie = m_lote.apply(lambda val: lote_serie in val) | m_serie.apply(lambda val: lote_serie in val)
 
         mask_ubicacion_principal = pd.Series([True] * len(df), index=df.index)
         if ubicaciones_principales:
@@ -514,17 +553,19 @@ class InventarioView(tk.Toplevel):
             sel_norm = {self._norm_text(v) for v in self.ubicaciones_seleccionadas}
             mask_sel_ubic = m_ubi.isin(sel_norm)
 
-        mask_total = mask_texto & mask_codigo_directo & mask_ubicacion_principal & mask_bodega & mask_stock_cero & mask_fila_letra & mask_posicion & mask_sel_ubic
+        mask_total = mask_texto & mask_codigo_directo & mask_lote_serie & mask_ubicacion_principal & mask_bodega & mask_stock_cero & mask_fila_letra & mask_posicion & mask_sel_ubic
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
             if codigo_producto:
                 self.tipo_busqueda = "codigo"
+            elif lote_serie:
+                self.tipo_busqueda = "lote_serie"
             elif self.ubicaciones_seleccionadas or ubicaciones_principales or bodega not in ("", "todas") or solo_stock_cero or fila_letra or posicion or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
-            elif mask_prod.any():
+            elif mask_prod.any() or mask_lote.any() or mask_serie.any():
                 self.tipo_busqueda = "producto"
             else:
                 self.tipo_busqueda = None
@@ -546,6 +587,7 @@ class InventarioView(tk.Toplevel):
     def _limpiar_busqueda(self):
         self.entry_busqueda.delete(0, "end")
         self.entry_codigo.delete(0, "end")
+        self.entry_lote_serie.delete(0, "end")
         self.entry_ubicacion_selector.delete(0, "end")
         self.bodega_var.set("Todas")
         self.stock_cero_var.set(False)
@@ -600,6 +642,7 @@ class InventarioView(tk.Toplevel):
         )
 
         report["Saldo Stock"] = pd.to_numeric(report["Saldo Stock"], errors="coerce").fillna(0).astype(int)
+        report = merge_inventory_differences(report.loc[:, BASE_INVENTORY_COLUMNS].reset_index(drop=True), self.diff_df)
         return report.loc[:, VISIBLE_COLUMNS].reset_index(drop=True)
 
     def _mostrar_duplicados_ubicacion(self):
@@ -743,7 +786,7 @@ class InventarioView(tk.Toplevel):
                 "",
                 "end",
                 iid=f"group-{row_index}",
-                values=("", codigo, producto, "", resumen, "", "", "", total_stock),
+                values=("", codigo, producto, "", resumen, "", "", "", total_stock, 0, total_stock),
                 tags=("group",),
             )
             row_index += 1
@@ -779,8 +822,10 @@ class InventarioView(tk.Toplevel):
                 width = 280
             elif col in ("Bodega", "Ubicación"):
                 width = 160
-            elif col in ("Fecha Vencimiento", "Saldo Stock"):
+            elif col in ("Fecha Vencimiento", "Saldo Stock", "Stock Contado"):
                 width = 130
+            elif col == "Dif. Stock":
+                width = 110
             self.tree.column(col, width=width, minwidth=110, anchor="center", stretch=True)
         self._update_heading_texts()
 
@@ -803,6 +848,12 @@ class InventarioView(tk.Toplevel):
     def _current_view_df(self) -> pd.DataFrame:
         return self.df_filtrado if not self.df_filtrado.empty else self.df
 
+    def _current_print_df(self) -> pd.DataFrame:
+        current = self._current_view_df()
+        if current is None or current.empty:
+            return pd.DataFrame(columns=BASE_INVENTORY_COLUMNS)
+        return current.loc[:, BASE_INVENTORY_COLUMNS].reset_index(drop=True)
+
     def _selected_view_df(self) -> pd.DataFrame:
         current = self._current_view_df()
         if current is None or current.empty or not self.selected_row_ids:
@@ -810,6 +861,15 @@ class InventarioView(tk.Toplevel):
         valid_indexes = [idx for idx in sorted(self.selected_row_ids) if 0 <= idx < len(current)]
         if not valid_indexes:
             return pd.DataFrame()
+        return current.iloc[valid_indexes].reset_index(drop=True)
+
+    def _selected_print_df(self) -> pd.DataFrame:
+        current = self._current_print_df()
+        if current is None or current.empty or not self.selected_row_ids:
+            return pd.DataFrame(columns=BASE_INVENTORY_COLUMNS)
+        valid_indexes = [idx for idx in sorted(self.selected_row_ids) if 0 <= idx < len(current)]
+        if not valid_indexes:
+            return pd.DataFrame(columns=BASE_INVENTORY_COLUMNS)
         return current.iloc[valid_indexes].reset_index(drop=True)
 
     def _toggle_select_all(self):
@@ -857,8 +917,8 @@ class InventarioView(tk.Toplevel):
     # ------------------------------ Print -------------------------------
 
     def _imprimir_resultado(self):
-        df_selected = self._selected_view_df()
-        df_to_print = df_selected if not df_selected.empty else self._current_view_df()
+        df_selected = self._selected_print_df()
+        df_to_print = df_selected if not df_selected.empty else self._current_print_df()
         if df_to_print.empty:
             self.safe_messagebox("warning", "Sin datos", "No hay datos para imprimir.")
             return
@@ -889,6 +949,206 @@ class InventarioView(tk.Toplevel):
         except Exception as e:
             capturar_log_bod1(f"[Inventario] Error al imprimir inventario: {e}", "error")
             self.safe_messagebox("error", "Error", f"No se pudo imprimir:\n{e}")
+
+    def _refresh_differences_and_view(self):
+        self.diff_df = get_inventory_differences_df()
+        if self.df_base is not None and not self.df_base.empty:
+            self.df = merge_inventory_differences(self.df_base, self.diff_df)
+        else:
+            self.df = pd.DataFrame()
+
+        if self._has_active_filters():
+            self._filtrar(silent_no_filters=True)
+        else:
+            self.df_filtrado = pd.DataFrame()
+            self._actualizar_tree(self.df)
+
+    def _has_active_filters(self) -> bool:
+        return any(
+            [
+                bool(self.entry_busqueda.get().strip()),
+                bool(self.entry_codigo.get().strip()),
+                bool(self.entry_lote_serie.get().strip()),
+                bool(self.entry_ubicacion_selector.get().strip()),
+                bool(self.entry_fila_letra.get().strip()),
+                bool(self.entry_posicion.get().strip()),
+                bool(self.ubicaciones_seleccionadas),
+                self._norm_text(self.bodega_var.get()) not in ("", "todas"),
+                bool(self.stock_cero_var.get()),
+            ]
+        )
+
+    def _abrir_dialogo_diferencia(self):
+        if self.df.empty:
+            self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
+            return
+
+        selected = self._selected_view_df()
+        if selected.empty:
+            self.safe_messagebox("info", "Diferencias", "Selecciona una fila para registrar la diferencia de stock.")
+            return
+        if len(selected) != 1:
+            self.safe_messagebox("info", "Diferencias", "Por ahora registra una diferencia a la vez para asegurar el lote o serie correcto.")
+            return
+
+        row = selected.iloc[0]
+        current_diff = int(pd.to_numeric(pd.Series([row.get("Dif. Stock", 0)]), errors="coerce").fillna(0).iloc[0])
+        current_note = str(row.get("Observación Dif.", "") or "")
+
+        win = tk.Toplevel(self)
+        win.title("Registrar diferencia de stock")
+        win.geometry("560x360")
+        win.transient(self)
+        win.grab_set()
+        win.config(bg="#FFFFFF")
+
+        ttk.Label(win, text="Registrar diferencia de stock").pack(anchor="w", padx=16, pady=(16, 8))
+        info = "\n".join(
+            [
+                f"Código: {row.get('Código', '')}",
+                f"Producto: {row.get('Producto', '')}",
+                f"Ubicación: {row.get('Ubicación', '')}",
+                f"Lote: {row.get('Lote', '') or '-'}",
+                f"Serie: {row.get('N° Serie', '') or '-'}",
+                f"Stock sistema: {row.get('Saldo Stock', 0)}",
+            ]
+        )
+        ttk.Label(win, text=info, justify="left").pack(anchor="w", padx=16, pady=(0, 12))
+
+        form = ttk.Frame(win, padding=16)
+        form.pack(fill="both", expand=True)
+
+        ttk.Label(form, text="Diferencia (+/-):").grid(row=0, column=0, sticky="w")
+        qty_var = tk.StringVar(value=str(current_diff if current_diff else ""))
+        qty_entry = ttk.Entry(form, textvariable=qty_var, width=16)
+        qty_entry.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        qty_entry.focus_set()
+
+        ttk.Label(form, text="Observación:").grid(row=1, column=0, sticky="nw", pady=(12, 0))
+        note_text = tk.Text(form, width=48, height=6, font=("Segoe UI", 10))
+        note_text.grid(row=1, column=1, sticky="we", padx=(8, 0), pady=(12, 0))
+        if current_note:
+            note_text.insert("1.0", current_note)
+        form.columnconfigure(1, weight=1)
+
+        def guardar():
+            try:
+                difference_qty = int(qty_var.get().strip())
+            except Exception:
+                self.safe_messagebox("error", "Diferencias", "La diferencia debe ser un numero entero, por ejemplo -2 o 5.")
+                return
+
+            if difference_qty == 0:
+                self.safe_messagebox("info", "Diferencias", "La diferencia no puede ser 0. Usa un valor positivo o negativo.")
+                return
+
+            try:
+                save_inventory_difference(
+                    row,
+                    difference_qty=difference_qty,
+                    note=note_text.get("1.0", "end").strip(),
+                    source_file=self._archivo_actual,
+                )
+                self._refresh_differences_and_view()
+                self.status_var.set(
+                    f"Diferencia guardada para {row.get('Código', '')} en {row.get('Ubicación', '')}: {difference_qty:+d}"
+                )
+                capturar_log_bod1(
+                    f"[Inventario] Diferencia guardada para codigo={row.get('Código', '')}, ubicacion={row.get('Ubicación', '')}, lote={row.get('Lote', '')}, serie={row.get('N° Serie', '')}, diferencia={difference_qty}",
+                    "info",
+                )
+                win.destroy()
+            except Exception as e:
+                capturar_log_bod1(f"[Inventario] Error guardando diferencia: {e}", "error")
+                self.safe_messagebox("error", "Diferencias", f"No se pudo guardar la diferencia:\n{e}")
+
+        buttons = ttk.Frame(win, padding=(16, 0, 16, 16))
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Guardar diferencia", command=guardar).pack(side="right")
+        ttk.Button(buttons, text="Cancelar", command=win.destroy).pack(side="right", padx=(0, 8))
+
+    def _abrir_historial_diferencias(self):
+        diff_df = get_inventory_differences_df()
+        if diff_df.empty:
+            self.safe_messagebox("info", "Diferencias", "Todavia no hay diferencias de stock guardadas.")
+            return
+
+        win = tk.Toplevel(self)
+        win.title("Diferencias guardadas")
+        win.geometry("1180x520")
+        win.transient(self)
+        win.config(bg="#FFFFFF")
+
+        ttk.Label(win, text="Diferencias guardadas").pack(anchor="w", padx=14, pady=(14, 8))
+
+        cols = list(diff_df.columns)
+        tree = ttk.Treeview(win, columns=cols, show="headings", height=18)
+        for col in cols:
+            tree.heading(col, text=col)
+            width = 120
+            if col == "Producto":
+                width = 240
+            elif col == "Observación":
+                width = 260
+            elif col in ("Código", "Bodega", "Ubicación", "Lote", "N° Serie"):
+                width = 120
+            tree.column(col, width=width, minwidth=80, anchor="center")
+
+        for _, row in diff_df.iterrows():
+            tree.insert("", "end", iid=str(row["id"]), values=[row[col] for col in cols])
+
+        tree.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+
+        actions = ttk.Frame(win, padding=(14, 0, 14, 14))
+        actions.pack(fill="x")
+
+        def eliminar():
+            selected_id = tree.selection()
+            if not selected_id:
+                self.safe_messagebox("info", "Diferencias", "Selecciona una diferencia para eliminar.")
+                return
+            record_id = int(selected_id[0])
+            try:
+                deleted = remove_inventory_difference(record_id)
+                if deleted:
+                    tree.delete(selected_id[0])
+                    self._refresh_differences_and_view()
+                    self.status_var.set(f"Diferencia eliminada: id {record_id}")
+                else:
+                    self.safe_messagebox("warning", "Diferencias", "La diferencia ya no estaba disponible.")
+            except Exception as e:
+                capturar_log_bod1(f"[Inventario] Error eliminando diferencia: {e}", "error")
+                self.safe_messagebox("error", "Diferencias", f"No se pudo eliminar la diferencia:\n{e}")
+
+        ttk.Button(actions, text="Eliminar seleccionada", command=eliminar).pack(side="left")
+        ttk.Button(actions, text="Exportar informe", command=self._exportar_informe_diferencias).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Cerrar", command=win.destroy).pack(side="right")
+
+    def _exportar_informe_diferencias(self):
+        diff_df = get_inventory_differences_df()
+        if diff_df.empty:
+            self.safe_messagebox("info", "Informe", "Todavia no hay diferencias de stock guardadas para informar.")
+            return
+
+        suggested_name = "informe_diferencias_stock.xlsx"
+        destination = filedialog.asksaveasfilename(
+            parent=self,
+            title="Guardar informe de diferencias",
+            defaultextension=".xlsx",
+            initialfile=suggested_name,
+            filetypes=[("Excel", "*.xlsx")],
+        )
+        if not destination:
+            return
+
+        try:
+            output_path = export_inventory_difference_report(destination, diff_df=diff_df)
+            self.status_var.set(f"Informe de diferencias generado: {output_path.name}")
+            capturar_log_bod1(f"[Inventario] Informe de diferencias generado en {output_path}", "info")
+            self.safe_messagebox("info", "Informe", f"Informe generado correctamente en:\n{output_path}")
+        except Exception as e:
+            capturar_log_bod1(f"[Inventario] Error generando informe de diferencias: {e}", "error")
+            self.safe_messagebox("error", "Informe", f"No se pudo generar el informe:\n{e}")
 
     # ---------------------- Selector de ubicaciones ----------------------
 
@@ -1080,11 +1340,12 @@ class InventarioView(tk.Toplevel):
     def _filtrar_desde_selector(self):
         tiene_texto = bool(self._norm_text(self.entry_busqueda.get()))
         tiene_codigo = bool(self._norm_text(self.entry_codigo.get()))
+        tiene_lote_serie = bool(self._norm_text(self.entry_lote_serie.get()))
         tiene_bodega = self._norm_text(self.bodega_var.get()) not in ("", "todas")
         tiene_stock_cero = bool(self.stock_cero_var.get())
         tiene_fila_letra = bool(self._norm_text(self.entry_fila_letra.get()))
         tiene_posicion = bool(self._norm_text(self.entry_posicion.get()))
-        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_bodega or tiene_stock_cero or tiene_fila_letra or tiene_posicion:
+        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_lote_serie or tiene_bodega or tiene_stock_cero or tiene_fila_letra or tiene_posicion:
             self._filtrar()
         else:
             self.df_filtrado = pd.DataFrame()

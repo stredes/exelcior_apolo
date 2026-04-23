@@ -57,8 +57,15 @@ class BuscadorCodigosPostales(tk.Toplevel):
     PREFERRED_HEADER_ROWS = [1, 2, 0, 3, 4, 5]
 
     @staticmethod
-    def _excel_engine_for_path(path: Path) -> str:
-        ext = path.suffix.lower()
+    def _path_suffix(path) -> str:
+        try:
+            return Path(path).suffix.lower()
+        except Exception:
+            return ""
+
+    @classmethod
+    def _excel_engine_for_path(cls, path) -> str:
+        ext = cls._path_suffix(path)
         if ext == ".ods":
             return "odf"
         if ext == ".xls":
@@ -391,7 +398,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
         """
         engine = self._excel_engine_for_path(path)
 
-        if path.suffix.lower() == ".ods":
+        if self._path_suffix(path) == ".ods":
             try:
                 df_ods = self._leer_ods_via_content_xml(path)
                 df_ods = self._rename_soft(df_ods)
@@ -491,7 +498,7 @@ class BuscadorCodigosPostales(tk.Toplevel):
             except Exception as e:
                 capturar_log_bod1(f"[CP] inferencia fallo: {e}", "warning")
 
-        if path.suffix.lower() == ".ods":
+        if self._path_suffix(path) == ".ods":
             raise ValueError("No se pudo leer el archivo .ods. Instala odfpy: pip install odfpy")
 
         raise ValueError(
