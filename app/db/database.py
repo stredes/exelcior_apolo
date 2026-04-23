@@ -212,3 +212,18 @@ def delete_inventory_difference(record_id: int) -> bool:
     except Exception as e:
         log_evento(f"Error eliminando diferencia de inventario: {e}", "error")
         raise
+
+
+def clear_inventory_differences() -> int:
+    try:
+        with SessionLocal() as session:
+            total = session.query(InventarioDiferencia).count()
+            if total <= 0:
+                return 0
+            session.query(InventarioDiferencia).delete()
+            session.commit()
+            log_evento(f"Diferencias de inventario depuradas: {total}", "info")
+            return int(total)
+    except Exception as e:
+        log_evento(f"Error limpiando diferencias de inventario: {e}", "error")
+        raise

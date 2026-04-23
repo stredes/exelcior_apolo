@@ -8,10 +8,12 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from app.db.database import (
+    clear_inventory_differences,
     delete_inventory_difference,
     list_inventory_differences,
     upsert_inventory_difference,
 )
+from app.utils.app_dirs import OUTPUT_DIR
 from app.utils.utils import autoajustar_columnas
 
 
@@ -141,6 +143,39 @@ def remove_inventory_difference(record_id: int) -> bool:
     return delete_inventory_difference(record_id)
 
 
+def get_inventory_difference_output_dir() -> Path:
+    path = OUTPUT_DIR / "inventario_diferencias"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_inventory_difference_archive_dir() -> Path:
+    path = get_inventory_difference_output_dir() / "historial_cierres"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_inventory_difference_summary(diff_df: pd.DataFrame | None = None) -> Dict[str, int]:
+    if diff_df is None:
+        diff_df = get_inventory_differences_df()
+
+    if diff_df is None or diff_df.empty:
+        return {
+            "items": 0,
+            "positive_items": 0,
+            "negative_items": 0,
+            "net_difference": 0,
+        }
+
+    diffs = pd.to_numeric(diff_df["Dif. Stock"], errors="coerce").fillna(0).astype(int)
+    return {
+        "items": int(len(diff_df)),
+        "positive_items": int((diffs > 0).sum()),
+        "negative_items": int((diffs < 0).sum()),
+        "net_difference": int(diffs.sum()),
+    }
+
+
 def build_inventory_difference_report_df(diff_df: pd.DataFrame | None = None) -> pd.DataFrame:
     if diff_df is None:
         diff_df = get_inventory_differences_df()
@@ -220,3 +255,111 @@ def export_inventory_difference_report(destination: str | Path, diff_df: pd.Data
         autoajustar_columnas(workbook, max_width=40)
 
     return output_path
+
+
+def export_inventory_difference_report_pdf(destination: str | Path, diff_df: pd.DataFrame | None = None) -> Path:
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception as exc:
+        raise RuntimeError(
+            "La exportacion PDF requiere la dependencia 'reportlab'. Instala reportlab para habilitar esta opcion."
+        ) from exc
+
+    report_df = build_inventory_difference_report_df(diff_df)
+    if report_df.empty:
+        raise ValueError("No hay diferencias guardadas para generar el informe.")
+
+    output_path = Path(destination)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    doc = SimpleDocTemplate(
+        str(output_path),
+        pagesize=landscape(A4),
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+    )
+    styles = getSampleStyleSheet()
+    title_style = styles["Heading2"]
+    normal_style = styles["BodyText"]
+
+    title = Paragraph(
+        f"INFORME DE DIFERENCIAS DE STOCK - {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        title_style,
+    )
+
+    summary = get_inventory_difference_summary(diff_df if diff_df is not None else report_df)
+    summary_text = Paragraph(
+        (
+            f"Registros: {summary['items']} | "
+            f"Diferencias positivas: {summary['positive_items']} | "
+            f"Diferencias negativas: {summary['negative_items']} | "
+            f"Diferencia neta: {summary['net_difference']:+d}"
+        ),
+        normal_style,
+    )
+
+    display_columns = [
+        "CÃ³digo",
+        "Producto",
+        "Bodega",
+        "UbicaciÃ³n",
+        "NÂ° Serie",
+        "Lote",
+        "Stock Sistema",
+        "Dif. Stock",
+        "Stock Contado",
+        "ObservaciÃ³n",
+        "Actualizado",
+    ]
+    table_data: List[List[object]] = [display_columns]
+    for _, row in report_df.iterrows():
+        table_data.append([str(row.get(col, "") or "") for col in display_columns])
+
+    table = Table(
+        table_data,
+        repeatRows=1,
+        colWidths=[24 * mm, 40 * mm, 26 * mm, 28 * mm, 25 * mm, 25 * mm, 20 * mm, 20 * mm, 22 * mm, 50 * mm, 28 * mm],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#D9E2F3")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEADING", (0, 0), (-1, -1), 10),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#7B8794")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F7FAFC")]),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+
+    doc.build([title, Spacer(1, 6), summary_text, Spacer(1, 8), table])
+    return output_path
+
+
+def close_inventory_difference_cycle(diff_df: pd.DataFrame | None = None) -> Path:
+    if diff_df is None:
+        diff_df = get_inventory_differences_df()
+
+    report_df = build_inventory_difference_report_df(diff_df)
+    if report_df.empty:
+        raise ValueError("No hay diferencias activas para cerrar.")
+
+    archive_dir = get_inventory_difference_archive_dir()
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_path = archive_dir / f"cierre_diferencias_stock_{stamp}.xlsx"
+    export_inventory_difference_report(archive_path, diff_df=report_df)
+    clear_inventory_differences()
+    return archive_path

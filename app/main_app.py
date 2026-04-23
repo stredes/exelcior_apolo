@@ -39,7 +39,7 @@ from app.config.config_manager import load_config
 from app.gui.etiqueta_editor import crear_editor_etiqueta, cargar_config as cargar_config_etiquetas
 from app.gui.sra_mary import SraMaryView
 from app.gui.inventario_view import InventarioView
-from app.gui.informes_existencia_view import InformesExistenciaView
+from app.gui.inventory_difference_report_view import InventoryDifferenceReportView
 from app.gui.printer_admin import PrinterAdminDialog
 from app.updater import (
     fetch_latest_release,
@@ -377,7 +377,7 @@ class ExcelPrinterApp(tk.Tk):
         self._add_sidebar_button(actions_frame, "Codigos Postales", self._abrir_buscador_codigos_postales)
         self._add_sidebar_button(actions_frame, "Sra Mary", self._abrir_sra_mary)
         self._add_sidebar_button(actions_frame, "Inventario", lambda: InventarioView(self))
-        self._add_sidebar_button(actions_frame, "Informes de existencia", lambda: InformesExistenciaView(self))
+        self._add_sidebar_button(actions_frame, "Informe diferencias stock", self._abrir_informe_diferencias_stock)
         self._add_sidebar_button(actions_frame, "Vale de Consumo", self._abrir_vale_consumo)
         self._update_button = self._add_sidebar_button(actions_frame, "Actualizar Sistema", self._download_and_install_update)
         self._update_button.configure(state=tk.DISABLED, style="SidebarUpdate.TButton")
@@ -1031,6 +1031,9 @@ class ExcelPrinterApp(tk.Tk):
 
     def _abrir_sra_mary(self):
         SraMaryView(self)
+
+    def _abrir_informe_diferencias_stock(self):
+        InventoryDifferenceReportView(self)
 
     def _abrir_vale_consumo(self):
         """

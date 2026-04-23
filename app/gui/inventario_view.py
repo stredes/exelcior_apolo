@@ -14,7 +14,11 @@ import pandas as pd
 import numpy as np
 
 from app.services.inventory_difference_service import (
+    close_inventory_difference_cycle,
     export_inventory_difference_report,
+    get_inventory_difference_archive_dir,
+    get_inventory_difference_output_dir,
+    get_inventory_difference_summary,
     get_inventory_differences_df,
     merge_inventory_differences,
     remove_inventory_difference,
@@ -155,8 +159,9 @@ class InventarioView(tk.Toplevel):
         self.geometry("1280x760")
         self.minsize(1080, 640)
         self.config(bg="#EEF2F8")
+        self.resizable(True, True)
         try:
-            self.transient(parent)
+            self.attributes("-toolwindow", False)
         except Exception:
             pass
 
@@ -179,6 +184,8 @@ class InventarioView(tk.Toplevel):
         self.ubicaciones_var = tk.StringVar(value="Ubicaciones: todas")
         self.ubicaciones_principales_var = tk.StringVar(value="Ubicaciones: todas")
         self.printer_info_var = tk.StringVar(value="Impresora inventario: sin configurar")
+        self.diff_cycle_var = tk.StringVar(value="Diferencias activas: 0")
+        self.diff_archive_var = tk.StringVar(value="Historial de cierres: no disponible")
         self.bodega_var = tk.StringVar(value="Todas")
         self.stock_cero_var = tk.BooleanVar(value=False)
 
@@ -280,9 +287,19 @@ class InventarioView(tk.Toplevel):
         self.entry_lote_serie.bind("<Return>", lambda e: self._filtrar())
         ttk.Label(
             search_block,
+            textvariable=self.diff_cycle_var,
+            style="InvLabel.TLabel",
+        ).grid(row=1, column=2, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Button(
+            search_block,
+            text="Registrar diferencia",
+            command=self._abrir_dialogo_diferencia,
+        ).grid(row=1, column=4, sticky="w", pady=(8, 0), padx=(0, 8))
+        ttk.Label(
+            search_block,
             text="Selecciona una fila para guardar una diferencia positiva o negativa.",
             style="InvHint.TLabel",
-        ).grid(row=1, column=2, columnspan=4, sticky="w", pady=(8, 0))
+        ).grid(row=1, column=5, sticky="w", pady=(8, 0))
         search_block.columnconfigure(6, weight=1)
 
         location_block = ttk.LabelFrame(filter_shell, text="Ubicacion Fisica", padding=10)
@@ -307,6 +324,14 @@ class InventarioView(tk.Toplevel):
 
         ttk.Checkbutton(location_block, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=7, padx=(0, 12), sticky="w")
         ttk.Button(location_block, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=8, padx=(0, 6), sticky="w")
+        ttk.Button(location_block, text="Ver ciclo activo", command=self._abrir_historial_diferencias).grid(row=0, column=9, padx=(10, 8), sticky="w")
+        ttk.Label(
+            location_block,
+            textvariable=self.diff_archive_var,
+            style="InvHint.TLabel",
+            wraplength=520,
+            justify="left",
+        ).grid(row=0, column=10, sticky="w")
         location_block.columnconfigure(9, weight=1)
 
         actions_block = ttk.LabelFrame(filter_shell, text="Acciones", padding=10)
@@ -314,12 +339,11 @@ class InventarioView(tk.Toplevel):
         ttk.Button(actions_block, text="Buscar", command=self._filtrar).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Limpiar", command=self._limpiar_busqueda).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Seleccionar todo", command=self._toggle_select_all).pack(side="left", padx=(0, 8))
-        ttk.Button(actions_block, text="Registrar diferencia", command=self._abrir_dialogo_diferencia).pack(side="left", padx=(0, 8))
-        ttk.Button(actions_block, text="Ver diferencias", command=self._abrir_historial_diferencias).pack(side="left", padx=(0, 8))
-        ttk.Button(actions_block, text="Informe diferencias", command=self._exportar_informe_diferencias).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Duplicados ubicación", command=self._mostrar_duplicados_ubicacion).pack(side="left", padx=(0, 8))
         ttk.Button(actions_block, text="Abrir Excel", command=self._recargar_archivo).pack(side="left", padx=(0, 8))
-        ttk.Button(actions_block, text="Imprimir Resultado", command=self._imprimir_resultado).pack(side="left")
+        ttk.Button(actions_block, text="Imprimir Resultado", command=self._imprimir_resultado).pack(side="left", padx=(0, 20))
+        ttk.Button(actions_block, text="Exportar informe activo", command=self._exportar_informe_diferencias).pack(side="left", padx=(0, 8))
+        ttk.Button(actions_block, text="Cerrar ciclo diferencias", command=self._cerrar_ciclo_diferencias).pack(side="left")
 
         info_row = ttk.Frame(top_card, style="Card.TFrame")
         info_row.pack(fill="x", pady=(12, 0))
@@ -416,6 +440,7 @@ class InventarioView(tk.Toplevel):
 
             self.df_base = df
             self.diff_df = get_inventory_differences_df()
+            self._actualizar_resumen_diferencias()
             self.df = merge_inventory_differences(self.df_base, self.diff_df)
             self.df_filtrado = pd.DataFrame()
             self.tipo_busqueda = None
@@ -447,6 +472,7 @@ class InventarioView(tk.Toplevel):
             self.df_base = pd.DataFrame()
             self.df_filtrado = pd.DataFrame()
             self.diff_df = pd.DataFrame()
+            self._actualizar_resumen_diferencias()
             self.tipo_busqueda = None
             self.sort_column = None
             self.sort_ascending = True
@@ -952,6 +978,7 @@ class InventarioView(tk.Toplevel):
 
     def _refresh_differences_and_view(self):
         self.diff_df = get_inventory_differences_df()
+        self._actualizar_resumen_diferencias()
         if self.df_base is not None and not self.df_base.empty:
             self.df = merge_inventory_differences(self.df_base, self.diff_df)
         else:
@@ -962,6 +989,15 @@ class InventarioView(tk.Toplevel):
         else:
             self.df_filtrado = pd.DataFrame()
             self._actualizar_tree(self.df)
+
+    def _actualizar_resumen_diferencias(self):
+        summary = get_inventory_difference_summary(self.diff_df)
+        self.diff_cycle_var.set(
+            "Diferencias activas: "
+            f"{summary['items']} | +{summary['positive_items']} | -{summary['negative_items']} | neto {summary['net_difference']:+d}"
+        )
+        archive_dir = get_inventory_difference_archive_dir()
+        self.diff_archive_var.set(f"Historial de cierres: {archive_dir}")
 
     def _has_active_filters(self) -> bool:
         return any(
@@ -997,12 +1033,18 @@ class InventarioView(tk.Toplevel):
 
         win = tk.Toplevel(self)
         win.title("Registrar diferencia de stock")
-        win.geometry("560x360")
+        win.geometry("620x460")
+        win.minsize(560, 420)
         win.transient(self)
         win.grab_set()
         win.config(bg="#FFFFFF")
 
-        ttk.Label(win, text="Registrar diferencia de stock").pack(anchor="w", padx=16, pady=(16, 8))
+        shell = ttk.Frame(win, padding=16)
+        shell.pack(fill="both", expand=True)
+        shell.columnconfigure(0, weight=1)
+        shell.rowconfigure(2, weight=1)
+
+        ttk.Label(shell, text="Registrar diferencia de stock").grid(row=0, column=0, sticky="w", pady=(0, 8))
         info = "\n".join(
             [
                 f"Código: {row.get('Código', '')}",
@@ -1013,10 +1055,10 @@ class InventarioView(tk.Toplevel):
                 f"Stock sistema: {row.get('Saldo Stock', 0)}",
             ]
         )
-        ttk.Label(win, text=info, justify="left").pack(anchor="w", padx=16, pady=(0, 12))
+        ttk.Label(shell, text=info, justify="left").grid(row=1, column=0, sticky="we", pady=(0, 12))
 
-        form = ttk.Frame(win, padding=16)
-        form.pack(fill="both", expand=True)
+        form = ttk.Frame(shell)
+        form.grid(row=2, column=0, sticky="nsew")
 
         ttk.Label(form, text="Diferencia (+/-):").grid(row=0, column=0, sticky="w")
         qty_var = tk.StringVar(value=str(current_diff if current_diff else ""))
@@ -1030,6 +1072,7 @@ class InventarioView(tk.Toplevel):
         if current_note:
             note_text.insert("1.0", current_note)
         form.columnconfigure(1, weight=1)
+        form.rowconfigure(1, weight=1)
 
         def guardar():
             try:
@@ -1062,8 +1105,8 @@ class InventarioView(tk.Toplevel):
                 capturar_log_bod1(f"[Inventario] Error guardando diferencia: {e}", "error")
                 self.safe_messagebox("error", "Diferencias", f"No se pudo guardar la diferencia:\n{e}")
 
-        buttons = ttk.Frame(win, padding=(16, 0, 16, 16))
-        buttons.pack(fill="x")
+        buttons = ttk.Frame(shell)
+        buttons.grid(row=3, column=0, sticky="ew", pady=(14, 0))
         ttk.Button(buttons, text="Guardar diferencia", command=guardar).pack(side="right")
         ttk.Button(buttons, text="Cancelar", command=win.destroy).pack(side="right", padx=(0, 8))
 
@@ -1135,6 +1178,7 @@ class InventarioView(tk.Toplevel):
             parent=self,
             title="Guardar informe de diferencias",
             defaultextension=".xlsx",
+            initialdir=str(get_inventory_difference_output_dir()),
             initialfile=suggested_name,
             filetypes=[("Excel", "*.xlsx")],
         )
@@ -1149,6 +1193,38 @@ class InventarioView(tk.Toplevel):
         except Exception as e:
             capturar_log_bod1(f"[Inventario] Error generando informe de diferencias: {e}", "error")
             self.safe_messagebox("error", "Informe", f"No se pudo generar el informe:\n{e}")
+
+    def _cerrar_ciclo_diferencias(self):
+        diff_df = get_inventory_differences_df()
+        if diff_df.empty:
+            self.safe_messagebox("info", "Cierre", "No hay diferencias activas para cerrar.")
+            return
+
+        summary = get_inventory_difference_summary(diff_df)
+        confirm = messagebox.askyesno(
+            "Cerrar ciclo de diferencias",
+            "Se archivará el informe actual en la carpeta histórica y se limpiarán las diferencias activas.\n\n"
+            f"Registros: {summary['items']}\n"
+            f"Diferencia neta: {summary['net_difference']:+d}\n\n"
+            "¿Deseas continuar?",
+            parent=self,
+        )
+        if not confirm:
+            return
+
+        try:
+            archive_path = close_inventory_difference_cycle(diff_df)
+            self._refresh_differences_and_view()
+            self.status_var.set(f"Ciclo de diferencias cerrado. Archivo histórico: {archive_path.name}")
+            capturar_log_bod1(f"[Inventario] Cierre de diferencias generado en {archive_path}", "info")
+            self.safe_messagebox(
+                "info",
+                "Cierre completado",
+                f"El informe anterior fue archivado en:\n{archive_path}\n\nSe inició un nuevo ciclo de diferencias.",
+            )
+        except Exception as e:
+            capturar_log_bod1(f"[Inventario] Error cerrando ciclo de diferencias: {e}", "error")
+            self.safe_messagebox("error", "Cierre", f"No se pudo cerrar el ciclo de diferencias:\n{e}")
 
     # ---------------------- Selector de ubicaciones ----------------------
 
