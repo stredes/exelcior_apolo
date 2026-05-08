@@ -13,7 +13,13 @@ import pandas as pd
 from app.gui.inventario_view import _clean_for_view, _normalize_headers
 from app.utils.app_dirs import CONFIG_DIR, ensure_file
 from app.utils.utils import guardar_ultimo_path, load_config as load_app_config
-from app.printer.printer_etiquetas import generar_etiqueta_excel, imprimir_excel
+from app.printer.printer_etiquetas import (
+    DEFAULT_LABEL_HEIGHT_CM,
+    DEFAULT_LABEL_ORIENTATION,
+    DEFAULT_LABEL_WIDTH_CM,
+    generar_etiqueta_excel,
+    imprimir_excel,
+)
 
 CONFIG_PATH = ensure_file(
     CONFIG_DIR / "excel_printer_config.json",
@@ -24,6 +30,9 @@ CONFIG_PATH = ensure_file(
 )
 CLIENTES_PATH_KEY = "clientes_proveedores_path"
 INVENTORY_PATH_KEY = "archivo_inventario"
+LABEL_WIDTH_KEY = "product_label_width_cm"
+LABEL_HEIGHT_KEY = "product_label_height_cm"
+LABEL_ORIENTATION_KEY = "product_label_orientation"
 
 
 def cargar_config():
@@ -196,7 +205,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     estado = {"df_clientes": df_clientes, "df_inventario": pd.DataFrame()}
 
     ventana = tk.Toplevel(parent)
-    ventana.title("Editor de Etiquetas 10x10 cm")
+    ventana.title("Editor de Etiquetas")
     ventana.geometry("1280x860")
     ventana.minsize(1120, 760)
     ventana.configure(bg="#EEF2F9")
@@ -255,6 +264,9 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
 
     entradas = {}
     status_var = tk.StringVar(value="Completa el formulario para imprimir.")
+    label_width_var = tk.StringVar(value=str(config.get(LABEL_WIDTH_KEY, DEFAULT_LABEL_WIDTH_CM)))
+    label_height_var = tk.StringVar(value=str(config.get(LABEL_HEIGHT_KEY, DEFAULT_LABEL_HEIGHT_CM)))
+    label_orientation_var = tk.StringVar(value=str(config.get(LABEL_ORIENTATION_KEY, DEFAULT_LABEL_ORIENTATION)))
 
     lbl_excel = ttk.Label(source_card, text="Archivo clientes: No cargado", style="Path.TLabel")
     lbl_excel.grid(row=1, column=0, sticky="w", pady=(0, 8))
@@ -361,7 +373,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         producto_card,
         columns=("Código", "Producto", "Ubicación", "Lote", "N° Serie", "Fecha Vencimiento", "Saldo Stock"),
         show="headings",
-        height=8,
+        height=5,
     )
     result_widths = {
         "Código": 100,
@@ -419,21 +431,201 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
 
     producto_entries["copias"].insert(0, "1")
 
-    fila_impresora = len(campos) + 1
     impresoras = obtener_impresoras_disponibles()
+    printer_var = tk.StringVar(value=printer_name_default or (impresoras[0] if impresoras else ""))
+
+    medidas_card = ttk.LabelFrame(producto_card, text="Medidas de etiqueta", padding=10)
+    medidas_card.grid(row=8, column=0, columnspan=2, sticky="nsew", pady=(10, 0), padx=(0, 10))
+    medidas_card.columnconfigure(1, weight=1)
+    ttk.Label(medidas_card, text="Ancho (cm):", style="Body.TLabel").grid(row=0, column=0, sticky="e", padx=(0, 8), pady=4)
+    label_width_entry = ttk.Entry(medidas_card, textvariable=label_width_var, width=10)
+    label_width_entry.grid(row=0, column=1, sticky="w", pady=4)
+    ttk.Label(medidas_card, text="Alto (cm):", style="Body.TLabel").grid(row=1, column=0, sticky="e", padx=(0, 8), pady=4)
+    label_height_entry = ttk.Entry(medidas_card, textvariable=label_height_var, width=10)
+    label_height_entry.grid(row=1, column=1, sticky="w", pady=4)
+    ttk.Label(medidas_card, text="Orientacion:", style="Body.TLabel").grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
+    orientation_combo = ttk.Combobox(
+        medidas_card,
+        textvariable=label_orientation_var,
+        values=("portrait", "landscape"),
+        width=14,
+        state="readonly",
+    )
+    orientation_combo.grid(row=2, column=1, sticky="w", pady=4)
+    ttk.Label(medidas_card, text="Impresora:", style="Body.TLabel").grid(row=3, column=0, sticky="e", padx=(0, 8), pady=(10, 4))
+    combo_impresoras = ttk.Combobox(
+        medidas_card,
+        textvariable=printer_var,
+        values=impresoras,
+        width=32,
+        state="readonly",
+    )
+    combo_impresoras.grid(row=3, column=1, sticky="ew", pady=(10, 4))
+
+    preview_card = ttk.LabelFrame(producto_card, text="Previsualizacion", padding=10)
+    preview_card.grid(row=8, column=2, columnspan=3, sticky="nsew", pady=(10, 0))
+    preview_card.columnconfigure(0, weight=1)
+    preview_canvas = tk.Canvas(
+        preview_card,
+        width=390,
+        height=190,
+        bg="#F8FAFC",
+        highlightthickness=1,
+        highlightbackground="#CBD5E1",
+    )
+    preview_canvas.grid(row=0, column=0, sticky="nsew")
+
+    def _parse_label_size(value, default):
+        try:
+            parsed = float(str(value).replace(",", ".").strip())
+        except Exception:
+            return None
+        if parsed < 2 or parsed > 30:
+            return None
+        return parsed
+
+    def _get_label_settings(show_errors=False):
+        width_cm = _parse_label_size(label_width_var.get(), DEFAULT_LABEL_WIDTH_CM)
+        height_cm = _parse_label_size(label_height_var.get(), DEFAULT_LABEL_HEIGHT_CM)
+        orientation = label_orientation_var.get().strip().lower()
+        if width_cm is None or height_cm is None:
+            if show_errors:
+                messagebox.showerror(
+                    "Medidas invalidas",
+                    "Ingresa ancho y alto en centimetros, entre 2 y 30 cm.",
+                )
+            return None
+        if orientation not in ("portrait", "landscape"):
+            if show_errors:
+                messagebox.showerror("Orientacion invalida", "Selecciona portrait o landscape.")
+            return None
+        return {
+            "label_width_cm": width_cm,
+            "label_height_cm": height_cm,
+            "label_orientation": orientation,
+        }
+
+    def _wrap_preview_text(text, max_chars=42):
+        text = str(text or "").strip()
+        if len(text) <= max_chars:
+            return text
+        return text[: max_chars - 3].rstrip() + "..."
+
+    def _preview_font_size(text, available_px, base_size=8, min_size=6):
+        text = str(text or "").strip()
+        if not text:
+            return base_size
+        longest_word = max((len(word) for word in text.split()), default=len(text))
+        estimated_px = max(len(text) * base_size * 0.46, longest_word * base_size * 0.58)
+        if estimated_px <= max(available_px, 1):
+            return base_size
+        return max(min_size, int(base_size * available_px / estimated_px))
+
+    def _draw_preview_rows(x0, y0, x1, row_h, rows):
+        label_w = max(78, int((x1 - x0) * 0.31))
+        for idx, (label, value) in enumerate(rows):
+            y = y0 + idx * row_h
+            label_area = max(label_w - 12, 20)
+            value_area = max((x1 - (x0 + label_w)) - 14, 30)
+            label_size = _preview_font_size(label, label_area, base_size=8, min_size=6)
+            value_size = _preview_font_size(value, value_area, base_size=8, min_size=6)
+            preview_canvas.create_rectangle(x0, y, x0 + label_w, y + row_h, fill="#F3F4F6", outline="#111827")
+            preview_canvas.create_rectangle(x0 + label_w, y, x1, y + row_h, fill="#FFFFFF", outline="#111827")
+            preview_canvas.create_text(
+                x0 + 6,
+                y + row_h / 2,
+                text=label,
+                anchor="w",
+                font=("Segoe UI", label_size, "bold"),
+                fill="#111827",
+                width=label_area,
+            )
+            preview_canvas.create_text(
+                x0 + label_w + 6,
+                y + row_h / 2,
+                text=_wrap_preview_text(value, max_chars=80),
+                anchor="w",
+                font=("Segoe UI", value_size, "bold"),
+                fill="#111827",
+                width=value_area,
+            )
+
+    def actualizar_previsualizacion(*_args):
+        preview_canvas.delete("all")
+        settings = _get_label_settings(show_errors=False)
+        width_cm = settings["label_width_cm"] if settings else DEFAULT_LABEL_WIDTH_CM
+        height_cm = settings["label_height_cm"] if settings else DEFAULT_LABEL_HEIGHT_CM
+        orientation = settings["label_orientation"] if settings else DEFAULT_LABEL_ORIENTATION
+        visual_w, visual_h = width_cm, height_cm
+        if orientation == "landscape" and visual_h > visual_w:
+            visual_w, visual_h = visual_h, visual_w
+        elif orientation == "portrait" and visual_w > visual_h:
+            visual_w, visual_h = visual_h, visual_w
+
+        canvas_w = int(preview_canvas.winfo_width() or 390)
+        canvas_h = int(preview_canvas.winfo_height() or 190)
+        scale = min((canvas_w - 34) / visual_w, (canvas_h - 34) / visual_h)
+        label_w = max(180, int(visual_w * scale))
+        label_h = max(120, int(visual_h * scale))
+        x0 = (canvas_w - label_w) // 2
+        y0 = (canvas_h - label_h) // 2
+        x1 = x0 + label_w
+        y1 = y0 + label_h
+
+        preview_canvas.create_rectangle(x0 + 4, y0 + 5, x1 + 4, y1 + 5, fill="#D7DEE9", outline="")
+        preview_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="#111827", width=2)
+        header_h = max(35, int(label_h * 0.18))
+        footer_h = max(18, int(label_h * 0.09))
+        body_top = y0 + header_h
+        body_bottom = y1 - footer_h
+
+        preview_canvas.create_rectangle(x0, y0, x1, body_top, fill="#FFFFFF", outline="#111827")
+        preview_canvas.create_text(
+            (x0 + x1) / 2,
+            y0 + header_h / 2,
+            text="Bodega Amilab\nEtiqueta de Producto",
+            anchor="center",
+            font=("Segoe UI", 9, "bold"),
+            fill="#111827",
+        )
+
+        rows = [
+            ("Codigo", producto_entries["codigo"].get()),
+            ("Producto", producto_entries["producto"].get()),
+            ("Bodega", producto_entries["bodega"].get()),
+            ("Ubicacion", producto_entries["ubicacion"].get()),
+            ("Lote / Serie", producto_entries["lote_serie"].get()),
+            ("Vencimiento", producto_entries["fecha_vencimiento"].get()),
+            ("Cantidad", producto_entries["cantidad"].get()),
+        ]
+        row_h = max(18, int((body_bottom - body_top) / len(rows)))
+        _draw_preview_rows(x0, body_top, x1, row_h, rows)
+        preview_canvas.create_rectangle(x0, y1 - footer_h, x1, y1, fill="#FFFFFF", outline="#111827")
+        preview_canvas.create_text(
+            x1 - 8,
+            y1 - footer_h / 2,
+            text=f"{width_cm:g} x {height_cm:g} cm | {orientation}",
+            anchor="e",
+            font=("Segoe UI", 8),
+            fill="#374151",
+        )
+
     printer_card = ttk.Frame(shell, style="Card.TFrame", padding=12)
     printer_card.pack(fill="x", pady=(12, 0))
-    ttk.Label(printer_card, text="Impresora y acciones", style="CardTitle.TLabel").grid(
+    ttk.Label(printer_card, text="Acciones", style="CardTitle.TLabel").grid(
         row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
     )
     printer_card.columnconfigure(1, weight=1)
-    ttk.Label(printer_card, text="Impresora:", style="Body.TLabel").grid(row=1, column=0, sticky="e", pady=5, padx=(0, 10))
-    combo_impresoras = ttk.Combobox(printer_card, values=impresoras, width=60, state="readonly")
-    if printer_name_default:
-        combo_impresoras.set(printer_name_default)
-    elif impresoras:
-        combo_impresoras.set(impresoras[0])
-    combo_impresoras.grid(row=1, column=1, pady=5, sticky="ew")
+    despacho_printer_label = ttk.Label(printer_card, text="Impresora:", style="Body.TLabel")
+    despacho_printer_label.grid(row=1, column=0, sticky="e", pady=5, padx=(0, 10))
+    despacho_combo_impresoras = ttk.Combobox(
+        printer_card,
+        textvariable=printer_var,
+        values=impresoras,
+        width=60,
+        state="readonly",
+    )
+    despacho_combo_impresoras.grid(row=1, column=1, pady=5, sticky="ew")
 
     actions = ttk.Frame(printer_card, style="Card.TFrame")
     actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
@@ -497,6 +689,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         producto_entries["copias"].insert(0, "1")
         product_search_var.set("")
         product_results.delete(*product_results.get_children())
+        actualizar_previsualizacion()
         status_var.set("Formulario limpio.")
 
     def buscar_productos(event=None):
@@ -564,15 +757,22 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         for key, value in values_map.items():
             producto_entries[key].delete(0, tk.END)
             producto_entries[key].insert(0, str(value))
+        actualizar_previsualizacion()
         status_var.set(f"Producto seleccionado: {row.get('Producto', '')}")
 
     product_search_entry.bind("<Return>", buscar_productos)
     product_results.bind("<<TreeviewSelect>>", seleccionar_producto)
     product_results.bind("<Double-1>", seleccionar_producto)
+    for entry in producto_entries.values():
+        entry.bind("<KeyRelease>", actualizar_previsualizacion)
+    label_width_entry.bind("<KeyRelease>", actualizar_previsualizacion)
+    label_height_entry.bind("<KeyRelease>", actualizar_previsualizacion)
+    orientation_combo.bind("<<ComboboxSelected>>", actualizar_previsualizacion)
+    preview_canvas.bind("<Configure>", actualizar_previsualizacion)
 
     def generar_y_imprimir():
         try:
-            printer_name = combo_impresoras.get().strip()
+            printer_name = printer_var.get().strip()
             if not printer_name:
                 messagebox.showerror("Impresora requerida", "Selecciona una etiquetadora antes de imprimir.")
                 return
@@ -594,6 +794,13 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
                 data = {k: v.get() for k, v in producto_entries.items()}
                 if not validar_campos_producto(data):
                     return
+                label_settings = _get_label_settings(show_errors=True)
+                if label_settings is None:
+                    return
+                config[LABEL_WIDTH_KEY] = label_settings["label_width_cm"]
+                config[LABEL_HEIGHT_KEY] = label_settings["label_height_cm"]
+                config[LABEL_ORIENTATION_KEY] = label_settings["label_orientation"]
+                guardar_config(config)
                 total_bultos = int(data["copias"])
                 if total_bultos > 10:
                     continuar = messagebox.askyesno(
@@ -615,6 +822,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
                         "fecha_vencimiento": data["fecha_vencimiento"],
                         "cantidad": data["cantidad"],
                     }
+                    etiqueta_data.update(label_settings)
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_xlsx:
                         output_path = Path(temp_xlsx.name)
                     archivos_temporales.append(str(output_path))
@@ -662,20 +870,60 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     ttk.Button(btn_row, text="Limpiar Formulario", style="Secondary.TButton", command=limpiar_formulario).pack(
         side="left", padx=(10, 0)
     )
+    action_header_buttons = ttk.Frame(printer_card, style="Card.TFrame")
+    action_header_buttons.grid(row=0, column=1, sticky="e", pady=(0, 8))
+    ttk.Button(
+        action_header_buttons,
+        text="Imprimir Etiqueta",
+        style="Primary.TButton",
+        command=generar_y_imprimir,
+    ).pack(side="left")
+    ttk.Button(
+        action_header_buttons,
+        text="Limpiar Formulario",
+        style="Secondary.TButton",
+        command=limpiar_formulario,
+    ).pack(side="left", padx=(10, 0))
+    product_btn_row = ttk.Frame(medidas_card)
+    product_btn_row.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+    ttk.Button(
+        product_btn_row,
+        text="Imprimir Etiqueta",
+        style="Primary.TButton",
+        command=generar_y_imprimir,
+    ).pack(side="left")
+    ttk.Button(
+        product_btn_row,
+        text="Limpiar Formulario",
+        style="Secondary.TButton",
+        command=limpiar_formulario,
+    ).pack(side="left", padx=(10, 0))
 
     def actualizar_modo(*_args):
         if mode_var.get() == "producto":
             form_card.pack_forget()
             producto_card.pack(fill="both", expand=True)
+            printer_card.pack_forget()
+            product_btn_row.grid()
+            despacho_printer_label.grid_remove()
+            despacho_combo_impresoras.grid_remove()
+            actions.grid_configure(row=1, pady=(0, 0))
             product_search_entry.focus_set()
+            actualizar_previsualizacion()
             status_var.set("Modo etiqueta productos activo. Busca por código o nombre del producto.")
         else:
             producto_card.pack_forget()
+            product_btn_row.grid_remove()
             form_card.pack(fill="x", pady=(0, 0))
+            printer_card.pack(fill="x", pady=(12, 0))
+            despacho_printer_label.grid()
+            despacho_combo_impresoras.grid()
+            actions.grid_configure(row=2, pady=(10, 0))
             entradas["rut"].focus_set()
             status_var.set("Modo despacho activo. Completa el formulario para imprimir.")
 
     mode_var.trace_add("write", actualizar_modo)
     actualizar_modo()
+    ventana.after(100, actualizar_previsualizacion)
 
     return ventana

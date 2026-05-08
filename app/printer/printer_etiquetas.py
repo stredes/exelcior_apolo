@@ -75,11 +75,32 @@ PRINT_TIMEOUT_S = int(os.environ.get("EXCELCIOR_PRINT_TIMEOUT", "25"))
 # Ejecutable forzado opcional (ruta a soffice)
 FORCED_PRINT_APP = os.environ.get("EXCELCIOR_PRINT_APP", "").strip().strip('"')
 
+DEFAULT_LABEL_WIDTH_CM = 10.0
+DEFAULT_LABEL_HEIGHT_CM = 14.0
+DEFAULT_LABEL_ORIENTATION = "portrait"
+
 
 # ----------------- Utilidades -----------------
 def _ensure_exists(path: Path) -> None:
     if not path.exists():
         raise FileNotFoundError(f"No existe el archivo: {path}")
+
+def _coerce_label_float(value, default: float) -> float:
+    try:
+        number = float(str(value).replace(",", ".").strip())
+    except Exception:
+        return default
+    if number < 2 or number > 30:
+        return default
+    return number
+
+def _label_page_settings(data: dict) -> tuple[float, float, str]:
+    width_cm = _coerce_label_float(data.get("label_width_cm"), DEFAULT_LABEL_WIDTH_CM)
+    height_cm = _coerce_label_float(data.get("label_height_cm"), DEFAULT_LABEL_HEIGHT_CM)
+    orientation = str(data.get("label_orientation", DEFAULT_LABEL_ORIENTATION)).strip().lower()
+    if orientation not in ("portrait", "landscape"):
+        orientation = DEFAULT_LABEL_ORIENTATION
+    return width_cm, height_cm, orientation
 
 def _find_soffice() -> Optional[str]:
     """
@@ -354,10 +375,13 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         medium = Side(style="medium", color="000000")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         label_fill = PatternFill(fill_type="solid", fgColor="F3F4F6")
-        # Ajuste visual: fuente y alturas mayores para ocupar mejor la etiqueta 10x14.
+        label_width_cm, label_height_cm, label_orientation = _label_page_settings(data)
+
+        # Ajuste visual: fuente y alturas mayores para ocupar mejor la etiqueta.
         label_font = Font(name="Calibri", size=15, bold=True, color="111827")
         value_font = Font(name="Calibri", size=16, bold=True, color="111827")
-        center = Alignment(vertical="center")
+        label_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, shrink_to_fit=True)
+        value_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, shrink_to_fit=True)
 
         ws.column_dimensions["A"].width = 16
         ws.column_dimensions["B"].width = 38
@@ -400,8 +424,8 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
             value_cell.font = value_font
             label_cell.border = border
             value_cell.border = border
-            label_cell.alignment = Alignment(horizontal="left", vertical="center")
-            value_cell.alignment = center
+            label_cell.alignment = label_alignment
+            value_cell.alignment = value_alignment
             ws.row_dimensions[row].height = 42
 
         ws.merge_cells("A1:B1")
@@ -435,21 +459,21 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
                     bottom=medium if r == max_r else thin,
                 )
 
-        # Config de pagina 10x14 cm
+        # Config de pagina segun medidas elegidas en el editor de etiquetas.
         try:
-            ws.page_setup.orientation = "portrait"
+            ws.page_setup.orientation = label_orientation
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 1
             ws.page_margins = PageMargins(
                 left=0.2, right=0.2, top=0.3, bottom=0.3, header=0.1, footer=0.1
             )
-            ws.page_setup.paperWidth = "10cm"
-            ws.page_setup.paperHeight = "14cm"
+            ws.page_setup.paperWidth = f"{label_width_cm:g}cm"
+            ws.page_setup.paperHeight = f"{label_height_cm:g}cm"
             if hasattr(ws, "sheet_properties") and hasattr(ws.sheet_properties, "pageSetUpPr"):
                 ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[attr-defined]
             ws.print_area = "A1:B9"
         except Exception as e:
-            log_evento(f"âš ï¸ No se pudo aplicar tamano 10x14 cm: {e}", "warning")
+            log_evento(f"âš ï¸ No se pudo aplicar tamano de etiqueta: {e}", "warning")
 
         wb.save(output_path)
         log_evento(f"ðŸ“„ Etiqueta generada: {output_path}", "info")
