@@ -100,7 +100,17 @@ def _label_page_settings(data: dict) -> tuple[float, float, str]:
     orientation = str(data.get("label_orientation", DEFAULT_LABEL_ORIENTATION)).strip().lower()
     if orientation not in ("portrait", "landscape"):
         orientation = DEFAULT_LABEL_ORIENTATION
+    if orientation == "landscape" and height_cm > width_cm:
+        width_cm, height_cm = height_cm, width_cm
+    elif orientation == "portrait" and width_cm > height_cm:
+        width_cm, height_cm = height_cm, width_cm
     return width_cm, height_cm, orientation
+
+def _excel_page_orientation(label_orientation: str) -> str:
+    # En etiquetas termicas con papel custom, el driver Zebra ya recibe ancho x alto.
+    # Usar "landscape" en Excel puede provocar una segunda rotacion y dejar media
+    # etiqueta vacia. Mantenemos portrait y controlamos la forma por paperWidth/Height.
+    return "portrait"
 
 def _label_layout_metrics(width_cm: float, height_cm: float) -> dict[str, float]:
     # Excel maneja filas en puntos y margenes en pulgadas.
@@ -482,7 +492,7 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
 
         # Config de pagina segun medidas elegidas en el editor de etiquetas.
         try:
-            ws.page_setup.orientation = label_orientation
+            ws.page_setup.orientation = _excel_page_orientation(label_orientation)
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 1
             ws.page_margins = PageMargins(
