@@ -102,6 +102,26 @@ def _label_page_settings(data: dict) -> tuple[float, float, str]:
         orientation = DEFAULT_LABEL_ORIENTATION
     return width_cm, height_cm, orientation
 
+def _label_layout_metrics(width_cm: float, height_cm: float) -> dict[str, float]:
+    # Excel maneja filas en puntos y margenes en pulgadas.
+    usable_height_pt = max(110.0, (height_cm * 28.3465) - 8.0)
+    header_h = max(20.0, min(54.0, usable_height_pt * 0.18))
+    footer_h = max(10.0, min(24.0, usable_height_pt * 0.07))
+    body_h = max(12.0, (usable_height_pt - header_h - footer_h) / 7.0)
+
+    width_scale = max(0.65, min(1.45, width_cm / DEFAULT_LABEL_WIDTH_CM))
+    return {
+        "header_h": header_h,
+        "body_h": body_h,
+        "footer_h": footer_h,
+        "label_font": max(7.0, min(15.0, body_h * 0.46)),
+        "value_font": max(7.0, min(16.0, body_h * 0.50)),
+        "header_font": max(8.0, min(18.0, header_h * 0.34)),
+        "footer_font": max(6.0, min(11.0, footer_h * 0.55)),
+        "label_col_w": max(10.0, min(22.0, 16.0 * width_scale)),
+        "value_col_w": max(24.0, min(58.0, 38.0 * width_scale)),
+    }
+
 def _find_soffice() -> Optional[str]:
     """
     Devuelve ruta a 'soffice' si estÃ¡ disponible. Busca en:
@@ -376,15 +396,16 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         label_fill = PatternFill(fill_type="solid", fgColor="F3F4F6")
         label_width_cm, label_height_cm, label_orientation = _label_page_settings(data)
+        layout = _label_layout_metrics(label_width_cm, label_height_cm)
 
-        # Ajuste visual: fuente y alturas mayores para ocupar mejor la etiqueta.
-        label_font = Font(name="Calibri", size=15, bold=True, color="111827")
-        value_font = Font(name="Calibri", size=16, bold=True, color="111827")
+        # Ajuste visual calculado desde el tamano fisico de la etiqueta.
+        label_font = Font(name="Calibri", size=layout["label_font"], bold=True, color="111827")
+        value_font = Font(name="Calibri", size=layout["value_font"], bold=True, color="111827")
         label_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, shrink_to_fit=True)
         value_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, shrink_to_fit=True)
 
-        ws.column_dimensions["A"].width = 16
-        ws.column_dimensions["B"].width = 38
+        ws.column_dimensions["A"].width = layout["label_col_w"]
+        ws.column_dimensions["B"].width = layout["value_col_w"]
 
         label_mode = str(data.get("label_mode", "despacho")).strip().lower()
         if label_mode == "producto":
@@ -426,26 +447,26 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
             value_cell.border = border
             label_cell.alignment = label_alignment
             value_cell.alignment = value_alignment
-            ws.row_dimensions[row].height = 42
+            ws.row_dimensions[row].height = layout["body_h"]
 
         ws.merge_cells("A1:B1")
         header = ws["A1"]
         header.value = header_text
-        header.font = Font(name="Calibri", size=18, bold=True, color="111827")
+        header.font = Font(name="Calibri", size=layout["header_font"], bold=True, color="111827")
         # Header sin fondo, segÃºn requerimiento.
         header.fill = PatternFill(fill_type=None)
-        header.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        header.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True, shrink_to_fit=True)
         header.border = border
-        ws.row_dimensions[1].height = 54
+        ws.row_dimensions[1].height = layout["header_h"]
 
         # Footer con fecha/hora de impresiÃ³n
         ws.merge_cells("A9:B9")
         footer = ws["A9"]
         footer.value = f"Impresion: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        footer.font = Font(name="Calibri", size=11, bold=False, color="374151")
-        footer.alignment = Alignment(horizontal="right", vertical="center")
+        footer.font = Font(name="Calibri", size=layout["footer_font"], bold=False, color="374151")
+        footer.alignment = Alignment(horizontal="right", vertical="center", shrink_to_fit=True)
         footer.border = border
-        ws.row_dimensions[9].height = 24
+        ws.row_dimensions[9].height = layout["footer_h"]
 
         # Bordes completos para toda el área imprimible, con contorno exterior reforzado.
         min_r, max_r, min_c, max_c = 1, 9, 1, 2
@@ -465,7 +486,7 @@ def generar_etiqueta_excel(data: dict, output_path: Path) -> Path:
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 1
             ws.page_margins = PageMargins(
-                left=0.2, right=0.2, top=0.3, bottom=0.3, header=0.1, footer=0.1
+                left=0.03, right=0.03, top=0.03, bottom=0.03, header=0.0, footer=0.0
             )
             ws.page_setup.paperWidth = f"{label_width_cm:g}cm"
             ws.page_setup.paperHeight = f"{label_height_cm:g}cm"

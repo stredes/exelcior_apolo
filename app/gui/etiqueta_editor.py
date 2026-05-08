@@ -33,6 +33,14 @@ INVENTORY_PATH_KEY = "archivo_inventario"
 LABEL_WIDTH_KEY = "product_label_width_cm"
 LABEL_HEIGHT_KEY = "product_label_height_cm"
 LABEL_ORIENTATION_KEY = "product_label_orientation"
+ORIENTATION_DISPLAY_TO_EXCEL = {
+    "vertical": "portrait",
+    "horizontal": "landscape",
+}
+ORIENTATION_EXCEL_TO_DISPLAY = {
+    "portrait": "Vertical",
+    "landscape": "Horizontal",
+}
 
 
 def cargar_config():
@@ -67,6 +75,17 @@ def _normalizar_columna(valor: str) -> str:
 def _normalizar_texto(valor: str) -> str:
     txt = unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii")
     return " ".join(txt.strip().lower().split())
+
+
+def _orientation_to_display(value: str) -> str:
+    normalized = _normalizar_texto(value)
+    excel_value = ORIENTATION_DISPLAY_TO_EXCEL.get(normalized, normalized)
+    return ORIENTATION_EXCEL_TO_DISPLAY.get(excel_value, "Vertical")
+
+
+def _orientation_to_excel(value: str) -> str:
+    normalized = _normalizar_texto(value)
+    return ORIENTATION_DISPLAY_TO_EXCEL.get(normalized, normalized)
 
 
 def _buscar_columna(columnas_lower, *opciones):
@@ -266,7 +285,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     status_var = tk.StringVar(value="Completa el formulario para imprimir.")
     label_width_var = tk.StringVar(value=str(config.get(LABEL_WIDTH_KEY, DEFAULT_LABEL_WIDTH_CM)))
     label_height_var = tk.StringVar(value=str(config.get(LABEL_HEIGHT_KEY, DEFAULT_LABEL_HEIGHT_CM)))
-    label_orientation_var = tk.StringVar(value=str(config.get(LABEL_ORIENTATION_KEY, DEFAULT_LABEL_ORIENTATION)))
+    label_orientation_var = tk.StringVar(value=_orientation_to_display(config.get(LABEL_ORIENTATION_KEY, DEFAULT_LABEL_ORIENTATION)))
 
     lbl_excel = ttk.Label(source_card, text="Archivo clientes: No cargado", style="Path.TLabel")
     lbl_excel.grid(row=1, column=0, sticky="w", pady=(0, 8))
@@ -447,7 +466,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     orientation_combo = ttk.Combobox(
         medidas_card,
         textvariable=label_orientation_var,
-        values=("portrait", "landscape"),
+        values=("Vertical", "Horizontal"),
         width=14,
         state="readonly",
     )
@@ -487,7 +506,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
     def _get_label_settings(show_errors=False):
         width_cm = _parse_label_size(label_width_var.get(), DEFAULT_LABEL_WIDTH_CM)
         height_cm = _parse_label_size(label_height_var.get(), DEFAULT_LABEL_HEIGHT_CM)
-        orientation = label_orientation_var.get().strip().lower()
+        orientation = _orientation_to_excel(label_orientation_var.get())
         if width_cm is None or height_cm is None:
             if show_errors:
                 messagebox.showerror(
@@ -497,7 +516,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
             return None
         if orientation not in ("portrait", "landscape"):
             if show_errors:
-                messagebox.showerror("Orientacion invalida", "Selecciona portrait o landscape.")
+                messagebox.showerror("Orientacion invalida", "Selecciona Vertical u Horizontal.")
             return None
         return {
             "label_width_cm": width_cm,
@@ -604,7 +623,7 @@ def crear_editor_etiqueta(df_clientes=None, parent=None):
         preview_canvas.create_text(
             x1 - 8,
             y1 - footer_h / 2,
-            text=f"{width_cm:g} x {height_cm:g} cm | {orientation}",
+            text=f"{width_cm:g} x {height_cm:g} cm | {_orientation_to_display(orientation)}",
             anchor="e",
             font=("Segoe UI", 8),
             fill="#374151",
