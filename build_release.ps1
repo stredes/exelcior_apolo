@@ -227,6 +227,7 @@ function Invoke-GitHubApi([string]$Method, [string]$Url, [string]$Token, $Body =
   $headers = @{
     Authorization = "Bearer $Token"
     Accept = "application/vnd.github+json"
+    "X-GitHub-Api-Version" = "2022-11-28"
     "User-Agent" = "ExelciorApoloBuildRelease/1.0"
   }
   $params = @{
@@ -239,6 +240,16 @@ function Invoke-GitHubApi([string]$Method, [string]$Url, [string]$Token, $Body =
     $params["ContentType"] = $ContentType
   }
   return Invoke-RestMethod @params
+}
+
+function Get-WebExceptionStatusCode($errorRecord){
+  try {
+    $response = $errorRecord.Exception.Response
+    if ($response -and $response.StatusCode) {
+      return [int]$response.StatusCode
+    }
+  } catch {}
+  return 0
 }
 
 function Assert-CleanGitWorktree{
@@ -453,7 +464,16 @@ function Set-GitHubRelease([string]$repo, [string]$token, [string]$tagName, [str
     $release = Invoke-GitHubApi -Method "GET" -Url "$baseApi/releases/tags/$tagName" -Token $token
     Write-Info "Release existente encontrada para tag $tagName."
   } catch {
-    Write-Info "No existe release para $tagName. Se creará una nueva."
+    $statusCode = Get-WebExceptionStatusCode $_
+    if ($statusCode -eq 404) {
+      Write-Info "No existe release para $tagName. Se creará una nueva."
+    } elseif ($statusCode -eq 401) {
+      throw "GitHub rechazó el token (401 No autorizado). Define GITHUB_TOKEN/GH_TOKEN o usa -GitHubToken con un token válido y permisos de Contents: Read and write para $repo."
+    } elseif ($statusCode -eq 403) {
+      throw "GitHub denegó la publicación (403 Prohibido). Revisa que el token tenga permisos de Contents: Read and write para $repo y acceso al repositorio."
+    } else {
+      throw
+    }
   }
 
   $payloadObj = @{
