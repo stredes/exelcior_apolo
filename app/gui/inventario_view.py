@@ -34,6 +34,7 @@ BASE_INVENTORY_COLUMNS = [
     "Código", "Producto", "Bodega", "Ubicación",
     "N° Serie", "Lote", "Fecha Vencimiento", "Saldo Stock"
 ]
+OPTIONAL_FILTER_COLUMNS = ["Subfamilia"]
 VISIBLE_COLUMNS = BASE_INVENTORY_COLUMNS + ["Dif. Stock", "Stock Contado"]
 TREE_COLUMNS = ["Sel"] + VISIBLE_COLUMNS
 
@@ -59,6 +60,9 @@ COL_SYNONYMS: Dict[str, str] = {
     "saldo stock": "Saldo Stock",
     "saldo": "Saldo Stock",
     "stock": "Saldo Stock",
+    "subfamilia": "Subfamilia",
+    "sub familia": "Subfamilia",
+    "sub-familia": "Subfamilia",
 }
 
 
@@ -114,7 +118,12 @@ def _clean_for_view(df: pd.DataFrame) -> pd.DataFrame:
     df2["Saldo Stock"] = pd.to_numeric(df2["Saldo Stock"], errors="coerce").fillna(0).astype(int)
 
     mask_any = df2[BASE_INVENTORY_COLUMNS].astype(str).apply(lambda s: s.str.strip() != "").any(axis=1)
-    df2 = df2.loc[mask_any, BASE_INVENTORY_COLUMNS].reset_index(drop=True)
+    output_columns = BASE_INVENTORY_COLUMNS + [c for c in OPTIONAL_FILTER_COLUMNS if c in df2.columns]
+    for c in OPTIONAL_FILTER_COLUMNS:
+        if c in df2.columns:
+            df2[c] = df2[c].astype(str).replace({"nan": "", "<NA>": ""}).fillna("").str.strip()
+
+    df2 = df2.loc[mask_any, output_columns].reset_index(drop=True)
 
     return df2
 
@@ -176,11 +185,13 @@ class InventarioView(tk.Toplevel):
         self.ubicaciones_seleccionadas = set()
         self.ubicaciones_principales_seleccionadas = set()
         self.bodegas_disponibles = []
+        self.subfamilias_disponibles = []
         self.selected_row_ids = set()
         self._ubic_popup = None
         self._archivo_actual = ""
         self.status_var = tk.StringVar(value="Carga un archivo de inventario para comenzar.")
         self.summary_var = tk.StringVar(value="Registros: 0")
+        self.subfamilia_var = tk.StringVar(value="Todas")
         self.ubicaciones_var = tk.StringVar(value="Ubicaciones: todas")
         self.ubicaciones_principales_var = tk.StringVar(value="Ubicaciones: todas")
         self.printer_info_var = tk.StringVar(value="Impresora inventario: sin configurar")
@@ -322,17 +333,23 @@ class InventarioView(tk.Toplevel):
         self.entry_posicion.grid(row=0, column=6, padx=(6, 12), sticky="w")
         self.entry_posicion.bind("<Return>", lambda e: self._filtrar())
 
-        ttk.Checkbutton(location_block, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=7, padx=(0, 12), sticky="w")
-        ttk.Button(location_block, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=8, padx=(0, 6), sticky="w")
-        ttk.Button(location_block, text="Ver ciclo activo", command=self._abrir_historial_diferencias).grid(row=0, column=9, padx=(10, 8), sticky="w")
+        tk.Label(location_block, text="Subfamilia:", bg="#FFFFFF", fg="#263754", font=("Segoe UI", 10)).grid(row=0, column=7, sticky="w")
+        self.combo_subfamilia = ttk.Combobox(location_block, textvariable=self.subfamilia_var, state="readonly", width=22)
+        self.combo_subfamilia.grid(row=0, column=8, padx=(6, 12), sticky="w")
+        self.combo_subfamilia.bind("<<ComboboxSelected>>", lambda e: self._filtrar())
+        self.combo_subfamilia["values"] = ["Todas"]
+
+        ttk.Checkbutton(location_block, text="Solo stock 0", variable=self.stock_cero_var, command=self._filtrar).grid(row=0, column=9, padx=(0, 12), sticky="w")
+        ttk.Button(location_block, text="Ubicaciones ▼", command=self._abrir_selector_ubicaciones).grid(row=0, column=10, padx=(0, 6), sticky="w")
+        ttk.Button(location_block, text="Ver ciclo activo", command=self._abrir_historial_diferencias).grid(row=0, column=11, padx=(10, 8), sticky="w")
         ttk.Label(
             location_block,
             textvariable=self.diff_archive_var,
             style="InvHint.TLabel",
             wraplength=520,
             justify="left",
-        ).grid(row=0, column=10, sticky="w")
-        location_block.columnconfigure(9, weight=1)
+        ).grid(row=0, column=12, sticky="w")
+        location_block.columnconfigure(12, weight=1)
 
         actions_block = ttk.LabelFrame(filter_shell, text="Acciones", padding=10)
         actions_block.pack(fill="x")
@@ -449,6 +466,10 @@ class InventarioView(tk.Toplevel):
             self.ubicaciones_disponibles = sorted(df["Ubicación"].dropna().astype(str).str.strip().unique().tolist())
             self.ubicaciones_seleccionadas = set()
             self.ubicaciones_principales_seleccionadas = set()
+            self.subfamilias_disponibles = self._extraer_valores_unicos(df, "Subfamilia")
+            self.combo_subfamilia["values"] = ["Todas"] + self.subfamilias_disponibles
+            self.subfamilia_var.set("Todas")
+            self.combo_subfamilia.configure(state="readonly" if self.subfamilias_disponibles else "disabled")
             self.bodegas_disponibles = sorted(df["Bodega"].dropna().astype(str).str.strip().unique().tolist())
             self.combo_bodega["values"] = ["Todas"] + self.bodegas_disponibles
             self.combo_bodega.current(0)
@@ -479,6 +500,10 @@ class InventarioView(tk.Toplevel):
             self.ubicaciones_disponibles = []
             self.ubicaciones_seleccionadas = set()
             self.ubicaciones_principales_seleccionadas = set()
+            self.subfamilias_disponibles = []
+            self.combo_subfamilia["values"] = ["Todas"]
+            self.subfamilia_var.set("Todas")
+            self.combo_subfamilia.configure(state="disabled")
             self.bodegas_disponibles = []
             self.combo_bodega["values"] = ["Todas"]
             self.bodega_var.set("Todas")
@@ -497,6 +522,20 @@ class InventarioView(tk.Toplevel):
         s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
         return " ".join(s.split())
 
+    def _extraer_valores_unicos(self, df: pd.DataFrame, column: str) -> list[str]:
+        if df is None or df.empty or column not in df.columns:
+            return []
+        values = []
+        seen = set()
+        for raw in df[column].dropna().astype(str):
+            value = raw.strip()
+            key = self._norm_text(value)
+            if not value or key in seen:
+                continue
+            seen.add(key)
+            values.append(value)
+        return sorted(values, key=self._norm_text)
+
     def _filtrar(self, silent_no_filters: bool = False):
         term_raw = self.entry_busqueda.get()
         codigo_producto = self._norm_text(self.entry_codigo.get())
@@ -505,13 +544,14 @@ class InventarioView(tk.Toplevel):
         self.ubicaciones_principales_seleccionadas = set(ubicaciones_principales)
         self._actualizar_label_ubicaciones_principales()
         bodega = self._norm_text(self.bodega_var.get())
+        subfamilia = self._norm_text(self.subfamilia_var.get())
         fila_letra = self._norm_text(self.entry_fila_letra.get())
         posicion = self._norm_text(self.entry_posicion.get())
         solo_stock_cero = bool(self.stock_cero_var.get())
 
-        if not term_raw.strip() and not codigo_producto and not lote_serie and not ubicaciones_principales and not fila_letra and not posicion and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
+        if not term_raw.strip() and not codigo_producto and not lote_serie and subfamilia in ("", "todas") and not ubicaciones_principales and not fila_letra and not posicion and not self.ubicaciones_seleccionadas and bodega in ("", "todas") and not solo_stock_cero:
             if not silent_no_filters:
-                self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, lote/serie, ubicacion principal, fila, posicion, bodega, stock 0 o seleccione ubicaciones.")
+                self.safe_messagebox("info", "Buscar", "Ingrese un termino, codigo de producto, lote/serie, subfamilia, ubicacion principal, fila, posicion, bodega, stock 0 o seleccione ubicaciones.")
             return
         if self.df.empty:
             self.safe_messagebox("warning", "Inventario", "Cargue primero un archivo de inventario.")
@@ -526,6 +566,7 @@ class InventarioView(tk.Toplevel):
         m_lote = df["Lote"].astype(str).map(self._norm_text)
         m_serie = df["N° Serie"].astype(str).map(self._norm_text)
         m_bodega = df["Bodega"].astype(str).map(self._norm_text)
+        m_subfamilia = df["Subfamilia"].astype(str).map(self._norm_text) if "Subfamilia" in df.columns else pd.Series([""] * len(df), index=df.index)
         m_ubicacion_principal = df["Ubicación"].astype(str).map(self._extract_main_row)
         m_fila_letra = df["Ubicación"].astype(str).map(self._extract_letter_row)
         m_posicion = df["Ubicación"].astype(str).map(self._extract_position)
@@ -569,6 +610,10 @@ class InventarioView(tk.Toplevel):
         if bodega and bodega != "todas":
             mask_bodega = m_bodega == bodega
 
+        mask_subfamilia = pd.Series([True] * len(df), index=df.index)
+        if subfamilia and subfamilia != "todas":
+            mask_subfamilia = m_subfamilia == subfamilia
+
         mask_stock_cero = pd.Series([True] * len(df), index=df.index)
         if solo_stock_cero:
             stock_values = pd.to_numeric(df["Saldo Stock"], errors="coerce").fillna(0)
@@ -579,7 +624,7 @@ class InventarioView(tk.Toplevel):
             sel_norm = {self._norm_text(v) for v in self.ubicaciones_seleccionadas}
             mask_sel_ubic = m_ubi.isin(sel_norm)
 
-        mask_total = mask_texto & mask_codigo_directo & mask_lote_serie & mask_ubicacion_principal & mask_bodega & mask_stock_cero & mask_fila_letra & mask_posicion & mask_sel_ubic
+        mask_total = mask_texto & mask_codigo_directo & mask_lote_serie & mask_ubicacion_principal & mask_bodega & mask_subfamilia & mask_stock_cero & mask_fila_letra & mask_posicion & mask_sel_ubic
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
@@ -587,7 +632,7 @@ class InventarioView(tk.Toplevel):
                 self.tipo_busqueda = "codigo"
             elif lote_serie:
                 self.tipo_busqueda = "lote_serie"
-            elif self.ubicaciones_seleccionadas or ubicaciones_principales or bodega not in ("", "todas") or solo_stock_cero or fila_letra or posicion or mask_ubi.any():
+            elif self.ubicaciones_seleccionadas or ubicaciones_principales or bodega not in ("", "todas") or subfamilia not in ("", "todas") or solo_stock_cero or fila_letra or posicion or mask_ubi.any():
                 self.tipo_busqueda = "ubicacion"
             elif mask_cod.any():
                 self.tipo_busqueda = "codigo"
@@ -616,6 +661,7 @@ class InventarioView(tk.Toplevel):
         self.entry_lote_serie.delete(0, "end")
         self.entry_ubicacion_selector.delete(0, "end")
         self.bodega_var.set("Todas")
+        self.subfamilia_var.set("Todas")
         self.stock_cero_var.set(False)
         self.entry_fila_letra.delete(0, "end")
         self.entry_posicion.delete(0, "end")
@@ -839,7 +885,7 @@ class InventarioView(tk.Toplevel):
         )
 
     def _configure_tree_columns(self):
-        self.tree.heading("Sel", text="Sel", anchor="center")
+        self.tree.heading("Sel", text="Sel", anchor="center", command=self._toggle_select_all)
         self.tree.column("Sel", width=52, minwidth=52, anchor="center", stretch=False)
         for col in VISIBLE_COLUMNS:
             self.tree.heading(col, text=col, anchor="center", command=lambda c=col: self._sort_by_column(c))
@@ -933,7 +979,7 @@ class InventarioView(tk.Toplevel):
             return "break"
 
     def _update_heading_texts(self):
-        self.tree.heading("Sel", text="Sel", anchor="center")
+        self.tree.heading("Sel", text="Sel", anchor="center", command=self._toggle_select_all)
         for col in VISIBLE_COLUMNS:
             arrow = ""
             if self.sort_column == col:
@@ -1005,6 +1051,7 @@ class InventarioView(tk.Toplevel):
                 bool(self.entry_busqueda.get().strip()),
                 bool(self.entry_codigo.get().strip()),
                 bool(self.entry_lote_serie.get().strip()),
+                self._norm_text(self.subfamilia_var.get()) not in ("", "todas"),
                 bool(self.entry_ubicacion_selector.get().strip()),
                 bool(self.entry_fila_letra.get().strip()),
                 bool(self.entry_posicion.get().strip()),
@@ -1417,11 +1464,12 @@ class InventarioView(tk.Toplevel):
         tiene_texto = bool(self._norm_text(self.entry_busqueda.get()))
         tiene_codigo = bool(self._norm_text(self.entry_codigo.get()))
         tiene_lote_serie = bool(self._norm_text(self.entry_lote_serie.get()))
+        tiene_subfamilia = self._norm_text(self.subfamilia_var.get()) not in ("", "todas")
         tiene_bodega = self._norm_text(self.bodega_var.get()) not in ("", "todas")
         tiene_stock_cero = bool(self.stock_cero_var.get())
         tiene_fila_letra = bool(self._norm_text(self.entry_fila_letra.get()))
         tiene_posicion = bool(self._norm_text(self.entry_posicion.get()))
-        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_lote_serie or tiene_bodega or tiene_stock_cero or tiene_fila_letra or tiene_posicion:
+        if self.ubicaciones_seleccionadas or tiene_texto or tiene_codigo or tiene_lote_serie or tiene_subfamilia or tiene_bodega or tiene_stock_cero or tiene_fila_letra or tiene_posicion:
             self._filtrar()
         else:
             self.df_filtrado = pd.DataFrame()
