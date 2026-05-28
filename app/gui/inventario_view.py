@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, filedialog, messagebox
+import re
 import unicodedata
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -568,8 +569,6 @@ class InventarioView(tk.Toplevel):
         m_bodega = df["Bodega"].astype(str).map(self._norm_text)
         m_subfamilia = df["Subfamilia"].astype(str).map(self._norm_text) if "Subfamilia" in df.columns else pd.Series([""] * len(df), index=df.index)
         m_ubicacion_principal = df["Ubicación"].astype(str).map(self._extract_main_row)
-        m_fila_letra = df["Ubicación"].astype(str).map(self._extract_letter_row)
-        m_posicion = df["Ubicación"].astype(str).map(self._extract_position)
 
         if terminos:
             mask_ubi = m_ubi.apply(lambda val: all(term in val for term in terminos))
@@ -588,11 +587,11 @@ class InventarioView(tk.Toplevel):
 
         mask_fila_letra = pd.Series([True] * len(df), index=df.index)
         if fila_letra:
-            mask_fila_letra = m_fila_letra == fila_letra
+            mask_fila_letra = df["Ubicación"].astype(str).apply(lambda val: self._location_row_matches(val, fila_letra))
 
         mask_posicion = pd.Series([True] * len(df), index=df.index)
         if posicion:
-            mask_posicion = m_posicion == posicion
+            mask_posicion = df["Ubicación"].astype(str).apply(lambda val: self._location_position_matches(val, posicion))
 
         mask_codigo_directo = pd.Series([True] * len(df), index=df.index)
         if codigo_producto:
@@ -628,6 +627,11 @@ class InventarioView(tk.Toplevel):
 
         if mask_total.any():
             self.df_filtrado = df.loc[mask_total].reset_index(drop=True)
+            location_filter_active = bool(ubicaciones_principales or fila_letra or posicion or self.ubicaciones_seleccionadas)
+            if location_filter_active:
+                self.df_filtrado = self._sorted_dataframe(self.df_filtrado, "Ubicación", True).reset_index(drop=True)
+                self.sort_column = "Ubicación"
+                self.sort_ascending = True
             if codigo_producto:
                 self.tipo_busqueda = "codigo"
             elif lote_serie:
@@ -795,6 +799,14 @@ class InventarioView(tk.Toplevel):
 
     def _sorted_dataframe(self, df: pd.DataFrame, column: str, ascending: bool) -> pd.DataFrame:
         s = df[column]
+        if self._is_location_column(column):
+            sorted_index = sorted(
+                df.index,
+                key=lambda idx: self._location_sort_key(df.at[idx, column]),
+                reverse=not ascending,
+            )
+            return df.loc[sorted_index]
+
         numeric = pd.to_numeric(s, errors="coerce")
         if numeric.notna().any():
             return df.assign(__sort_key=numeric).sort_values(
@@ -1302,28 +1314,84 @@ class InventarioView(tk.Toplevel):
                 tokens.append(token)
         return set(tokens)
 
-    def _extract_main_row(self, ubicacion: str) -> str:
+    def _split_location_parts(self, ubicacion: str) -> list[str]:
         value = str(ubicacion or "").strip()
         if not value:
-            return ""
-        main = value.split("-", 1)[0].strip()
-        return self._norm_text(main)
+            return []
+        return [self._norm_text(part) for part in value.split("-") if str(part).strip()]
+
+    def _extract_main_row(self, ubicacion: str) -> str:
+        parts = self._split_location_parts(ubicacion)
+        return parts[0] if parts else ""
 
     def _extract_letter_row(self, ubicacion: str) -> str:
-        value = str(ubicacion or "").strip()
-        if "-" not in value:
+        parts = self._split_location_parts(ubicacion)
+        if len(parts) < 2:
             return ""
-        suffix = value.split("-", 1)[1].strip()
-        letters = "".join(ch for ch in suffix if ch.isalpha())
-        return self._norm_text(letters)
+        return self._letters_only(parts[1])
 
     def _extract_position(self, ubicacion: str) -> str:
-        value = str(ubicacion or "").strip()
-        if "-" not in value:
-            return ""
-        suffix = value.split("-", 1)[1].strip()
-        digits = "".join(ch for ch in suffix if ch.isdigit())
-        return self._norm_text(digits)
+        parts = self._split_location_parts(ubicacion)
+        if len(parts) >= 3:
+            return parts[2]
+        if len(parts) == 2:
+            return self._digits_only(parts[1])
+        return ""
+
+    def _letters_only(self, value: str) -> str:
+        return self._norm_text("".join(ch for ch in str(value or "") if ch.isalpha()))
+
+    def _digits_only(self, value: str) -> str:
+        return self._norm_text("".join(ch for ch in str(value or "") if ch.isdigit()))
+
+    def _is_location_column(self, column: str) -> bool:
+        key = self._norm_text(column)
+        return key == "ubicacion" or key.startswith("ubicaci")
+
+    def _location_sort_key(self, ubicacion: str):
+        parts = self._split_location_parts(ubicacion)
+        if not parts:
+            return (1, "", 0, "", 0, "", 0, "")
+
+        main_text, main_number = self._split_location_segment(parts[0])
+        row_text, row_number = self._split_location_segment(parts[1] if len(parts) > 1 else "")
+        pos_text, pos_number = self._split_location_segment(parts[2] if len(parts) > 2 else "")
+        extra = "-".join(parts[3:])
+
+        return (
+            0,
+            main_text,
+            main_number,
+            row_text,
+            row_number,
+            pos_text,
+            pos_number,
+            extra,
+        )
+
+    def _split_location_segment(self, value: str) -> tuple[str, int]:
+        value = self._norm_text(value)
+        letters = "".join(re.findall(r"[a-z]+", value))
+        digits = re.findall(r"\d+", value)
+        number = int(digits[0]) if digits else 0
+        return letters, number
+
+    def _location_row_matches(self, ubicacion: str, filtro: str) -> bool:
+        parts = self._split_location_parts(ubicacion)
+        filtro_norm = self._norm_text(filtro)
+        if not filtro_norm or len(parts) < 2:
+            return False
+        row_segment = parts[1]
+        return filtro_norm in {row_segment, self._letters_only(row_segment), self._digits_only(row_segment)}
+
+    def _location_position_matches(self, ubicacion: str, filtro: str) -> bool:
+        filtro_norm = self._norm_text(filtro)
+        if not filtro_norm:
+            return False
+        position = self._extract_position(ubicacion)
+        if not position:
+            return False
+        return filtro_norm in {position, self._letters_only(position), self._digits_only(position)}
 
     def _seleccionar_por_ubicacion_principal(self):
         if self.df.empty:
